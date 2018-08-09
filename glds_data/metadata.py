@@ -75,7 +75,7 @@ def hits_to_dataframe(hits, na_values=("NA", "NaN", ""), sort_subfields=True):
 class GeneLabDataSet():
     accession = None
     _frame = None
-    _factor = None
+    _factors = None
     """"""
     def __init__(self, accession):
         """Request JSON representation of ISA metadata and store fields"""
@@ -122,25 +122,19 @@ class GeneLabDataSet():
             self._frame.set_index(sample_names_field_id, inplace=True)
         return self._frame
     """"""
-    def get_factor(self):
+    def get_factors(self):
         """Get factor type from _header"""
-        if self._factor is None:
-            self._factor = Namespace()
+        if self._factors is None:
+            self._factors = {}
             for record in self._header:
                 if record["title"] == "Factor Value":
-                    if len(record["columns"]) > 1:
-                        msg = "{}: {} (not implemented yet, {})".format(
-                            self.accession, "Multiple factors", "using first"
-                        )
-                        warn(msg)
-                    column = record["columns"][0]
-                    values = set(self.frame()[column["field"]].values)
-                    self._factor.name = column["title"]
-                    self._factor.values = values
-                    break
-            else:
+                    for column in record["columns"]:
+                        factor = column["title"]
+                        values = set(self.frame()[column["field"]].values)
+                        self._factors[factor] = values
+            if not self._factors:
                 raise KeyError("No factor associated with dataset")
-        return self._factor
+        return self._factors
     """"""
     def get_datafiles(self, as_urls=True):
         """Return DataFrame subset to filenames and factor values"""
