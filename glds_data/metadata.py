@@ -164,5 +164,11 @@ class GeneLabDataSet():
             datafiles_urls.name = "URL"
             datafiles = concat([factor_dataframe, datafiles_urls], axis=1)
         else:
-            raise NotImplementedError("as_urls=False")
+            datafiles_names = datafiles_names.apply(
+                lambda fn: "{}_microarray_{}.gz".format(
+                    self.accession, sub(r'^\*', "", fn)
+                )
+            )
+            datafiles_names.name = "filename"
+            datafiles = concat([factor_dataframe, datafiles_names], axis=1)
         return datafiles
