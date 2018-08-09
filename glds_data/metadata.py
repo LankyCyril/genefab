@@ -107,19 +107,30 @@ class GeneLabDataSet():
         else:
             raise KeyError("Field {} missing from metadata".format(field_name))
     """"""
+    def _is_consistent(self, raw):
+        """Check if keys are the same for each record in _raw"""
+        key_set = set(raw[0].keys())
+        for record in raw:
+            if set(record.keys()) != key_set:
+                return False
+        else:
+            return True
+    """"""
     def frame(self):
         """Convert _raw field of _isa2json to pandas DataFrame"""
         if self._frame is None:
-            self._frame = DataFrame(
-                # trust that keys are consistent across records (write checker!)
-                columns=sorted(self._raw[0].keys()),
-                index=range(len(self._raw))
-            )
-            for i, record in enumerate(self._raw):
-                for key, value in record.items():
-                    self._frame.loc[i, key] = value
-            sample_names_field_id = self._field_name_to_id("Sample Name")
-            self._frame.set_index(sample_names_field_id, inplace=True)
+            if not self._is_consistent(self._raw):
+                raise KeyError("_raw field keys are inconsistent")
+            else:
+                self._frame = DataFrame(
+                    columns=sorted(self._raw[0].keys()),
+                    index=range(len(self._raw))
+                )
+                for i, record in enumerate(self._raw):
+                    for key, value in record.items():
+                        self._frame.loc[i, key] = value
+                sample_names_field_id = self._field_name_to_id("Sample Name")
+                self._frame.set_index(sample_names_field_id, inplace=True)
         return self._frame
     """"""
     def get_factors(self):
