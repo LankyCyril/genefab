@@ -3,7 +3,7 @@ from json import loads
 from copy import deepcopy
 from numpy import nan
 from re import sub, search
-from pandas import DataFrame
+from pandas import DataFrame, concat
 from argparse import Namespace
 from warnings import warn
 
@@ -75,7 +75,6 @@ def hits_to_dataframe(hits, na_values=("NA", "NaN", ""), sort_subfields=True):
 class GeneLabDataSet():
     accession = None
     _frame = None
-    _factors = None
     """"""
     def __init__(self, accession):
         """Request JSON representation of ISA metadata and store fields"""
@@ -133,32 +132,37 @@ class GeneLabDataSet():
                 self._frame.set_index(sample_names_field_id, inplace=True)
         return self._frame
     """"""
-    def get_factors(self):
+    def get_factors(self, as_fields=False):
         """Get factor type from _header"""
-        if self._factors is None:
-            self._factors = {}
-            for record in self._header:
-                if record["title"] == "Factor Value":
-                    for column in record["columns"]:
-                        factor = column["title"]
+        factors = {}
+        for record in self._header:
+            if record["title"] == "Factor Value":
+                for column in record["columns"]:
+                    factor = column["title"]
+                    if as_fields:
+                        values = column["field"]
+                    else:
                         values = set(self.frame()[column["field"]].values)
-                        self._factors[factor] = values
-            if not self._factors:
-                raise KeyError("No factor associated with dataset")
-        return self._factors
+                    factors[factor] = values
+        if not factors:
+            raise KeyError("No factor associated with dataset")
+        return factors
     """"""
     def get_datafiles(self, as_urls=True):
         """Return DataFrame subset to filenames and factor values"""
-        factor_field_id = self._field_name_to_id("Factor Value")
+        factor_fields = self.get_factors(as_fields=True)
+        factor_dataframe = self.frame()[list(factor_fields.values())]
+        factor_dataframe.columns = list(factor_fields.keys())
         datafiles_field_id = self._field_name_to_id("Array Data File")
-        datafiles = self.frame()[[factor_field_id, datafiles_field_id]]
+        datafiles_names = self.frame()[datafiles_field_id]
         if as_urls:
-            datafiles.columns = [self.get_factor().name, "URL"]
-            datafiles["URL"] = datafiles["URL"].apply(
+            datafiles_urls = datafiles_names.apply(
                 lambda fn: "{}/static/media/dataset/{}_microarray_{}.gz".format(
                     URL_ROOT, self.accession, sub(r'^\*', "", fn)
                 )
             )
+            datafiles_urls.name = "URL"
+            datafiles = concat([factor_dataframe, datafiles_urls], axis=1)
         else:
             raise NotImplementedError("as_urls=False")
         return datafiles
