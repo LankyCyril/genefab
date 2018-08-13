@@ -8,6 +8,7 @@ from argparse import Namespace
 from warnings import warn
 from os.path import join, exists, isdir
 from subprocess import call
+from os import walk
 
 URL_ROOT = "https://genelab-data.ndc.nasa.gov/genelab"
 ARRAY_EXPRESS = "ftp://ftp.ebi.ac.uk/pub/databases/microarray/data/experiment/GEOD/{}/{}"
@@ -93,6 +94,25 @@ def from_genelab(archive_filename, cwd):
     """Attempt download from genelab directly"""
     url = "{}/static/media/dataset/{}".format(URL_ROOT, archive_filename)
     return (call(["wget", "-O", archive_filename, url], cwd=cwd) == 0)
+
+def extract_and_rename(archive_filename, names, cwd):
+    """Extract ZIP and rename / repack files if necessary"""
+    call(["unzip", archive_filename], cwd=cwd)
+    filenames_there = list(walk(cwd))[0][2]
+    if not (set(names) < set(filenames_there)):
+        for filename in filenames_there:
+            for name in names:
+                if filename in name:
+                    if name.endswith(".gz") and not filename.endswith(".gz"):
+                        call(["gzip", filename], cwd=cwd)
+                        filename = filename + ".gz"
+                    if filename.endswith(".gz") and not name.endswith(".gz"):
+                        call(["gunzip", filename], cwd=cwd)
+                        filename = filename[:-3]
+                    call(["mv", filename, name], cwd=cwd)
+    filenames_there = list(walk(cwd))[0][2]
+    if not (set(names) < set(filenames_there)):
+        raise OSError("Unsuccessful download or extraction")
 
 class GeneLabDataSet():
     accession = None
@@ -216,12 +236,14 @@ class GeneLabDataSet():
             if len(archive_files) == 1:
                 # exactly one archive file, as expected:
                 archive_filename = sub(r'^\*', "", archive_files.pop())
-                if from_arrayexpress(archive_filename, cwd=self._storage):
-                    extract_cel_archive(archive_filename, cwd=self._storage)
-                elif from_genelab(archive_filename, cwd=self._storage):
-                    extract_cel_archive(archive_filename, cwd=self._storage)
-                else:
-                    raise IOError("Could not download archive file")
+                if not from_arrayexpress(archive_filename, cwd=self._storage):
+                    if not from_genelab(archive_filename, cwd=self._storage):
+                        raise IOError("Could not download archive file")
+                extract_and_rename(
+                    archive_filename,
+                    names=self.datafiles()["filename"],
+                    cwd=self._storage
+                )
             else:
                 # we do not expect this to happen:
                 raise NotImplementedError("Unexpected number of archive files")
