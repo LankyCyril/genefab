@@ -172,15 +172,15 @@ class GeneLabDataSet():
         return concat([factor_dataframe, names_only], axis=1)
     """"""
     def datafile_urls(self):
-        """Return DataFrame subset to filenames (converted to URLs) and factor values"""
+        """Return DataFrame subset to filenames, URLs, and factor values"""
         datafiles = self.datafiles()
-        datafiles_urls = datafiles["filename"].apply(
+        urls_only = datafiles["filename"].apply(
             lambda fn: "{}/static/media/dataset/{}".format(
                 URL_ROOT, fn
             )
         )
-        datafiles_urls.name = "URL"
-        return concat([datafiles, datafiles_urls], axis=1)
+        urls_only.name = "URL"
+        return concat([datafiles, urls_only], axis=1)
     """"""
     def retrieve_datafiles(self):
         """Actually download datafiles"""
