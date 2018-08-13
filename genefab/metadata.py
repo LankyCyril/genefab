@@ -6,6 +6,8 @@ from re import sub, search
 from pandas import DataFrame, concat
 from argparse import Namespace
 from warnings import warn
+from os.path import join, exists, isdir
+from subprocess import call
 
 URL_ROOT = "https://genelab-data.ndc.nasa.gov/genelab"
 
@@ -75,10 +77,17 @@ def hits_to_dataframe(hits, na_values=("NA", "NaN", ""), sort_subfields=True):
 class GeneLabDataSet():
     accession = None
     _frame = None
+    _storage = None
     """"""
-    def __init__(self, accession):
+    def __init__(self, accession, storage=".genefab"):
         """Request JSON representation of ISA metadata and store fields"""
         self.accession = accession
+        self._storage = join(storage, accession)
+        if not exists(self._storage):
+            call(["mkdir", "-p", self._storage])
+        elif not isdir(self._storage):
+            err_mask = "Storage directory {} cannot be created (file exists)"
+            raise OSError(err_mask.format(self._storage))
         getter_url = "{}/data/study/data/{}/"
         data_json = get_json(getter_url.format(URL_ROOT, accession))
         if len(data_json) > 1:
@@ -148,27 +157,33 @@ class GeneLabDataSet():
             raise KeyError("No factor associated with dataset")
         return factors
     """"""
-    def get_datafiles(self, as_urls=True):
+    def datafiles(self, as_relpath=False):
         """Return DataFrame subset to filenames and factor values"""
         factor_fields = self.get_factors(as_fields=True)
         factor_dataframe = self.frame()[list(factor_fields.values())]
         factor_dataframe.columns = list(factor_fields.keys())
         datafiles_field_id = self._field_name_to_id("Array Data File")
-        datafiles_names = self.frame()[datafiles_field_id]
-        if as_urls:
-            datafiles_urls = datafiles_names.apply(
-                lambda fn: "{}/static/media/dataset/{}_microarray_{}.gz".format(
-                    URL_ROOT, self.accession, sub(r'^\*', "", fn)
-                )
+        names_only = self.frame()[datafiles_field_id].apply(
+            lambda fn: "{}_microarray_{}.gz".format(
+                self.accession, sub(r'^\*', "", fn)
             )
-            datafiles_urls.name = "URL"
-            datafiles = concat([factor_dataframe, datafiles_urls], axis=1)
-        else:
-            datafiles_names = datafiles_names.apply(
-                lambda fn: "{}_microarray_{}.gz".format(
-                    self.accession, sub(r'^\*', "", fn)
-                )
+        )
+        names_only.name = "filename"
+        return concat([factor_dataframe, names_only], axis=1)
+    """"""
+    def datafile_urls(self):
+        """Return DataFrame subset to filenames (converted to URLs) and factor values"""
+        datafiles = self.datafiles()
+        datafiles_urls = datafiles["filename"].apply(
+            lambda fn: "{}/static/media/dataset/{}".format(
+                URL_ROOT, fn
             )
-            datafiles_names.name = "filename"
-            datafiles = concat([factor_dataframe, datafiles_names], axis=1)
-        return datafiles
+        )
+        datafiles_urls.name = "URL"
+        return concat([datafiles, datafiles_urls], axis=1)
+    """"""
+    def retrieve_datafiles(self):
+        """Actually download datafiles"""
+        meta = self.datafile_urls()[["filename", "URL"]]
+        for _, filename, url in meta.itertuples():
+            call(["wget", "-O", filename, url], cwd=self._storage)
