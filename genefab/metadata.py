@@ -10,6 +10,7 @@ from os.path import join, exists, isdir
 from subprocess import call
 
 URL_ROOT = "https://genelab-data.ndc.nasa.gov/genelab"
+ARRAY_EXPRESS = "ftp://ftp.ebi.ac.uk/pub/databases/microarray/data/experiment/GEOD/{}/{}"
 
 def get_json(url):
     """HTTP get, decode, parse"""
@@ -73,6 +74,25 @@ def hits_to_dataframe(hits, na_values=("NA", "NaN", ""), sort_subfields=True):
         return meta_table
     else:
         raise KeyError("Key 'Accession' missing from metadata")
+
+def from_arrayexpress(archive_filename, cwd):
+    """Attempt download from ArrayExpress"""
+    geod_matcher = search(r'E-GEOD-\d+', archive_filename)
+    if geod_matcher is not None:
+        subdirectory = geod_matcher.group()
+        url = ARRAY_EXPRESS.format(subdirectory, archive_filename)
+        returncode = call(
+            ["wget", "-O", archive_filename, url],
+            cwd=cwd
+        )
+        return (returncode == 0)
+    else:
+        return False
+
+def from_genelab(archive_filename, cwd):
+    """Attempt download from genelab directly"""
+    url = "{}/static/media/dataset/{}".format(URL_ROOT, archive_filename)
+    return (call(["wget", "-O", archive_filename, url], cwd=cwd) == 0)
 
 class GeneLabDataSet():
     accession = None
@@ -180,6 +200,31 @@ class GeneLabDataSet():
     """"""
     def retrieve_datafiles(self):
         """Actually download datafiles"""
-        meta = self.datafile_urls()[["filename", "URL"]]
-        for _, filename, url in meta.itertuples():
-            call(["wget", "-O", filename, url], cwd=self._storage)
+        archive_fields = [
+            field for (_, _, field)
+            in self._find_fields("Comment", "Raw Data Archive File")
+        ]
+        if not archive_fields:
+            # no archives deposited, can download individual files:
+            meta = self.datafile_urls()[["filename", "URL"]]
+            for _, filename, url in meta.itertuples():
+                call(["wget", "-O", filename, url], cwd=self._storage)
+        elif len(archive_fields) == 1:
+            # exactly one archive field, as expected:
+            archive_field = archive_fields[0]
+            archive_files = set(self.frame()[archive_field])
+            if len(archive_files) == 1:
+                # exactly one archive file, as expected:
+                archive_filename = sub(r'^\*', "", archive_files.pop())
+                if from_arrayexpress(archive_filename, cwd=self._storage):
+                    extract_cel_archive(archive_filename, cwd=self._storage)
+                elif from_genelab(archive_filename, cwd=self._storage):
+                    extract_cel_archive(archive_filename, cwd=self._storage)
+                else:
+                    raise IOError("Could not download archive file")
+            else:
+                # we do not expect this to happen:
+                raise NotImplementedError("Unexpected number of archive files")
+        else:
+            # we do not expect this to happen:
+            raise NotImplementedError("Unexpected multiple Raw Archive fields")
