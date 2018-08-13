@@ -101,19 +101,17 @@ class GeneLabDataSet():
         except KeyError:
             raise ValueError("Malformed JSON")
     """"""
-    def _field_name_to_id(self, field_name):
+    def _find_fields(self, title, subtitle=None):
         """Convert external field name to internal field id"""
         for record in self._header:
-            if record["title"] == field_name:
-                # trust that field is unique (write checker!)
-                if "field" in record:
-                    return record["field"]
-                elif "columns" in record:
-                    # trust that field is unique (write checker!)
-                    if "field" in record["columns"][0]:
-                        return record["columns"][0]["field"]
-        else:
-            raise KeyError("Field {} missing from metadata".format(field_name))
+            if record["title"] == title:
+                if ("field" in record) and (subtitle is None):
+                    yield None, record["title"], record["field"]
+                if "columns" in record:
+                    for column in record["columns"]:
+                        if "field" in column:
+                            if (subtitle is None) or (column["title"] == subtitle):
+                                yield record["title"], column["title"], column["field"]
     """"""
     def _is_consistent(self, raw):
         """Check if keys are the same for each record in _raw"""
@@ -137,22 +135,19 @@ class GeneLabDataSet():
                 for i, record in enumerate(self._raw):
                     for key, value in record.items():
                         self._frame.loc[i, key] = value
-                sample_names_field_id = self._field_name_to_id("Sample Name")
+                sn_json_path = next(self._find_fields("Sample Name"))
+                sample_names_field_id = sn_json_path[2]
                 self._frame.set_index(sample_names_field_id, inplace=True)
         return self._frame
     """"""
     def get_factors(self, as_fields=False):
         """Get factor type from _header"""
         factors = {}
-        for record in self._header:
-            if record["title"] == "Factor Value":
-                for column in record["columns"]:
-                    factor = column["title"]
-                    if as_fields:
-                        values = column["field"]
-                    else:
-                        values = set(self.frame()[column["field"]].values)
-                    factors[factor] = values
+        for _, title, field in self._find_fields("Factor Value"):
+            if as_fields:
+                factors[title] = field
+            else:
+                factors[title] = set(self.frame()[field].values)
         if not factors:
             raise KeyError("No factor associated with dataset")
         return factors
@@ -162,7 +157,8 @@ class GeneLabDataSet():
         factor_fields = self.get_factors(as_fields=True)
         factor_dataframe = self.frame()[list(factor_fields.values())]
         factor_dataframe.columns = list(factor_fields.keys())
-        datafiles_field_id = self._field_name_to_id("Array Data File")
+        adf_json_path = next(self._find_fields("Array Data File"))
+        datafiles_field_id = adf_json_path[2]
         names_only = self.frame()[datafiles_field_id].apply(
             lambda fn: "{}_microarray_{}.gz".format(
                 self.accession, sub(r'^\*', "", fn)
