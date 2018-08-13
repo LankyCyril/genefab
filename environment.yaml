@@ -31,3 +31,11 @@ dependencies:
   - libgcc-ng=7.2.0=hdf63c60_3
   - libgfortran=3.0.0=1
   - libstdcxx-ng=7.2.0=hdf63c60_3
+  - pip:
+    - docopt==0.6.2
+    - jedi==0.12.1
+    - parso==0.3.1
+    - prompt-toolkit==1.0.15
+    - ptpython==0.41
+    - pygments==2.2.0
+    - wcwidth==0.1.7
