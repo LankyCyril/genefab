@@ -133,22 +133,32 @@ def get_ffield_matches(**kwargs):
                 yield ffield, ffvalue
         print("\b", file=stderr)
 
-def get_json_hits(**kwargs):
-    """Match passed regexes and combine into search URL, return JSON"""
-    if "maxcount" in kwargs:
-        maxcount = str(kwargs["maxcount"])
-        del kwargs["maxcount"]
-    else:
-        maxcount = "25"
-    term_pairs = [
-        "ffield={}&fvalue={}".format(ffield, quote_plus(ffvalue))
-        for ffield, ffvalue in get_ffield_matches(**kwargs)
-    ]
-    url = "&".join(
-        [URL_ROOT + "/data/search/?q=", "type=cgene", "size="+maxcount] +
-        term_pairs
-    )
-    try:
-        return get_json(url)["hits"]["hits"]
-    except:
-        raise ValueError("Unrecognized JSON structure")
+class GeneLabDataSetCollection():
+    _ids = None
+    _datasets = None
+    """"""
+    def __init__(self, **kwargs):
+        """Match passed regexes and combine into search URL, store JSON"""
+        if "maxcount" in kwargs:
+            maxcount = str(kwargs["maxcount"])
+            del kwargs["maxcount"]
+        else:
+            maxcount = "25"
+        term_pairs = [
+            "ffield={}&fvalue={}".format(ffield, quote_plus(ffvalue))
+            for ffield, ffvalue in get_ffield_matches(**kwargs)
+        ]
+        url = "&".join(
+            [URL_ROOT+"/data/search/?term=GLDS", "type=cgene", "size="+maxcount]
+            + term_pairs
+        )
+        try:
+            self._json = get_json(url)["hits"]["hits"]
+        except:
+            raise ValueError("Unrecognized JSON structure")
+        self._ids = [
+            hit["_id"] for hit in self._json
+        ]
+    """"""
+    def _populate_datasets(self):
+        pass
