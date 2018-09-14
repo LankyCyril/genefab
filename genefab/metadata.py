@@ -135,7 +135,7 @@ def get_ffield_matches(**kwargs):
 
 class GeneLabDataSetCollection():
     _ids = None
-    _datasets = None
+    _datasets = {}
     """"""
     def __init__(self, **kwargs):
         """Match passed regexes and combine into search URL, store JSON"""
@@ -160,5 +160,12 @@ class GeneLabDataSetCollection():
             hit["_id"] for hit in self._json
         ]
     """"""
-    def _populate_datasets(self):
-        pass
+    def keys(self):
+        return self._ids
+    """"""
+    def __getitem__(self, accession):
+        if accession not in self._ids:
+            raise KeyError("No such dataset in collection")
+        if accession not in self._datasets:
+            self._datasets[accession] = GeneLabDataSet(accession)
+        return self._datasets[accession]
