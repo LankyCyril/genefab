@@ -1,7 +1,10 @@
 from urllib.request import urlopen
+from urllib.parse import quote_plus
 from json import loads
-from re import sub
+from sys import stderr
+from re import sub, search, IGNORECASE
 from pandas import DataFrame, concat
+from .known_terms import FFIELD_ALIASES, FFIELD_VALUES
 
 URL_ROOT = "https://genelab-data.ndc.nasa.gov/genelab"
 
@@ -115,3 +118,37 @@ class GeneLabDataSet():
             )
             for record in get_json(listing_url)
         }
+
+def get_ffield_matches(**kwargs):
+    """Expand passed regexes to all matching ffield values"""
+    for ffield_alias, ffregex in kwargs.items():
+        print("looking up", ffield_alias, end="(s): ", file=stderr)
+        if ffield_alias in FFIELD_ALIASES:
+            ffield = FFIELD_ALIASES[ffield_alias]
+        else:
+            raise ValueError("Unrecognized field: " + ffield_alias)
+        for ffvalue in FFIELD_VALUES[ffield]:
+            if search(ffregex, ffvalue, IGNORECASE):
+                print('"{}"'.format(ffvalue), end=", ", file=stderr)
+                yield ffield, ffvalue
+        print("\b", file=stderr)
+
+def get_json_hits(**kwargs):
+    """Match passed regexes and combine into search URL, return JSON"""
+    if "maxcount" in kwargs:
+        maxcount = str(kwargs["maxcount"])
+        del kwargs["maxcount"]
+    else:
+        maxcount = "25"
+    term_pairs = [
+        "ffield={}&fvalue={}".format(ffield, quote_plus(ffvalue))
+        for ffield, ffvalue in get_ffield_matches(**kwargs)
+    ]
+    url = "&".join(
+        [URL_ROOT + "/data/search/?q=", "type=cgene", "size="+maxcount] +
+        term_pairs
+    )
+    try:
+        return get_json(url)["hits"]["hits"]
+    except:
+        raise ValueError("Unrecognized JSON structure")
