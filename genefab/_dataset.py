@@ -1,6 +1,6 @@
 from re import sub
 from pandas import DataFrame, concat
-from ._util import get_json, URL_ROOT
+from ._util import get_json, fetch_file, URL_ROOT, LOCAL_STORAGE
 
 class GeneLabDataSet():
     """Implements single dataset interface (generated from accession id)"""
@@ -97,14 +97,22 @@ class GeneLabDataSet():
         datafiles = concat([factor_dataframe, datafiles_names], axis=1)
         return datafiles
  
-    def get_data_urls(self):
-        """Return URLs of data files stored on GeneLab servers"""
+    def get_file_list(self, fetch=False, update=False):
+        """Return names and URLs of data files stored on GeneLab servers"""
         listing_url = "{}/data/study/filelistings/{}".format(
             URL_ROOT, self._internal_id
         )
-        return {
+        file_list = {
             record["file_name"]: "{}/static/media/dataset/{}".format(
                 URL_ROOT, record["file_name"]
             )
             for record in get_json(listing_url)
         }
+        if fetch:
+            for file_name, url in file_list.items():
+                fetch_file(file_name, url, LOCAL_STORAGE, update=update)
+        return file_list
+ 
+    def get_files(self, update=False):
+        """Alias for get_file_list(self, fetch=True, update=update)"""
+        self.get_file_list(fetch=True, update=update)

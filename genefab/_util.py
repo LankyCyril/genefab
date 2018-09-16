@@ -1,12 +1,38 @@
 from urllib.request import urlopen
 from json import loads
+from os.path import join, isfile, isdir
+from os import mkdir
+from subprocess import call
+from urllib.error import URLError
+from sys import stderr
 
 URL_ROOT = "https://genelab-data.ndc.nasa.gov/genelab"
+LOCAL_STORAGE = ".genefab"
 
 def get_json(url):
     """HTTP get, decode, parse"""
     with urlopen(url) as response:
         return loads(response.read().decode())
+
+def fetch_file(file_name, url, target_directory=LOCAL_STORAGE, update=False):
+    """Perform checks, download file"""
+    if not isdir(target_directory):
+        if isfile(target_directory):
+            raise OSError("Local storage exists and is not a directory")
+        mkdir(target_directory)
+    target_file = join(target_directory, file_name)
+    if not update:
+        if isdir(target_file):
+            raise OSError("Directory with target name exists: " + target_file)
+        if isfile(target_file):
+            print("Reusing", file_name, file=stderr)
+            return target_file
+    print("Downloading", file_name, file=stderr)
+    returncode = call(["wget", "-O", file_name, url], cwd=target_directory)
+    if returncode != 0:
+        raise URLError("Could not download file: " + file_name)
+    else:
+        return target_file
 
 FFIELD_VALUES = {
     "Project+Type": [
