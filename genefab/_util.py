@@ -11,6 +11,7 @@ LOCAL_STORAGE = ".genefab"
 
 def get_json(url):
     """HTTP get, decode, parse"""
+    print("Parsing url: ", url, file=stderr)
     with urlopen(url) as response:
         return loads(response.read().decode())
 

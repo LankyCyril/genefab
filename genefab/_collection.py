@@ -49,6 +49,10 @@ class GeneLabDataSetCollection():
     def keys(self):
         return self._accessions
  
+    def values(self):
+        for accession in self._accessions:
+            yield self[accession]
+ 
     def __getitem__(self, accession):
         if accession not in self._accessions:
             raise KeyError("No such dataset in collection")
