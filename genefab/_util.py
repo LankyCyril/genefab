@@ -1,3 +1,13 @@
+from urllib.request import urlopen
+from json import loads
+
+URL_ROOT = "https://genelab-data.ndc.nasa.gov/genelab"
+
+def get_json(url):
+    """HTTP get, decode, parse"""
+    with urlopen(url) as response:
+        return loads(response.read().decode())
+
 FFIELD_VALUES = {
     "Project+Type": [
         "Spaceflight Study", "Spaceflight Project", "Spaceflight", "Flight Study", "Flight", "ground", "parabolic"

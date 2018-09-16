@@ -1,22 +1,12 @@
-from urllib.request import urlopen
-from urllib.parse import quote_plus
-from json import loads
-from sys import stderr
-from re import sub, search, IGNORECASE
+from re import sub
 from pandas import DataFrame, concat
-from .known_terms import FFIELD_ALIASES, FFIELD_VALUES
-
-URL_ROOT = "https://genelab-data.ndc.nasa.gov/genelab"
-
-def get_json(url):
-    """HTTP get, decode, parse"""
-    with urlopen(url) as response:
-        return loads(response.read().decode())
+from ._util import get_json, URL_ROOT
 
 class GeneLabDataSet():
+    """Implements single dataset interface (generated from accession id)"""
     accession = None
     _frame = None
-    """"""
+ 
     def __init__(self, accession):
         """Request JSON representation of ISA metadata and store fields"""
         self.accession = accession
@@ -34,7 +24,7 @@ class GeneLabDataSet():
             self._raw = assay_json["raw"]
         except KeyError:
             raise ValueError("Malformed JSON")
-    """"""
+ 
     def _field_name_to_id(self, field_name):
         """Convert external field name to internal field id"""
         for record in self._header:
@@ -48,7 +38,7 @@ class GeneLabDataSet():
                         return record["columns"][0]["field"]
         else:
             raise KeyError("Field {} missing from metadata".format(field_name))
-    """"""
+ 
     def _is_consistent(self, raw):
         """Check if keys are the same for each record in _raw"""
         key_set = set(raw[0].keys())
@@ -57,7 +47,7 @@ class GeneLabDataSet():
                 return False
         else:
             return True
-    """"""
+ 
     def frame(self):
         """Convert _raw field of _isa2json to pandas DataFrame"""
         if self._frame is None:
@@ -74,7 +64,7 @@ class GeneLabDataSet():
                 sample_names_field_id = self._field_name_to_id("Sample Name")
                 self._frame.set_index(sample_names_field_id, inplace=True)
         return self._frame
-    """"""
+
     def get_factors(self, as_fields=False):
         """Get factor type from _header"""
         factors = {}
@@ -90,7 +80,7 @@ class GeneLabDataSet():
         if not factors:
             raise KeyError("No factor associated with dataset")
         return factors
-    """"""
+ 
     def get_file_table(self):
         """Return DataFrame subset to filenames and factor values"""
         factor_fields = self.get_factors(as_fields=True)
@@ -106,7 +96,7 @@ class GeneLabDataSet():
         datafiles_names.name = "filename"
         datafiles = concat([factor_dataframe, datafiles_names], axis=1)
         return datafiles
-    """"""
+ 
     def get_data_urls(self):
         """Return URLs of data files stored on GeneLab servers"""
         listing_url = "{}/data/study/filelistings/{}".format(
@@ -118,54 +108,3 @@ class GeneLabDataSet():
             )
             for record in get_json(listing_url)
         }
-
-def get_ffield_matches(**kwargs):
-    """Expand passed regexes to all matching ffield values"""
-    for ffield_alias, ffregex in kwargs.items():
-        print("looking up", ffield_alias, end="(s): ", file=stderr)
-        if ffield_alias in FFIELD_ALIASES:
-            ffield = FFIELD_ALIASES[ffield_alias]
-        else:
-            raise ValueError("Unrecognized field: " + ffield_alias)
-        for ffvalue in FFIELD_VALUES[ffield]:
-            if search(ffregex, ffvalue, IGNORECASE):
-                print('"{}"'.format(ffvalue), end=", ", file=stderr)
-                yield ffield, ffvalue
-        print("\b", file=stderr)
-
-class GeneLabDataSetCollection():
-    _ids = None
-    _datasets = {}
-    """"""
-    def __init__(self, **kwargs):
-        """Match passed regexes and combine into search URL, store JSON"""
-        if "maxcount" in kwargs:
-            maxcount = str(kwargs["maxcount"])
-            del kwargs["maxcount"]
-        else:
-            maxcount = "25"
-        term_pairs = [
-            "ffield={}&fvalue={}".format(ffield, quote_plus(ffvalue))
-            for ffield, ffvalue in get_ffield_matches(**kwargs)
-        ]
-        url = "&".join(
-            [URL_ROOT+"/data/search/?term=GLDS", "type=cgene", "size="+maxcount]
-            + term_pairs
-        )
-        try:
-            self._json = get_json(url)["hits"]["hits"]
-        except:
-            raise ValueError("Unrecognized JSON structure")
-        self._ids = [
-            hit["_id"] for hit in self._json
-        ]
-    """"""
-    def keys(self):
-        return self._ids
-    """"""
-    def __getitem__(self, accession):
-        if accession not in self._ids:
-            raise KeyError("No such dataset in collection")
-        if accession not in self._datasets:
-            self._datasets[accession] = GeneLabDataSet(accession)
-        return self._datasets[accession]
