@@ -2,7 +2,7 @@ from urllib.request import urlopen
 from json import loads
 from os.path import join, isfile, isdir
 from os import mkdir
-from subprocess import call
+from wget import download
 from urllib.error import URLError
 from sys import stderr
 
@@ -28,11 +28,8 @@ def fetch_file(file_name, url, target_directory=LOCAL_STORAGE, update=False):
             print("Reusing", file_name, file=stderr)
             return target_file
     print("Downloading", file_name, file=stderr)
-    returncode = call(["wget", "-O", file_name, url], cwd=target_directory)
-    if returncode != 0:
-        raise URLError("Could not download file: " + file_name)
-    else:
-        return target_file
+    download(url=url, out=target_file)
+    return target_file
 
 FFIELD_VALUES = {
     "Project+Type": [
