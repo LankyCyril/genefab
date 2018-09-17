@@ -100,11 +100,6 @@ class GeneLabDataSet():
         if len(datafiles_field_ids) != 1:
             raise ValueError("Number of 'Array Data File' ids is not 1")
         datafiles_names = self.frame()[datafiles_field_ids[0]]
-        datafiles_names = datafiles_names.apply(
-            lambda fn: "{}_microarray_{}.gz".format(
-                self.accession, sub(r'^\*', "", fn)
-            )
-        )
         datafiles_names.name = "filename"
         datafiles = concat([factor_dataframe, datafiles_names], axis=1)
         return datafiles
