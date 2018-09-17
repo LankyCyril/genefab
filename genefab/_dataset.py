@@ -87,13 +87,13 @@ class GeneLabDataSet():
                     else:
                         values = set(self.frame()[column["field"]].values)
                     _factors[factor] = values
-        if not _factors:
-            raise KeyError("No factor associated with dataset")
         return _factors
  
     def file_table(self):
         """Return DataFrame subset to filenames and factor values"""
         factor_fields = self.factors(as_fields=True)
+        if not factor_fields:
+            return None
         factor_dataframe = self.frame()[list(factor_fields.values())]
         factor_dataframe.columns = list(factor_fields.keys())
         datafiles_field_ids = self.field_ids("Array Data File")
