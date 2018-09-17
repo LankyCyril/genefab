@@ -34,7 +34,7 @@ class GeneLabDataSet():
         else:
             return True
  
-    def get_field_ids(self, field_name, column_name=None):
+    def field_ids(self, field_name, column_name=None):
         """Convert external field name to internal field id"""
         fields = []
         for record in self._header:
@@ -62,15 +62,15 @@ class GeneLabDataSet():
                 for i, record in enumerate(self._raw):
                     for key, value in record.items():
                         self._frame.loc[i, key] = value
-                sample_names_field_ids = self.get_field_ids("Sample Name")
+                sample_names_field_ids = self.field_ids("Sample Name")
                 if len(sample_names_field_ids) != 1:
                     raise ValueError("Number of 'Sample Name' fields is not 1")
                 self._frame.set_index(sample_names_field_ids[0], inplace=True)
         return self._frame
 
-    def get_factors(self, as_fields=False):
+    def factors(self, as_fields=False):
         """Get factor type from _header"""
-        factors = {}
+        _factors = {}
         for record in self._header:
             if record["title"] == "Factor Value":
                 for column in record["columns"]:
@@ -79,17 +79,17 @@ class GeneLabDataSet():
                         values = column["field"]
                     else:
                         values = set(self.frame()[column["field"]].values)
-                    factors[factor] = values
-        if not factors:
+                    _factors[factor] = values
+        if not _factors:
             raise KeyError("No factor associated with dataset")
-        return factors
+        return _factors
  
-    def get_file_table(self):
+    def file_table(self):
         """Return DataFrame subset to filenames and factor values"""
-        factor_fields = self.get_factors(as_fields=True)
+        factor_fields = self.factors(as_fields=True)
         factor_dataframe = self.frame()[list(factor_fields.values())]
         factor_dataframe.columns = list(factor_fields.keys())
-        datafiles_field_ids = self.get_field_ids("Array Data File")
+        datafiles_field_ids = self.field_ids("Array Data File")
         if len(datafiles_field_ids) != 1:
             raise ValueError("Number of 'Array Data File' ids is not 1")
         datafiles_names = self.frame()[datafiles_field_ids[0]]
@@ -102,7 +102,7 @@ class GeneLabDataSet():
         datafiles = concat([factor_dataframe, datafiles_names], axis=1)
         return datafiles
  
-    def get_file_list(self, fetch=False, update=False):
+    def file_list(self, fetch=False, update=False):
         """Return names and URLs of data files stored on GeneLab servers"""
         listing_url = "{}/data/study/filelistings/{}".format(
             URL_ROOT, self._internal_id
@@ -118,6 +118,6 @@ class GeneLabDataSet():
                 fetch_file(file_name, url, LOCAL_STORAGE, update=update)
         return file_list
  
-    def get_files(self, update=False):
-        """Alias for get_file_list(self, fetch=True, update=update)"""
-        self.get_file_list(fetch=True, update=update)
+    def fetch_files(self, update=False):
+        """Alias for file_list(self, fetch=True, update=update)"""
+        self.file_list(fetch=True, update=update)
