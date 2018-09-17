@@ -25,20 +25,6 @@ class GeneLabDataSet():
         except KeyError:
             raise ValueError("Malformed JSON")
  
-    def _field_name_to_id(self, field_name):
-        """Convert external field name to internal field id"""
-        for record in self._header:
-            if record["title"] == field_name:
-                # trust that field is unique (write checker!)
-                if "field" in record:
-                    return record["field"]
-                elif "columns" in record:
-                    # trust that field is unique (write checker!)
-                    if "field" in record["columns"][0]:
-                        return record["columns"][0]["field"]
-        else:
-            raise KeyError("Field {} missing from metadata".format(field_name))
- 
     def _is_consistent(self, raw):
         """Check if keys are the same for each record in _raw"""
         key_set = set(raw[0].keys())
@@ -47,6 +33,21 @@ class GeneLabDataSet():
                 return False
         else:
             return True
+ 
+    def get_field_ids(self, field_name, column_name=None):
+        """Convert external field name to internal field id"""
+        fields = []
+        for record in self._header:
+            if record["title"] == field_name:
+                if column_name is not None:
+                    if "columns" in record:
+                        for column in record["columns"]:
+                            if "field" in column:
+                                if column.get("title", None) == column_name:
+                                    fields.append(column["field"])
+                elif "field" in record:
+                    fields.append(record["field"])
+        return fields
  
     def frame(self):
         """Convert _raw field of _isa2json to pandas DataFrame"""
@@ -61,8 +62,10 @@ class GeneLabDataSet():
                 for i, record in enumerate(self._raw):
                     for key, value in record.items():
                         self._frame.loc[i, key] = value
-                sample_names_field_id = self._field_name_to_id("Sample Name")
-                self._frame.set_index(sample_names_field_id, inplace=True)
+                sample_names_field_ids = self.get_field_ids("Sample Name")
+                if len(sample_names_field_ids) != 1:
+                    raise ValueError("Number of 'Sample Name' fields is not 1")
+                self._frame.set_index(sample_names_field_ids[0], inplace=True)
         return self._frame
 
     def get_factors(self, as_fields=False):
@@ -86,8 +89,10 @@ class GeneLabDataSet():
         factor_fields = self.get_factors(as_fields=True)
         factor_dataframe = self.frame()[list(factor_fields.values())]
         factor_dataframe.columns = list(factor_fields.keys())
-        datafiles_field_id = self._field_name_to_id("Array Data File")
-        datafiles_names = self.frame()[datafiles_field_id]
+        datafiles_field_ids = self.get_field_ids("Array Data File")
+        if len(datafiles_field_ids) != 1:
+            raise ValueError("Number of 'Array Data File' ids is not 1")
+        datafiles_names = self.frame()[datafiles_field_ids[0]]
         datafiles_names = datafiles_names.apply(
             lambda fn: "{}_microarray_{}.gz".format(
                 self.accession, sub(r'^\*', "", fn)
