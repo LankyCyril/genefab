@@ -23,4 +23,8 @@ dependencies:
   - wheel=0.31.1=py35_0
   - wincertstore=0.2=py35hfebbdb8_0
   - pip:
-    - wget==3.2
+    - chardet==3.0.4
+    - idna==2.7
+    - requests==2.19.1
+    - tqdm==4.26.0
+    - urllib3==1.23
