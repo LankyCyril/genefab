@@ -67,7 +67,14 @@ class GeneLabDataSet():
                     raise ValueError("Number of 'Sample Name' fields is not 1")
                 self._frame.set_index(sample_names_field_ids[0], inplace=True)
         return self._frame
-
+ 
+    def field_values(self, field_name, column_name=None):
+        """Convert external field name to internal field id, return set of possible values for the field"""
+        return set.union(*(
+            set(self.frame()[field_id])
+            for field_id in self.field_ids(field_name, column_name)
+        ), set())
+ 
     def factors(self, as_fields=False):
         """Get factor type from _header"""
         _factors = {}
