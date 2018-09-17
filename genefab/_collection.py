@@ -20,7 +20,7 @@ def get_ffield_matches(**kwargs):
 
 class GeneLabDataSetCollection():
     """Implements collection of GeneLabDataSet instances (generated from search terms)"""
-    _accessions = None
+    accessions = None
     _datasets = {}
  
     def __init__(self, **kwargs):
@@ -42,20 +42,20 @@ class GeneLabDataSetCollection():
             self._json = get_json(url)["hits"]["hits"]
         except:
             raise ValueError("Unrecognized JSON structure")
-        self._accessions = [
+        self.accessions = [
             hit["_id"] for hit in self._json
         ]
  
-    def keys(self):
-        return self._accessions
- 
-    def values(self):
-        for accession in self._accessions:
-            yield self[accession]
- 
     def __getitem__(self, accession):
-        if accession not in self._accessions:
+        if accession not in self.accessions:
             raise KeyError("No such dataset in collection")
         if accession not in self._datasets:
             self._datasets[accession] = GeneLabDataSet(accession)
         return self._datasets[accession]
+ 
+    def __iter__(self):
+        for accession in self.accessions:
+            yield self[accession]
+ 
+    def __len__(self):
+        return len(self.accessions or [])
