@@ -1,0 +1,30 @@
+name: genefab
+channels:
+  - defaults
+dependencies:
+  - blas=1.0=mkl
+  - certifi=2018.8.24=py35_1
+  - icc_rt=2017.0.4=h97af966_0
+  - intel-openmp=2019.0=117
+  - mkl=2019.0=117
+  - mkl_fft=1.0.4=py35h1e22a9b_1
+  - mkl_random=1.0.1=py35h77b88f5_1
+  - numpy=1.15.1=py35ha559c80_0
+  - numpy-base=1.15.1=py35h8128ebf_0
+  - pandas=0.23.4=py35h830ac7b_0
+  - pip=10.0.1=py35_0
+  - python=3.5.6=he025d50_0
+  - python-dateutil=2.7.3=py35_0
+  - pytz=2018.5=py35_0
+  - setuptools=40.2.0=py35_0
+  - six=1.11.0=py35_1
+  - vc=14=h0510ff6_3
+  - vs2015_runtime=14.0.25123=3
+  - wheel=0.31.1=py35_0
+  - wincertstore=0.2=py35hfebbdb8_0
+  - pip:
+    - chardet==3.0.4
+    - idna==2.7
+    - requests==2.19.1
+    - tqdm==4.26.0
+    - urllib3==1.23
