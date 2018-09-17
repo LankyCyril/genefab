@@ -24,9 +24,13 @@ dependencies:
   - xz=5.2.4=h14c3975_4
   - zlib=1.2.11=ha838bed_2
   - pip:
+    - chardet==3.0.4
+    - idna==2.7
     - numpy==1.15.1
     - pandas==0.23.4
     - python-dateutil==2.7.3
     - pytz==2018.5
+    - requests==2.19.1
     - six==1.11.0
-    - wget==3.2
+    - tqdm==4.26.0
+    - urllib3==1.23

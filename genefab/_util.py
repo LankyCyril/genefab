@@ -1,8 +1,10 @@
 from urllib.request import urlopen
 from json import loads
 from os.path import join, isfile, isdir
-from os import mkdir
-from wget import download
+from requests import get
+from math import ceil
+from tqdm import tqdm
+from os import mkdir, remove
 from urllib.error import URLError
 from sys import stderr
 
@@ -28,8 +30,23 @@ def fetch_file(file_name, url, target_directory=LOCAL_STORAGE, update=False):
         if isfile(target_file):
             print("Reusing", file_name, file=stderr)
             return target_file
-    print("Downloading", file_name, file=stderr)
-    download(url=url, out=target_file)
+    stream = get(url, stream=True)
+    if stream.status_code != 200:
+        raise URLError("{}: status code {}".format(url, stream.status_code))
+    total_bytes = int(stream.headers.get("content-length", 0))
+    total_kb = ceil(total_bytes / 1024)
+    with open(target_file, "wb") as output_handle:
+        written_bytes = 0
+        stream_iterator = tqdm(
+            stream.iter_content(1024), desc="Downloading "+file_name,
+            total=total_kb, unit="KB"
+        )
+        for block in stream_iterator:
+            output_handle.write(block)
+            written_bytes += len(block)
+    if total_bytes != written_bytes:
+        remove(target_file)
+        raise URLError("Failed to download the correct number of bytes")
     return target_file
 
 FFIELD_VALUES = {
