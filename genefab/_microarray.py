@@ -98,3 +98,24 @@ class MicroarrayExperiment():
             return self._file_list
         else:
             raise OSError("No files associated with experiment")
+ 
+    @property
+    def annotation(self):
+        if self.raw_data is None:
+            raise NotImplementedError("Experiment without raw data")
+        _annotation = self.raw_data.copy()
+        _property = _annotation.columns[-1]
+        _annotation["filename"] = None
+        for ix, row in _annotation.iterrows():
+            tail = sub(r'^\*', "", row[_property])
+            matching_files = set(
+                filename
+                for filename in self._file_list
+                if filename.endswith(tail)
+            )
+            if len(matching_files) != 1:
+                err_msg = "Number of files matching '{}' is not 1".format(tail)
+                raise OSError(err_msg)
+            _annotation.loc[ix, "filename"] = matching_files.pop()
+        del _annotation[_property]
+        return _annotation.reset_index().set_index("filename")

@@ -99,6 +99,7 @@ class GLDS():
         if not factor_fields:
             return None
         factor_dataframe = self.frame[list(factor_fields.values())]
+        factor_dataframe.index.name = "Sample Name"
         factor_dataframe.columns = list(factor_fields.keys())
         property_field_ids = self.field_ids(field_name)
         if len(property_field_ids) != 1:
