@@ -20,6 +20,7 @@ class MicroarrayExperiment():
     _file_list = None
  
     def __init__(self, glds):
+        """Interpret GLDS, describe; if data has been unpacked before, check and reuse"""
         self.glds = glds
         self.accession = glds.accession
         self._storage = join(glds._storage, "MicroarrayExperiment_source")

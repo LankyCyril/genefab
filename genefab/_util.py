@@ -54,6 +54,7 @@ def fetch_file(file_name, url, target_directory=DEFAULT_STORAGE, update=False):
     return target_file
 
 def ensure_dir(target_dir, force_new_dir):
+    """Guarantee writable directory or raise exception"""
     if exists(target_dir):
         if not isdir(target_dir):
             raise OSError("Target name exists and is not a directory")
