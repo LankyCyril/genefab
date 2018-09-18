@@ -2,11 +2,12 @@ from ._dataset import GLDS
 from ._util import ensure_dir, gunzip
 from tqdm import tqdm
 from os import walk, getcwd
-from os.path import join
+from os.path import join, isfile, relpath
 from re import search, sub
 from tarfile import TarFile
 from gzip import open as gzopen
 from subprocess import call
+from glob import iglob
 
 class MicroarrayExperiment():
     """Implements wrapper of GLDS class that has 'Array Data Files'"""
@@ -39,6 +40,13 @@ class MicroarrayExperiment():
     def derived_only(self):
         return (self.raw_data is None) and (self.derived_data is not None)
  
+    def _store_file_list(self):
+        """List all unpacked files into a TSV file"""
+        tsv = join(getcwd(), self._storage, self.accession+".tsv")
+        with open(tsv, "wt") as tsv_handle:
+            for filename in self._file_list:
+                print(filename, file=tsv_handle)
+ 
     def unpack(self, force_new_dir=True, update_glds_files=False):
         """Store unpacked contents of associated archive files in experiment subdirectory"""
         self.glds.fetch_files(update=update_glds_files)
@@ -58,7 +66,6 @@ class MicroarrayExperiment():
                 call(["unzip", source_file, "-d", target_dir])
             else:
                 call(["cp", source_file, target_dir])
-        self._file_list = set()
         second_level_iterator = tqdm(
             next(walk(target_dir))[2], desc="Unpacking second-level files",
             unit="file"
@@ -66,9 +73,12 @@ class MicroarrayExperiment():
         for filename in second_level_iterator:
             if search(r'\.gz$', filename):
                 gunzip(join(getcwd(), target_dir, filename))
-                self._file_list.add(sub(r'\.gz$', "", filename))
-            else:
-                self._file_list.add(filename)
+        self._file_list = set(
+            relpath(name)
+            for name in iglob(join(target_dir, "**"), recursive=True)
+            if isfile(name)
+        )
+        self._store_file_list()
  
     @property
     def file_list(self):
