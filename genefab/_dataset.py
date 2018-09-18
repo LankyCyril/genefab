@@ -1,11 +1,11 @@
 from re import sub
 from pandas import DataFrame, concat
+from functools import lru_cache
 from ._util import get_json, fetch_file, URL_ROOT, LOCAL_STORAGE
 
 class GeneLabDataSet():
     """Implements single dataset interface (generated from accession id)"""
     accession = None
-    _frame = None
  
     def __init__(self, accession):
         """Request JSON representation of ISA metadata and store fields"""
@@ -34,6 +34,7 @@ class GeneLabDataSet():
         else:
             return True
  
+    @lru_cache(maxsize=None)
     def field_ids(self, field_name, column_name=None):
         """Convert external field name to internal field id"""
         fields = []
@@ -49,25 +50,24 @@ class GeneLabDataSet():
                     fields.append(record["field"])
         return fields
  
+    @lru_cache(maxsize=None)
     def frame(self):
         """Convert _raw field of _isa2json to pandas DataFrame"""
-        if self._frame is None:
-            if not self._is_consistent(self._raw):
-                raise KeyError("_raw field keys are inconsistent")
-            else:
-                self._frame = DataFrame(
-                    columns=sorted(self._raw[0].keys()),
-                    index=range(len(self._raw))
-                )
-                for i, record in enumerate(self._raw):
-                    for key, value in record.items():
-                        self._frame.loc[i, key] = value
-                sample_names_field_ids = self.field_ids("Sample Name")
-                if len(sample_names_field_ids) != 1:
-                    raise ValueError("Number of 'Sample Name' fields is not 1")
-                self._frame.set_index(sample_names_field_ids[0], inplace=True)
-        return self._frame
+        if not self._is_consistent(self._raw):
+            raise KeyError("_raw field keys are inconsistent")
+        _frame = DataFrame(
+            columns=sorted(self._raw[0].keys()),
+            index=range(len(self._raw))
+        )
+        for i, record in enumerate(self._raw):
+            for key, value in record.items():
+                _frame.loc[i, key] = value
+        sample_names_field_ids = self.field_ids("Sample Name")
+        if len(sample_names_field_ids) != 1:
+            raise ValueError("Number of 'Sample Name' fields is not 1")
+        return _frame.set_index(sample_names_field_ids[0])
  
+    @lru_cache(maxsize=None)
     def field_values(self, field_name, column_name=None):
         """Convert external field name to internal field id, return set of possible values for the field"""
         return set.union(*(
@@ -75,6 +75,7 @@ class GeneLabDataSet():
             for field_id in self.field_ids(field_name, column_name)
         ), set())
  
+    @lru_cache(maxsize=None)
     def factors(self, as_fields=False):
         """Get factor type from _header"""
         _factors = {}
@@ -89,6 +90,7 @@ class GeneLabDataSet():
                     _factors[factor] = values
         return _factors
  
+    @lru_cache(maxsize=None)
     def file_table(self):
         """Return DataFrame subset to filenames and factor values"""
         factor_fields = self.factors(as_fields=True)
