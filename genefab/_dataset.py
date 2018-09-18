@@ -116,22 +116,21 @@ class GLDS():
     def is_microarray(self):
         return self.has_raw_arrays or self.has_derived_arrays
  
-    def file_list(self, fetch=False, update=False):
+    @property
+    @lru_cache(maxsize=None)
+    def file_list(self):
         """Return names and URLs of data files stored on GeneLab servers"""
         listing_url = "{}/data/study/filelistings/{}".format(
             URL_ROOT, self._internal_id
         )
-        file_list = {
+        return {
             record["file_name"]: "{}/static/media/dataset/{}".format(
                 URL_ROOT, record["file_name"]
             )
             for record in get_json(listing_url)
         }
-        if fetch:
-            for file_name, url in file_list.items():
-                fetch_file(file_name, url, LOCAL_STORAGE, update=update)
-        return file_list
  
     def fetch_files(self, update=False):
         """Alias for file_list(self, fetch=True, update=update)"""
-        self.file_list(fetch=True, update=update)
+        for file_name, url in self.file_list:
+            fetch_file(file_name, url, LOCAL_STORAGE, update=update)
