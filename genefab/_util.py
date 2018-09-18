@@ -4,7 +4,7 @@ from os.path import join, isfile, isdir, exists
 from requests import get
 from math import ceil
 from tqdm import tqdm
-from os import mkdir, remove
+from os import makedirs, remove
 from re import sub
 from shutil import rmtree, copyfileobj
 from gzip import open as gzopen
@@ -25,7 +25,7 @@ def fetch_file(file_name, url, target_directory=DEFAULT_STORAGE, update=False):
     if not isdir(target_directory):
         if isfile(target_directory):
             raise OSError("Local storage exists and is not a directory")
-        mkdir(target_directory)
+        makedirs(target_directory)
     target_file = join(target_directory, file_name)
     if not update:
         if isdir(target_file):
@@ -60,7 +60,7 @@ def ensure_dir(target_dir, force_new_dir):
             rmtree(target_dir)
         else:
             raise OSError("Target directory exists")
-    mkdir(target_dir)
+    makedirs(target_dir)
 
 def gunzip(source_file, target_file=None, target_dir=None, keep_original=False):
     """Alternative to call(["gunzip", ...]), because the latter fails on Windows"""

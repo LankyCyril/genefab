@@ -1,7 +1,7 @@
 from ._dataset import GLDS
 from ._util import ensure_dir, gunzip
 from tqdm import tqdm
-from os import mkdir, walk, getcwd
+from os import walk, getcwd
 from os.path import join
 from re import search, sub
 from tarfile import TarFile
@@ -21,7 +21,7 @@ class MicroarrayExperiment():
     def __init__(self, glds):
         self.glds = glds
         self.accession = glds.accession
-        self._storage = glds._storage
+        self._storage = join(glds._storage, "MicroarrayExperiment_source")
         self.factors = glds.factors(as_fields=False)
         if glds.field_ids("Array Design REF"):
             self.design_ref = glds.property_table("Array Design REF")
@@ -48,7 +48,7 @@ class MicroarrayExperiment():
             self.glds.file_list, desc="Unpacking top-level files", unit="file"
         )
         for filename in file_list_iterator:
-            source_file = join(getcwd(), self._storage, filename)
+            source_file = join(getcwd(), self.glds._storage, filename)
             if search(r'\.tar$|\.tar\.gz$', filename):
                 with TarFile(source_file) as tar:
                     tar.extractall(path=target_dir)
