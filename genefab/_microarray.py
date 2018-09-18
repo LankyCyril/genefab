@@ -135,4 +135,7 @@ class MicroarrayExperiment():
  
     def cel2exp(self, sample_name):
         filename = self.annotation.loc[sample_name, "filename"]
-        return routput(self._R, AFFY_SCRIPT, cel=filename.replace("\\", "\\\\"))
+        expression_table = routput(
+            self._R, AFFY_SCRIPT,
+            cel=filename.replace("\\", "\\\\")
+        )

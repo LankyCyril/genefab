@@ -79,10 +79,10 @@ def gunzip(source_file, target_file=None, target_dir=None, keep_original=False):
 
 def routput(R, script_mask, **kwargs):
     if "output" not in kwargs:
-        with NamedTemporaryFile("wb", dir=".", delete=False) as output:
+        with NamedTemporaryFile("wb", delete=False) as output:
             kwargs["output"] = output.name.replace("\\", "\\\\")
     script = script_mask.format(**kwargs)
-    with NamedTemporaryFile("wt", dir=".", delete=False) as script_file:
+    with NamedTemporaryFile("wt", delete=False) as script_file:
         script_file.write(script)
     returncode = call([R, "--vanilla", script_file.name])
     if returncode != 0:
