@@ -1,22 +1,12 @@
 from ._dataset import GLDS
-from ._util import LOCAL_STORAGE
+from ._util import LOCAL_STORAGE, ensure_dir
 from os import mkdir, getcwd, walk
-from shutil import rmtree, copyfileobj
-from os.path import join, isfile, isdir, exists
+from shutil import copyfileobj
+from os.path import join
 from re import search, sub
 from tarfile import TarFile
 from gzip import open as gzopen
 from subprocess import call
-
-def ensure_dir(target_dir, force_new_dir):
-    if exists(target_dir):
-        if not isdir(target_dir):
-            raise OSError("Target name exists and is not a directory")
-        elif force_new_dir:
-            rmtree(target_dir)
-        else:
-            raise OSError("Target directory exists")
-    mkdir(target_dir)
 
 class MicroarrayExperiment():
     """Implements wrapper of GLDS class that has 'Array Data Files'"""

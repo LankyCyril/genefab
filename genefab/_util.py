@@ -1,10 +1,11 @@
 from urllib.request import urlopen
 from json import loads
-from os.path import join, isfile, isdir
+from os.path import join, isfile, isdir, exists
 from requests import get
 from math import ceil
 from tqdm import tqdm
 from os import mkdir, remove
+from shutil import rmtree
 from urllib.error import URLError
 from sys import stderr
 
@@ -48,6 +49,16 @@ def fetch_file(file_name, url, target_directory=LOCAL_STORAGE, update=False):
         remove(target_file)
         raise URLError("Failed to download the correct number of bytes")
     return target_file
+
+def ensure_dir(target_dir, force_new_dir):
+    if exists(target_dir):
+        if not isdir(target_dir):
+            raise OSError("Target name exists and is not a directory")
+        elif force_new_dir:
+            rmtree(target_dir)
+        else:
+            raise OSError("Target directory exists")
+    mkdir(target_dir)
 
 FFIELD_VALUES = {
     "Project+Type": [
