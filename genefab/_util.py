@@ -11,6 +11,7 @@ from gzip import open as gzopen
 from urllib.error import URLError
 from sys import stderr
 from subprocess import call
+from tempfile import NamedTemporaryFile
 
 URL_ROOT = "https://genelab-data.ndc.nasa.gov/genelab"
 DEFAULT_STORAGE = ".genefab"
@@ -75,6 +76,22 @@ def gunzip(source_file, target_file=None, target_dir=None, keep_original=False):
         call(["mv", target_file, target_dir])
     if not keep_original:
         remove(source_file)
+
+def routput(R, script_mask, **kwargs):
+    if "output" not in kwargs:
+        with NamedTemporaryFile("wb", dir=".", delete=False) as output:
+            kwargs["output"] = output.name.replace("\\", "\\\\")
+    script = script_mask.format(**kwargs)
+    with NamedTemporaryFile("wt", dir=".", delete=False) as script_file:
+        script_file.write(script)
+    returncode = call([R, "--vanilla", script_file.name])
+    if returncode != 0:
+        raise OSError("R script failed, error code {}".format(returncode))
+    with open(output.name, "rt") as output_readable:
+        result = output_readable.read()
+    remove(output.name)
+    remove(script_file.name)
+    return result
 
 FFIELD_VALUES = {
     "Project+Type": [

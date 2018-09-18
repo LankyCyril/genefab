@@ -1,5 +1,5 @@
 from ._dataset import GLDS
-from ._util import ensure_dir, gunzip
+from ._util import ensure_dir, gunzip, routput
 from tqdm import tqdm
 from os import walk, getcwd
 from os.path import join, isfile, relpath
@@ -8,6 +8,16 @@ from tarfile import TarFile
 from gzip import open as gzopen
 from subprocess import call
 from glob import iglob
+
+AFFY_SCRIPT = """
+if (!require("affy")) {{
+    source("https://bioconductor.org/biocLite.R")
+    biocLite("affy", suppressUpdates=TRUE, suppressAutoUpdate=TRUE, ask=FALSE)
+}}
+library("affy")
+eset = just.rma(filenames="{cel}")
+write.exprs(eset, file="{output}")
+"""
 
 class MicroarrayExperiment():
     """Implements wrapper of GLDS class that has 'Array Data Files'"""
@@ -20,12 +30,14 @@ class MicroarrayExperiment():
     _file_list = None
     _storage = None
     _tsv = None
+    _R = None
  
-    def __init__(self, glds, reextract=False):
+    def __init__(self, glds, reextract=False, R="Rscript"):
         """Interpret GLDS, describe; if data has been unpacked before, check and reuse"""
         self.glds = glds
         self.accession = glds.accession
         self._storage = join(glds._storage, "MicroarrayExperiment_source")
+        self._R = R
         self.factors = glds.factors(as_fields=False)
         if glds.field_ids("Array Design REF"):
             self.design_ref = glds.property_table("Array Design REF")
@@ -119,4 +131,8 @@ class MicroarrayExperiment():
                 raise OSError(err_msg)
             _annotation.loc[ix, "filename"] = matching_files.pop()
         del _annotation[_property]
-        return _annotation.reset_index().set_index("filename")
+        return _annotation
+ 
+    def cel2exp(self, sample_name):
+        filename = self.annotation.loc[sample_name, "filename"]
+        return routput(self._R, AFFY_SCRIPT, cel=filename.replace("\\", "\\\\"))
