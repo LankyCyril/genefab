@@ -63,6 +63,7 @@ def ensure_dir(target_dir, force_new_dir):
     mkdir(target_dir)
 
 def gunzip(source_file, target_file=None, target_dir=None, keep_original=False):
+    """Alternative to call(["gunzip", ...]), because the latter fails on Windows"""
     if target_file is None:
         target_file = sub(r'\.gz$', "", source_file)
     with gzopen(source_file, "rb") as compressed:

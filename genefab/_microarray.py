@@ -50,11 +50,9 @@ class MicroarrayExperiment():
         for filename in file_list_iterator:
             source_file = join(getcwd(), self._storage, filename)
             if search(r'\.tar$|\.tar\.gz$', filename):
-                # call(["tar", "xf", ...]) fails on Windows:
                 with TarFile(source_file) as tar:
                     tar.extractall(path=target_dir)
             elif search(r'\.gz$', filename):
-                # call(["gunzip", ...]) fails on Windows:
                 gunzip(source_file, target_dir=target_dir)
             elif search(r'\.zip$', filename):
                 call(["unzip", source_file, "-d", target_dir])
@@ -67,9 +65,7 @@ class MicroarrayExperiment():
         )
         for filename in second_level_iterator:
             if search(r'\.gz$', filename):
-                # call(["gunzip", ...]) fails on Windows:
-                source_file = join(getcwd(), target_dir, filename)
-                gunzip(source_file)
+                gunzip(join(getcwd(), target_dir, filename))
                 self._file_list.add(sub(r'\.gz$', "", filename))
             else:
                 self._file_list.add(filename)
