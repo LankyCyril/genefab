@@ -1,7 +1,7 @@
 from ._dataset import GLDS
-from ._util import ensure_dir
+from ._util import ensure_dir, gunzip
+from tqdm import tqdm
 from os import mkdir, walk, getcwd
-from shutil import copyfileobj
 from os.path import join
 from re import search, sub
 from tarfile import TarFile
@@ -40,11 +40,14 @@ class MicroarrayExperiment():
         return (self.raw_data is None) and (self.derived_data is not None)
  
     def unpack(self, force_new_dir=True, update_glds_files=False):
-        """TEST THIS ON VARIOUS DIRECTORIES"""
+        """Store unpacked contents of associated archive files in experiment subdirectory"""
         self.glds.fetch_files(update=update_glds_files)
         target_dir = join(getcwd(), self._storage, self.accession)
         ensure_dir(target_dir, force_new_dir=force_new_dir)
-        for filename in self.glds.file_list:
+        file_list_iterator = tqdm(
+            self.glds.file_list, desc="Unpacking top-level files", unit="file"
+        )
+        for filename in file_list_iterator:
             source_file = join(getcwd(), self._storage, filename)
             if search(r'\.tar$|\.tar\.gz$', filename):
                 # call(["tar", "xf", ...]) fails on Windows:
@@ -52,24 +55,21 @@ class MicroarrayExperiment():
                     tar.extractall(path=target_dir)
             elif search(r'\.gz$', filename):
                 # call(["gunzip", ...]) fails on Windows:
-                target_file = sub(r'\.gz$', "", source_file)
-                with gzopen(source_file, "rb") as compressed:
-                    with open(target_file, "wb") as uncompressed:
-                        copyfileobj(compressed, uncompressed)
-                call(["mv", target_file, target_dir])
+                gunzip(source_file, target_dir=target_dir)
             elif search(r'\.zip$', filename):
                 call(["unzip", source_file, "-d", target_dir])
             else:
                 call(["cp", source_file, target_dir])
         self._file_list = set()
-        for filename in next(walk(target_dir))[2]:
+        second_level_iterator = tqdm(
+            next(walk(target_dir))[2], desc="Unpacking second-level files",
+            unit="file"
+        )
+        for filename in second_level_iterator:
             if search(r'\.gz$', filename):
-                source_file = join(getcwd(), target_dir, filename)
-                target_file = sub(r'\.gz$', "", source_file)
                 # call(["gunzip", ...]) fails on Windows:
-                with gzopen(source_file, "rb") as compressed:
-                    with open(target_file, "wb") as uncompressed:
-                        copyfileobj(compressed, uncompressed)
+                source_file = join(getcwd(), target_dir, filename)
+                gunzip(source_file)
                 self._file_list.add(sub(r'\.gz$', "", filename))
             else:
                 self._file_list.add(filename)

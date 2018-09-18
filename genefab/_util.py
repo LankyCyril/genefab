@@ -5,7 +5,9 @@ from requests import get
 from math import ceil
 from tqdm import tqdm
 from os import mkdir, remove
-from shutil import rmtree
+from re import sub
+from shutil import rmtree, copyfileobj
+from gzip import open as gzopen
 from urllib.error import URLError
 from sys import stderr
 
@@ -59,6 +61,17 @@ def ensure_dir(target_dir, force_new_dir):
         else:
             raise OSError("Target directory exists")
     mkdir(target_dir)
+
+def gunzip(source_file, target_file=None, target_dir=None, keep_original=False):
+    if target_file is None:
+        target_file = sub(r'\.gz$', "", source_file)
+    with gzopen(source_file, "rb") as compressed:
+        with open(target_file, "wb") as uncompressed:
+            copyfileobj(compressed, uncompressed)
+    if target_dir is not None:
+        call(["mv", target_file, target_dir])
+    if not keep_original:
+        remove(source_file)
 
 FFIELD_VALUES = {
     "Project+Type": [
