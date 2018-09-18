@@ -10,6 +10,7 @@ from shutil import rmtree, copyfileobj
 from gzip import open as gzopen
 from urllib.error import URLError
 from sys import stderr
+from subprocess import call
 
 URL_ROOT = "https://genelab-data.ndc.nasa.gov/genelab"
 DEFAULT_STORAGE = ".genefab"
