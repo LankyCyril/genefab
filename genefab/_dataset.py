@@ -133,5 +133,5 @@ class GLDS():
  
     def fetch_files(self, update=False):
         """Alias for file_list(self, fetch=True, update=update)"""
-        for file_name, url in self.file_list:
+        for file_name, url in self.file_list.items():
             fetch_file(file_name, url, self._storage, update=update)

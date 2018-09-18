@@ -22,10 +22,10 @@ def get_ffield_matches(**kwargs):
 class GLDSCollection():
     """Implements collection of GLDS instances (generated from search terms)"""
     accessions = None
-    _datasets = {}
  
     def __init__(self, **kwargs):
         """Match passed regexes and combine into search URL, store JSON"""
+        self._datasets = {}
         if "maxcount" in kwargs:
             maxcount = str(kwargs["maxcount"])
             del kwargs["maxcount"]

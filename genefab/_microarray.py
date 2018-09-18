@@ -1,6 +1,6 @@
 from ._dataset import GLDS
 from ._util import ensure_dir
-from os import mkdir, getcwd, walk
+from os import mkdir, walk, getcwd
 from shutil import copyfileobj
 from os.path import join
 from re import search, sub
@@ -39,28 +39,28 @@ class MicroarrayExperiment():
     def derived_only(self):
         return (self.raw_data is None) and (self.derived_data is not None)
  
-    def unpack(self, force_new_dir=True):
-        target_dir = join(self._storage, self.accession)
+    def unpack(self, force_new_dir=True, update_glds_files=False):
+        """TEST THIS ON VARIOUS DIRECTORIES"""
+        self.glds.fetch_files(update=update_glds_files)
+        target_dir = join(getcwd(), self._storage, self.accession)
         ensure_dir(target_dir, force_new_dir=force_new_dir)
         for filename in self.glds.file_list:
             source_file = join(getcwd(), self._storage, filename)
-            cleanup_cmd = None
             if search(r'\.tar$|\.tar\.gz$', filename):
-                cmd_a = "untar"
-            elif search(r'\.gz$', filename):
-                cmd_a = ["gunzip", source_file]
-                cleanup_cmd = ["mv", sub(r'\.gz$', "", source_file), "."]
-            elif search(r'\.zip$', filename):
-                cmd_a = ["unzip", source_file, "-d", "."]
-            else:
-                cmd_a = ["cp", source_file, "."]
-            if cmd_a == "untar": # call(["tar", "xf", ...]) fails on Windows
+                # call(["tar", "xf", ...]) fails on Windows:
                 with TarFile(source_file) as tar:
                     tar.extractall(path=target_dir)
+            elif search(r'\.gz$', filename):
+                # call(["gunzip", ...]) fails on Windows:
+                target_file = sub(r'\.gz$', "", source_file)
+                with gzopen(source_file, "rb") as compressed:
+                    with open(target_file, "wb") as uncompressed:
+                        copyfileobj(compressed, uncompressed)
+                call(["mv", target_file, target_dir])
+            elif search(r'\.zip$', filename):
+                call(["unzip", source_file, "-d", target_dir])
             else:
-                call(cmd_a, cwd=target_dir)
-            if cleanup_cmd:
-                call(cleanup_cmd, cwd=target_dir)
+                call(["cp", source_file, target_dir])
         self._file_list = set()
         for filename in next(walk(target_dir))[2]:
             if search(r'\.gz$', filename):
