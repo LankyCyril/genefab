@@ -91,20 +91,28 @@ class GLDS():
         return _factors
  
     @lru_cache(maxsize=None)
-    def file_table(self):
+    def property_table(self, field_name):
         """Return DataFrame subset to filenames and factor values"""
         factor_fields = self.factors(as_fields=True)
         if not factor_fields:
             return None
         factor_dataframe = self.frame()[list(factor_fields.values())]
         factor_dataframe.columns = list(factor_fields.keys())
-        datafiles_field_ids = self.field_ids("Array Data File")
-        if len(datafiles_field_ids) != 1:
-            raise ValueError("Number of 'Array Data File' ids is not 1")
-        datafiles_names = self.frame()[datafiles_field_ids[0]]
-        datafiles_names.name = "filename"
-        datafiles = concat([factor_dataframe, datafiles_names], axis=1)
-        return datafiles
+        property_field_ids = self.field_ids(field_name)
+        if len(property_field_ids) != 1:
+            raise ValueError("Number of '{}' ids is not 1".format(field_name))
+        property_names = self.frame()[property_field_ids[0]]
+        property_names.name = field_name
+        return concat([factor_dataframe, property_names], axis=1)
+ 
+    def has_raw_arrays(self):
+        return (len(self.field_values("Array Data File")) != 0)
+    def has_derived_arrays(self):
+        return (len(self.field_values("Derived Array Data File")) != 0)
+    def has_raw_arrays_only(self):
+        return self.has_raw_arrays() and (not self.has_derived_arrays())
+    def has_derived_arrays_only(self):
+        return (not self.has_raw_arrays()) and self.has_derived_arrays()
  
     def file_list(self, fetch=False, update=False):
         """Return names and URLs of data files stored on GeneLab servers"""
