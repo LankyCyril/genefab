@@ -113,12 +113,6 @@ class GLDS():
     def has_derived_arrays(self):
         return (len(self.field_values("Derived Array Data File")) != 0)
     @property
-    def has_raw_arrays_only(self):
-        return self.has_raw_arrays and (not self.has_derived_arrays)
-    @property
-    def has_derived_arrays_only(self):
-        return (not self.has_raw_arrays) and self.has_derived_arrays
-    @property
     def is_microarray(self):
         return self.has_raw_arrays or self.has_derived_arrays
  
