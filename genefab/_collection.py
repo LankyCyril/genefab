@@ -1,7 +1,7 @@
 from re import search, IGNORECASE
 from urllib.parse import quote_plus
 from sys import stderr
-from ._dataset import GeneLabDataSet
+from ._dataset import GLDS
 from ._util import get_json, URL_ROOT, FFIELD_ALIASES, FFIELD_VALUES
 
 def get_ffield_matches(**kwargs):
@@ -18,8 +18,8 @@ def get_ffield_matches(**kwargs):
                 yield ffield, ffvalue
         print("\b", file=stderr)
 
-class GeneLabDataSetCollection():
-    """Implements collection of GeneLabDataSet instances (generated from search terms)"""
+class GLDSCollection():
+    """Implements collection of GLDS instances (generated from search terms)"""
     accessions = None
     _datasets = {}
  
@@ -50,7 +50,7 @@ class GeneLabDataSetCollection():
         if accession not in self.accessions:
             raise KeyError("No such dataset in collection")
         if accession not in self._datasets:
-            self._datasets[accession] = GeneLabDataSet(accession)
+            self._datasets[accession] = GLDS(accession)
         return self._datasets[accession]
  
     def __iter__(self):

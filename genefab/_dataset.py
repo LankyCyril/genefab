@@ -3,7 +3,7 @@ from pandas import DataFrame, concat
 from functools import lru_cache
 from ._util import get_json, fetch_file, URL_ROOT, LOCAL_STORAGE
 
-class GeneLabDataSet():
+class GLDS():
     """Implements single dataset interface (generated from accession id)"""
     accession = None
  

@@ -1,2 +1,2 @@
-from ._dataset import GeneLabDataSet
-from ._collection import GeneLabDataSetCollection
+from ._dataset import GLDS
+from ._collection import GLDSCollection
