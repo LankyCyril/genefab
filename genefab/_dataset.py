@@ -50,6 +50,7 @@ class GLDS():
                     fields.append(record["field"])
         return fields
  
+    @property
     @lru_cache(maxsize=None)
     def frame(self):
         """Convert _raw field of _isa2json to pandas DataFrame"""
@@ -71,12 +72,12 @@ class GLDS():
     def field_values(self, field_name, column_name=None):
         """Convert external field name to internal field id, return set of possible values for the field"""
         return set.union(*(
-            set(self.frame()[field_id])
+            set(self.frame[field_id])
             for field_id in self.field_ids(field_name, column_name)
         ), set())
  
     @lru_cache(maxsize=None)
-    def factors(self, as_fields=False):
+    def factors(self, *, as_fields):
         """Get factor type from _header"""
         _factors = {}
         for record in self._header:
@@ -86,7 +87,7 @@ class GLDS():
                     if as_fields:
                         values = column["field"]
                     else:
-                        values = set(self.frame()[column["field"]].values)
+                        values = set(self.frame[column["field"]].values)
                     _factors[factor] = values
         return _factors
  
@@ -96,21 +97,25 @@ class GLDS():
         factor_fields = self.factors(as_fields=True)
         if not factor_fields:
             return None
-        factor_dataframe = self.frame()[list(factor_fields.values())]
+        factor_dataframe = self.frame[list(factor_fields.values())]
         factor_dataframe.columns = list(factor_fields.keys())
         property_field_ids = self.field_ids(field_name)
         if len(property_field_ids) != 1:
             raise ValueError("Number of '{}' ids is not 1".format(field_name))
-        property_names = self.frame()[property_field_ids[0]]
+        property_names = self.frame[property_field_ids[0]]
         property_names.name = field_name
         return concat([factor_dataframe, property_names], axis=1)
  
+    @property
     def has_raw_arrays(self):
         return (len(self.field_values("Array Data File")) != 0)
+    @property
     def has_derived_arrays(self):
         return (len(self.field_values("Derived Array Data File")) != 0)
+    @property
     def has_raw_arrays_only(self):
         return self.has_raw_arrays() and (not self.has_derived_arrays())
+    @property
     def has_derived_arrays_only(self):
         return (not self.has_raw_arrays()) and self.has_derived_arrays()
  

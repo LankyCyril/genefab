@@ -10,7 +10,7 @@ class MicroarrayExperiment():
  
     def __init__(self, glds):
         self.glds = glds
-        self.factors = glds.factors()
+        self.factors = glds.factors(as_fields=False)
         if glds.field_ids("Array Design REF"):
             self.design_ref = glds.property_table("Array Design REF")
         if glds.field_ids("Array Data File"):
