@@ -3,6 +3,7 @@ from urllib.parse import quote_plus
 from sys import stderr
 from ._dataset import GLDS
 from ._util import get_json, URL_ROOT, FFIELD_ALIASES, FFIELD_VALUES
+from ._util import DEFAULT_STORAGE
 
 def get_ffield_matches(**kwargs):
     """Expand passed regexes to all matching ffield values"""
@@ -30,6 +31,11 @@ class GLDSCollection():
             del kwargs["maxcount"]
         else:
             maxcount = "25"
+        if "storage" in kwargs:
+            self._storage = kwargs["storage"]
+            del kwargs["storage"]
+        else:
+            self._storage = DEFAULT_STORAGE
         term_pairs = [
             "ffield={}&fvalue={}".format(ffield, quote_plus(ffvalue))
             for ffield, ffvalue in get_ffield_matches(**kwargs)
@@ -50,7 +56,7 @@ class GLDSCollection():
         if accession not in self.accessions:
             raise KeyError("No such dataset in collection")
         if accession not in self._datasets:
-            self._datasets[accession] = GLDS(accession)
+            self._datasets[accession] = GLDS(accession, storage=self._storage)
         return self._datasets[accession]
  
     def __iter__(self):

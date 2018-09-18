@@ -1,5 +1,5 @@
 from ._dataset import GLDS
-from ._util import LOCAL_STORAGE, ensure_dir
+from ._util import ensure_dir
 from os import mkdir, getcwd, walk
 from shutil import copyfileobj
 from os.path import join
@@ -21,6 +21,7 @@ class MicroarrayExperiment():
     def __init__(self, glds):
         self.glds = glds
         self.accession = glds.accession
+        self._storage = glds._storage
         self.factors = glds.factors(as_fields=False)
         if glds.field_ids("Array Design REF"):
             self.design_ref = glds.property_table("Array Design REF")
@@ -39,10 +40,10 @@ class MicroarrayExperiment():
         return (self.raw_data is None) and (self.derived_data is not None)
  
     def unpack(self, force_new_dir=True):
-        target_dir = join(LOCAL_STORAGE, self.accession)
+        target_dir = join(self._storage, self.accession)
         ensure_dir(target_dir, force_new_dir=force_new_dir)
         for filename in self.glds.file_list:
-            source_file = join(getcwd(), LOCAL_STORAGE, filename)
+            source_file = join(getcwd(), self._storage, filename)
             if search(r'\.tar$|\.tar\.gz$', filename):
                 cmd_a = "untar"
                 cmd_b = None

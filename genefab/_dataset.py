@@ -1,15 +1,16 @@
 from re import sub
 from pandas import DataFrame, concat
 from functools import lru_cache
-from ._util import get_json, fetch_file, URL_ROOT, LOCAL_STORAGE
+from ._util import get_json, fetch_file, URL_ROOT, DEFAULT_STORAGE
 
 class GLDS():
     """Implements single dataset interface (generated from accession id)"""
     accession = None
  
-    def __init__(self, accession):
+    def __init__(self, accession, storage=DEFAULT_STORAGE):
         """Request JSON representation of ISA metadata and store fields"""
         self.accession = accession
+        self._storage = storage
         getter_url = "{}/data/study/data/{}/"
         data_json = get_json(getter_url.format(URL_ROOT, accession))
         if len(data_json) > 1:
@@ -133,4 +134,4 @@ class GLDS():
     def fetch_files(self, update=False):
         """Alias for file_list(self, fetch=True, update=update)"""
         for file_name, url in self.file_list:
-            fetch_file(file_name, url, LOCAL_STORAGE, update=update)
+            fetch_file(file_name, url, self._storage, update=update)

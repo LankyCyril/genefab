@@ -10,7 +10,7 @@ from urllib.error import URLError
 from sys import stderr
 
 URL_ROOT = "https://genelab-data.ndc.nasa.gov/genelab"
-LOCAL_STORAGE = ".genefab"
+DEFAULT_STORAGE = ".genefab"
 
 def get_json(url):
     """HTTP get, decode, parse"""
@@ -18,7 +18,7 @@ def get_json(url):
     with urlopen(url) as response:
         return loads(response.read().decode())
 
-def fetch_file(file_name, url, target_directory=LOCAL_STORAGE, update=False):
+def fetch_file(file_name, url, target_directory=DEFAULT_STORAGE, update=False):
     """Perform checks, download file"""
     if not isdir(target_directory):
         if isfile(target_directory):
