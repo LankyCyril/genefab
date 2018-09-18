@@ -1,15 +1,26 @@
 from ._dataset import GLDS
+from ._util import LOCAL_STORAGE
+from os import mkdir, getcwd, walk
+from shutil import rmtree, copyfileobj
+from os.path import join, isfile, isdir, exists
+from re import search, sub
+from tarfile import TarFile
+from gzip import open as gzopen
+from subprocess import call
 
 class MicroarrayExperiment():
     """Implements wrapper of GLDS class that has 'Array Data Files'"""
     glds = None
+    accession = None
     design_ref = None
     factors = None
     raw_data = None
     derived_data = None
+    file_list = None
  
     def __init__(self, glds):
         self.glds = glds
+        self.accession = glds.accession
         self.factors = glds.factors(as_fields=False)
         if glds.field_ids("Array Design REF"):
             self.design_ref = glds.property_table("Array Design REF")
@@ -26,3 +37,42 @@ class MicroarrayExperiment():
     @property
     def derived_only(self):
         return (self.raw_data is None) and (self.derived_data is not None)
+ 
+    def unpack(self, force_new_dir=True):
+        target_dir = join(LOCAL_STORAGE, self.accession)
+        if exists(target_dir):
+            if not isdir(target_dir):
+                raise OSError("Target name exists and is not a directory")
+            elif force_new_dir:
+                rmtree(target_dir)
+            else:
+                raise OSError("Target directory exists")
+        mkdir(target_dir)
+        for filename in self.glds.file_list:
+            source_file = join(getcwd(), LOCAL_STORAGE, filename)
+            if search(r'\.tar$|\.tar\.gz$', filename):
+                cmd_a = "untar"
+                cmd_b = None
+            elif search(r'\.gz$', filename):
+                cmd_a = ["gunzip", source_file]
+                cmd_b = ["mv", sub(r'\.gz$', "", source_file), "."]
+            elif search(r'\.zip$', filename):
+                cmd_a = ["unzip", source_file, "-d", "."]
+                cmd_b = None
+            else:
+                cmd_a = ["cp", source_file, "."]
+            if cmd_a == "untar": # call(["tar", "xf", ...]) fails on Windows
+                with TarFile(source_file) as tar:
+                    tar.extractall(path=target_dir)
+            else:
+                call(cmd_a, cwd=target_dir)
+            if cmd_b:
+                call(cmd_b, cwd=target_dir)
+        for filename in next(walk(target_dir))[2]:
+            if search(r'\.gz$', filename):
+                source_file = join(getcwd(), target_dir, filename)
+                target_file = sub(r'\.gz$', "", source_file)
+                # call(["gunzip", ...]) fails on Windows:
+                with gzopen(source_file, "rb") as compressed:
+                    with open(target_file, "wb") as uncompressed:
+                        copyfileobj(compressed, uncompressed)
