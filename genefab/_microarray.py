@@ -44,15 +44,14 @@ class MicroarrayExperiment():
         ensure_dir(target_dir, force_new_dir=force_new_dir)
         for filename in self.glds.file_list:
             source_file = join(getcwd(), self._storage, filename)
+            cleanup_cmd = None
             if search(r'\.tar$|\.tar\.gz$', filename):
                 cmd_a = "untar"
-                cmd_b = None
             elif search(r'\.gz$', filename):
                 cmd_a = ["gunzip", source_file]
-                cmd_b = ["mv", sub(r'\.gz$', "", source_file), "."]
+                cleanup_cmd = ["mv", sub(r'\.gz$', "", source_file), "."]
             elif search(r'\.zip$', filename):
                 cmd_a = ["unzip", source_file, "-d", "."]
-                cmd_b = None
             else:
                 cmd_a = ["cp", source_file, "."]
             if cmd_a == "untar": # call(["tar", "xf", ...]) fails on Windows
@@ -60,8 +59,8 @@ class MicroarrayExperiment():
                     tar.extractall(path=target_dir)
             else:
                 call(cmd_a, cwd=target_dir)
-            if cmd_b:
-                call(cmd_b, cwd=target_dir)
+            if cleanup_cmd:
+                call(cleanup_cmd, cwd=target_dir)
         self._file_list = set()
         for filename in next(walk(target_dir))[2]:
             if search(r'\.gz$', filename):
