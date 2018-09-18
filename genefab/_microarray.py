@@ -32,6 +32,15 @@ class MicroarrayExperiment():
             self.derived_data = glds.property_table("Derived Array Data File")
         if (self.raw_data is None) and (self.derived_data is None):
             raise ValueError("No raw or derived data associated with factors")
+        tsv = join(getcwd(), self._storage, self.accession+".tsv")
+        if isfile(tsv):
+            with open(tsv, "rt") as tsv_handle:
+                putative_file_list = set(map(str.strip, tsv_handle))
+                for filename in putative_file_list:
+                    if not isfile(filename):
+                        break
+                else:
+                    self._file_list = putative_file_list
  
     @property
     def raw_only(self):
@@ -47,7 +56,7 @@ class MicroarrayExperiment():
             for filename in self._file_list:
                 print(filename, file=tsv_handle)
  
-    def unpack(self, force_new_dir=True, update_glds_files=False):
+    def _unpack(self, force_new_dir=True, update_glds_files=False):
         """Store unpacked contents of associated archive files in experiment subdirectory"""
         self.glds.fetch_files(update=update_glds_files)
         target_dir = join(getcwd(), self._storage, self.accession)
@@ -83,7 +92,7 @@ class MicroarrayExperiment():
     @property
     def file_list(self):
         if self._file_list is None:
-            self.unpack()
+            self._unpack()
         if self._file_list:
             return self._file_list
         else:
