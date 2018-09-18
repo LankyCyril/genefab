@@ -1,8 +1,9 @@
 from re import search, IGNORECASE
 from urllib.parse import quote_plus
 from sys import stderr
-from ._dataset import GeneLabDataSet
+from ._dataset import GLDS
 from ._util import get_json, URL_ROOT, FFIELD_ALIASES, FFIELD_VALUES
+from ._util import DEFAULT_STORAGE
 
 def get_ffield_matches(**kwargs):
     """Expand passed regexes to all matching ffield values"""
@@ -18,18 +19,23 @@ def get_ffield_matches(**kwargs):
                 yield ffield, ffvalue
         print("\b", file=stderr)
 
-class GeneLabDataSetCollection():
-    """Implements collection of GeneLabDataSet instances (generated from search terms)"""
-    _accessions = None
-    _datasets = {}
+class GLDSCollection():
+    """Implements collection of GLDS instances (generated from search terms)"""
+    accessions = None
  
     def __init__(self, **kwargs):
         """Match passed regexes and combine into search URL, store JSON"""
+        self._datasets = {}
         if "maxcount" in kwargs:
             maxcount = str(kwargs["maxcount"])
             del kwargs["maxcount"]
         else:
             maxcount = "25"
+        if "storage" in kwargs:
+            self._storage = kwargs["storage"]
+            del kwargs["storage"]
+        else:
+            self._storage = DEFAULT_STORAGE
         term_pairs = [
             "ffield={}&fvalue={}".format(ffield, quote_plus(ffvalue))
             for ffield, ffvalue in get_ffield_matches(**kwargs)
@@ -42,20 +48,20 @@ class GeneLabDataSetCollection():
             self._json = get_json(url)["hits"]["hits"]
         except:
             raise ValueError("Unrecognized JSON structure")
-        self._accessions = [
+        self.accessions = [
             hit["_id"] for hit in self._json
         ]
  
-    def keys(self):
-        return self._accessions
- 
-    def values(self):
-        for accession in self._accessions:
-            yield self[accession]
- 
     def __getitem__(self, accession):
-        if accession not in self._accessions:
+        if accession not in self.accessions:
             raise KeyError("No such dataset in collection")
         if accession not in self._datasets:
-            self._datasets[accession] = GeneLabDataSet(accession)
+            self._datasets[accession] = GLDS(accession, storage=self._storage)
         return self._datasets[accession]
+ 
+    def __iter__(self):
+        for accession in self.accessions:
+            yield self[accession]
+ 
+    def __len__(self):
+        return len(self.accessions or [])

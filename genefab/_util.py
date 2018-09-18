@@ -1,15 +1,19 @@
 from urllib.request import urlopen
 from json import loads
-from os.path import join, isfile, isdir
+from os.path import join, isfile, isdir, exists
 from requests import get
 from math import ceil
 from tqdm import tqdm
-from os import mkdir, remove
+from os import makedirs, remove
+from re import sub
+from shutil import rmtree, copyfileobj
+from gzip import open as gzopen
 from urllib.error import URLError
 from sys import stderr
+from subprocess import call
 
 URL_ROOT = "https://genelab-data.ndc.nasa.gov/genelab"
-LOCAL_STORAGE = ".genefab"
+DEFAULT_STORAGE = ".genefab"
 
 def get_json(url):
     """HTTP get, decode, parse"""
@@ -17,12 +21,12 @@ def get_json(url):
     with urlopen(url) as response:
         return loads(response.read().decode())
 
-def fetch_file(file_name, url, target_directory=LOCAL_STORAGE, update=False):
+def fetch_file(file_name, url, target_directory=DEFAULT_STORAGE, update=False):
     """Perform checks, download file"""
     if not isdir(target_directory):
         if isfile(target_directory):
             raise OSError("Local storage exists and is not a directory")
-        mkdir(target_directory)
+        makedirs(target_directory)
     target_file = join(target_directory, file_name)
     if not update:
         if isdir(target_file):
@@ -48,6 +52,29 @@ def fetch_file(file_name, url, target_directory=LOCAL_STORAGE, update=False):
         remove(target_file)
         raise URLError("Failed to download the correct number of bytes")
     return target_file
+
+def ensure_dir(target_dir, force_new_dir):
+    """Guarantee writable directory or raise exception"""
+    if exists(target_dir):
+        if not isdir(target_dir):
+            raise OSError("Target name exists and is not a directory")
+        elif force_new_dir:
+            rmtree(target_dir)
+        else:
+            raise OSError("Target directory exists")
+    makedirs(target_dir)
+
+def gunzip(source_file, target_file=None, target_dir=None, keep_original=False):
+    """Alternative to call(["gunzip", ...]), because the latter fails on Windows"""
+    if target_file is None:
+        target_file = sub(r'\.gz$', "", source_file)
+    with gzopen(source_file, "rb") as compressed:
+        with open(target_file, "wb") as uncompressed:
+            copyfileobj(compressed, uncompressed)
+    if target_dir is not None:
+        call(["mv", target_file, target_dir])
+    if not keep_original:
+        remove(source_file)
 
 FFIELD_VALUES = {
     "Project+Type": [

@@ -1,2 +1,3 @@
-from ._dataset import GeneLabDataSet
-from ._collection import GeneLabDataSetCollection
+from ._dataset import GLDS
+from ._collection import GLDSCollection
+from ._microarray import MicroarrayExperiment
