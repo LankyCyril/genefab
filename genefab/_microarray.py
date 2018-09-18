@@ -18,8 +18,10 @@ class MicroarrayExperiment():
     raw_data = None
     derived_data = None
     _file_list = None
+    _storage = None
+    _tsv = None
  
-    def __init__(self, glds):
+    def __init__(self, glds, reextract=False):
         """Interpret GLDS, describe; if data has been unpacked before, check and reuse"""
         self.glds = glds
         self.accession = glds.accession
@@ -33,9 +35,9 @@ class MicroarrayExperiment():
             self.derived_data = glds.property_table("Derived Array Data File")
         if (self.raw_data is None) and (self.derived_data is None):
             raise ValueError("No raw or derived data associated with factors")
-        tsv = join(getcwd(), self._storage, self.accession+".tsv")
-        if isfile(tsv):
-            with open(tsv, "rt") as tsv_handle:
+        self._tsv = join(getcwd(), self._storage, self.accession+".tsv")
+        if (not reextract) and isfile(self._tsv):
+            with open(self._tsv, "rt") as tsv_handle:
                 putative_file_list = set(map(str.strip, tsv_handle))
                 for filename in putative_file_list:
                     if not isfile(filename):
@@ -52,8 +54,7 @@ class MicroarrayExperiment():
  
     def _store_file_list(self):
         """List all unpacked files into a TSV file"""
-        tsv = join(getcwd(), self._storage, self.accession+".tsv")
-        with open(tsv, "wt") as tsv_handle:
+        with open(self._tsv, "wt") as tsv_handle:
             for filename in self._file_list:
                 print(filename, file=tsv_handle)
  
@@ -71,7 +72,7 @@ class MicroarrayExperiment():
                 with TarFile(source_file) as tar:
                     tar.extractall(path=target_dir)
             elif search(r'\.gz$', filename):
-                gunzip(source_file, target_dir=target_dir)
+                gunzip(source_file, target_dir=target_dir, keep_original=True)
             elif search(r'\.zip$', filename):
                 call(["unzip", source_file, "-d", target_dir])
             else:
