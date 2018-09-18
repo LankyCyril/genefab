@@ -8,6 +8,16 @@ from tarfile import TarFile
 from gzip import open as gzopen
 from subprocess import call
 
+def ensure_dir(target_dir, force_new_dir):
+    if exists(target_dir):
+        if not isdir(target_dir):
+            raise OSError("Target name exists and is not a directory")
+        elif force_new_dir:
+            rmtree(target_dir)
+        else:
+            raise OSError("Target directory exists")
+    mkdir(target_dir)
+
 class MicroarrayExperiment():
     """Implements wrapper of GLDS class that has 'Array Data Files'"""
     glds = None
@@ -16,7 +26,7 @@ class MicroarrayExperiment():
     factors = None
     raw_data = None
     derived_data = None
-    file_list = None
+    _file_list = None
  
     def __init__(self, glds):
         self.glds = glds
@@ -40,14 +50,7 @@ class MicroarrayExperiment():
  
     def unpack(self, force_new_dir=True):
         target_dir = join(LOCAL_STORAGE, self.accession)
-        if exists(target_dir):
-            if not isdir(target_dir):
-                raise OSError("Target name exists and is not a directory")
-            elif force_new_dir:
-                rmtree(target_dir)
-            else:
-                raise OSError("Target directory exists")
-        mkdir(target_dir)
+        ensure_dir(target_dir, force_new_dir=force_new_dir)
         for filename in self.glds.file_list:
             source_file = join(getcwd(), LOCAL_STORAGE, filename)
             if search(r'\.tar$|\.tar\.gz$', filename):
@@ -68,6 +71,7 @@ class MicroarrayExperiment():
                 call(cmd_a, cwd=target_dir)
             if cmd_b:
                 call(cmd_b, cwd=target_dir)
+        self._file_list = set()
         for filename in next(walk(target_dir))[2]:
             if search(r'\.gz$', filename):
                 source_file = join(getcwd(), target_dir, filename)
@@ -76,3 +80,15 @@ class MicroarrayExperiment():
                 with gzopen(source_file, "rb") as compressed:
                     with open(target_file, "wb") as uncompressed:
                         copyfileobj(compressed, uncompressed)
+                self._file_list.add(sub(r'\.gz$', "", filename))
+            else:
+                self._file_list.add(filename)
+ 
+    @property
+    def file_list(self):
+        if self._file_list is None:
+            self.unpack()
+        if self._file_list:
+            return self._file_list
+        else:
+            raise OSError("No files associated with experiment")
