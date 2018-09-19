@@ -12,6 +12,7 @@ from urllib.error import URLError
 from sys import stderr
 from subprocess import call
 from tempfile import NamedTemporaryFile
+from io import StringIO
 
 URL_ROOT = "https://genelab-data.ndc.nasa.gov/genelab"
 DEFAULT_STORAGE = ".genefab"
@@ -78,20 +79,29 @@ def gunzip(source_file, target_file=None, target_dir=None, keep_original=False):
         remove(source_file)
 
 def routput(R, script_mask, **kwargs):
-    if "output" not in kwargs:
+    """Expand R script mask with kwargs (format string), run, return output as StringIO and store if `output` passed"""
+    using_temp_output = ("output" not in kwargs)
+    if using_temp_output:
         with NamedTemporaryFile("wb", delete=False) as output:
-            kwargs["output"] = output.name.replace("\\", "\\\\")
+            kwargs["output"] = output.name
+    unescaped_output_name = kwargs["output"][:]
+    kwargs["output"] = repr(kwargs["output"])
     script = script_mask.format(**kwargs)
     with NamedTemporaryFile("wt", delete=False) as script_file:
         script_file.write(script)
+    msg_mask = "Running Rscript {} and storing to {}"
+    print(msg_mask.format(script_file.name, unescaped_output_name), file=stderr)
     returncode = call([R, "--vanilla", script_file.name])
-    if returncode != 0:
-        raise OSError("R script failed, error code {}".format(returncode))
-    with open(output.name, "rt") as output_readable:
-        result = output_readable.read()
-    remove(output.name)
     remove(script_file.name)
-    return result
+    with open(unescaped_output_name, "rt") as output_readable:
+        result = output_readable.read()
+    if using_temp_output:
+        remove(output.name)
+    if returncode == 0:
+        return StringIO(result)
+    else:
+        print("# Offending R script:", script, sep="\n", file=stderr)
+        raise OSError("R script failed, error code {}".format(returncode))
 
 FFIELD_VALUES = {
     "Project+Type": [

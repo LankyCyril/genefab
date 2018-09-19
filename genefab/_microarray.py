@@ -5,9 +5,10 @@ from os import walk, getcwd
 from os.path import join, isfile, relpath
 from re import search, sub
 from tarfile import TarFile
-from gzip import open as gzopen
 from subprocess import call
 from glob import iglob
+from pandas import read_csv
+from functools import lru_cache
 
 AFFY_SCRIPT = """
 if (!require("affy")) {{
@@ -15,8 +16,8 @@ if (!require("affy")) {{
     biocLite("affy", suppressUpdates=TRUE, suppressAutoUpdate=TRUE, ask=FALSE)
 }}
 library("affy")
-eset = just.rma(filenames="{cel}")
-write.exprs(eset, file="{output}")
+eset = just.rma(filenames=c({cels}))
+write.exprs(eset, file={output})
 """
 
 class MicroarrayExperiment():
@@ -113,6 +114,7 @@ class MicroarrayExperiment():
             raise OSError("No files associated with experiment")
  
     @property
+    @lru_cache(maxsize=None)
     def annotation(self):
         if self.raw_data is None:
             raise NotImplementedError("Experiment without raw data")
@@ -133,9 +135,18 @@ class MicroarrayExperiment():
         del _annotation[_property]
         return _annotation
  
-    def cel2exp(self, sample_name):
-        filename = self.annotation.loc[sample_name, "filename"]
-        expression_table = routput(
-            self._R, AFFY_SCRIPT,
-            cel=filename.replace("\\", "\\\\")
+    @property
+    def expression_table(self):
+        """Run R script with bioconductor-affy on all CELs in experiment"""
+        cels = ", ".join(
+            repr(cel) # safeguard mainly against single backslashes on Windows
+            for cel in self.annotation["filename"]
         )
+        expression_table_raw = routput(self._R, AFFY_SCRIPT, cels=cels)
+        expression_table = read_csv(expression_table_raw, sep="\t", index_col=0)
+        # replace filenames with sample names (trust unique):
+        expression_table.columns = [
+            self.annotation[self.annotation["filename"]==filename].index[0]
+            for filename in expression_table.columns
+        ]
+        return expression_table
