@@ -89,7 +89,7 @@ def routput(R, script_mask, **kwargs):
     script = script_mask.format(**kwargs)
     with NamedTemporaryFile("wt", delete=False) as script_file:
         script_file.write(script)
-    msg_mask = "Running Rscript {} and storing to {}"
+    msg_mask = "Running Rscript '{}' and storing to '{}'"
     print(msg_mask.format(script_file.name, unescaped_output_name), file=stderr)
     returncode = call([R, "--vanilla", script_file.name])
     remove(script_file.name)

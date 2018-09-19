@@ -16,8 +16,24 @@ if (!require("affy")) {{
     biocLite("affy", suppressUpdates=TRUE, suppressAutoUpdate=TRUE, ask=FALSE)
 }}
 library("affy")
-eset = just.rma(filenames=c({cels}))
-write.exprs(eset, file={output})
+
+if (!require("limma")) {{
+    source("https://bioconductor.org/biocLite.R")
+    biocLite("limma", suppressUpdates=TRUE, suppressAutoUpdate=TRUE, ask=FALSE)
+}}
+library("limma")
+
+affy_set = ReadAffy(filenames=c({cels}))
+annotation = data.frame({factor_name}=factor(c({factor_list})))
+rownames(annotation) = sampleNames(affy_set)
+phenoData(affy_set) = AnnotatedDataFrame(annotation)
+
+expression_set = rma(affy_set)
+design = model.matrix(~expression_set${factor_name})
+bayes_data = eBayes(lmFit(expression_set, design))
+results = topTable(bayes_data, n=Inf)
+
+write.csv(results, file={output}, quote=FALSE)
 """
 
 class MicroarrayExperiment():
@@ -135,18 +151,20 @@ class MicroarrayExperiment():
         del _annotation[_property]
         return _annotation
  
-    @property
-    def expression_table(self):
+    def limma(self):
         """Run R script with bioconductor-affy on all CELs in experiment"""
         cels = ", ".join(
             repr(cel) # safeguard mainly against single backslashes on Windows
             for cel in self.annotation["filename"]
         )
-        expression_table_raw = routput(self._R, AFFY_SCRIPT, cels=cels)
-        expression_table = read_csv(expression_table_raw, sep="\t", index_col=0)
-        # replace filenames with sample names (trust unique):
-        expression_table.columns = [
-            self.annotation[self.annotation["filename"]==filename].index[0]
-            for filename in expression_table.columns
-        ]
-        return expression_table
+        factor_name = list(self.factors.keys())[0]
+        factor_list = ", ".join(
+            repr(value) # just puts quotes around values
+            for value in self.annotation[factor_name]
+        )
+        deg_data_raw = routput(
+            self._R, AFFY_SCRIPT,
+            cels=cels, factor_name=factor_name, factor_list=factor_list
+        )
+        deg_data = read_csv(deg_data_raw, index_col=0)
+        return deg_data
