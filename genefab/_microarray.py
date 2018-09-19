@@ -116,7 +116,7 @@ class MicroarrayExperiment():
             tail = sub(r'^\*', "", row[_property])
             matching_files = set(
                 filename
-                for filename in self._file_list
+                for filename in self.file_list
                 if filename.endswith(tail)
             )
             if len(matching_files) != 1:

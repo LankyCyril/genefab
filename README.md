@@ -1,6 +1,7 @@
 # GeneFab
 
-Work in progress with an admittedly silly name.
+Work in progress with an admittedly silly name.  
+There are **a lot** of corner cases and something is probably very broken.
 
 ## Quick start (demo)
 
