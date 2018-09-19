@@ -5,7 +5,7 @@ There are **a lot** of corner cases and something is probably very broken.
 
 ## Quick start (demo)
 
-...
+https://github.com/LankyCyril/genefab/blob/master/genefab-demo.ipynb
 
 ## Description
 
@@ -28,7 +28,8 @@ Python packages:
 * requests
 * tqdm
 
-It is recommended to use a user installed [Conda]() environment.  
+It is recommended to use a user installed
+[Conda](https://www.anaconda.com/download/) environment.  
 Full requirements can be fulfilled by using the \*.yaml files provided in the
 top-level directory of the repo:
 
