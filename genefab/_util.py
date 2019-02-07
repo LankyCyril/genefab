@@ -1,107 +1,15 @@
+from sys import stderr
 from urllib.request import urlopen
 from json import loads
-from os.path import join, isfile, isdir, exists
-from requests import get
-from math import ceil
-from tqdm import tqdm
-from os import makedirs, remove
-from re import sub
-from shutil import rmtree, copyfileobj
-from gzip import open as gzopen
-from urllib.error import URLError
-from sys import stderr
-from subprocess import call
-from tempfile import NamedTemporaryFile
-from io import StringIO
 
-URL_ROOT = "https://genelab-data.ndc.nasa.gov/genelab"
-DEFAULT_STORAGE = ".genefab"
+GENELAB_ROOT = "https://genelab-data.ndc.nasa.gov"
+API_ROOT = "https://genelab-data.ndc.nasa.gov/genelab"
 
 def get_json(url):
     """HTTP get, decode, parse"""
     print("Parsing url: ", url, file=stderr)
     with urlopen(url) as response:
         return loads(response.read().decode())
-
-def fetch_file(file_name, url, target_directory=DEFAULT_STORAGE, update=False):
-    """Perform checks, download file"""
-    if not isdir(target_directory):
-        if isfile(target_directory):
-            raise OSError("Local storage exists and is not a directory")
-        makedirs(target_directory)
-    target_file = join(target_directory, file_name)
-    if not update:
-        if isdir(target_file):
-            raise OSError("Directory with target name exists: " + target_file)
-        if isfile(target_file):
-            print("Reusing", file_name, file=stderr)
-            return target_file
-    stream = get(url, stream=True)
-    if stream.status_code != 200:
-        raise URLError("{}: status code {}".format(url, stream.status_code))
-    total_bytes = int(stream.headers.get("content-length", 0))
-    total_kb = ceil(total_bytes / 1024)
-    with open(target_file, "wb") as output_handle:
-        written_bytes = 0
-        stream_iterator = tqdm(
-            stream.iter_content(1024), desc="Downloading "+file_name,
-            total=total_kb, unit="KB"
-        )
-        for block in stream_iterator:
-            output_handle.write(block)
-            written_bytes += len(block)
-    if total_bytes != written_bytes:
-        remove(target_file)
-        raise URLError("Failed to download the correct number of bytes")
-    return target_file
-
-def ensure_dir(target_dir, force_new_dir):
-    """Guarantee writable directory or raise exception"""
-    if exists(target_dir):
-        if not isdir(target_dir):
-            raise OSError("Target name exists and is not a directory")
-        elif force_new_dir:
-            rmtree(target_dir)
-        else:
-            raise OSError("Target directory exists")
-    makedirs(target_dir)
-
-def gunzip(source_file, target_file=None, target_dir=None, keep_original=False):
-    """Alternative to call(["gunzip", ...]), because the latter fails on Windows"""
-    if target_file is None:
-        target_file = sub(r'\.gz$', "", source_file)
-    with gzopen(source_file, "rb") as compressed:
-        with open(target_file, "wb") as uncompressed:
-            copyfileobj(compressed, uncompressed)
-    if target_dir is not None:
-        call(["mv", target_file, target_dir])
-    if not keep_original:
-        remove(source_file)
-
-def routput(R, script_mask, **kwargs):
-    """Expand R script mask with kwargs (format string), run, return output as StringIO and store if `output` passed"""
-    using_temp_output = ("output" not in kwargs)
-    if using_temp_output:
-        with NamedTemporaryFile("wb", delete=False) as output:
-            kwargs["output"] = output.name
-    unescaped_output_name = kwargs["output"][:]
-    kwargs["output"] = repr(kwargs["output"])
-    script = script_mask.format(**kwargs)
-    with NamedTemporaryFile("wt", delete=False) as script_file:
-        script_file.write(script)
-    msg_mask = "Running Rscript '{}' and storing to '{}'"
-    print(msg_mask.format(script_file.name, unescaped_output_name), file=stderr)
-    returncode = call([R, "--vanilla", script_file.name])
-    remove(script_file.name)
-    with open(unescaped_output_name, "rt") as output_readable:
-        result = output_readable.read()
-    if using_temp_output:
-        remove(output.name)
-    if returncode == 0:
-        return StringIO(result)
-    else:
-        print("# Offending R script:", script, sep="\n", file=stderr)
-        raise OSError("R script failed, error code {}".format(returncode))
 
 FFIELD_VALUES = {
     "Project+Type": [
