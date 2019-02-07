@@ -88,6 +88,14 @@ class GeneLabDataSet():
             factor_info["factor"] for factor_info in self.description["factors"]
         ]
  
+    def __repr__(self):
+        """Simple description, for now"""
+        return (
+            self.accession +
+            " (number of assays: {}".format(len(self.assays)) +
+            "; factors: " + ", ".join(self.factors) + ")"
+        )
+ 
     def _get_file_urls(self, force_reload=False):
         """Get filenames and associated URLs"""
         if self.accession is None:
