@@ -5,18 +5,16 @@ There are **a lot** of corner cases and something is probably very broken.
 
 ## Quick start (demo)
 
-https://github.com/LankyCyril/genefab/blob/master/genefab-demo.ipynb
+(coming up)
 
 ## Description
 
-Implements classes:
-* `GLDS(accession)` which stores metadata and data files associated with a
-GLDS accession number
-* `GLDSCollection(ptype, organism, factor, assay, maxcount=25)` which looks up
-and stores all GLDS datasets matching passed search terms
-* `MicroarrayExperiment(glds)` which converts a `GLDS` instance into an object
-capable of performing a differential expression analysis based on microarray
-data.
+Implements classes and methods:
+* `GeneLabDataSet(accession)` which stores metadata and data files associated
+with a GLDS accession number
+* `GLDS(accession)`: alias to `GeneLabDataSet`
+* `get_datasets(ptype, organism, factor, assay, maxcount=25)` which looks up and
+stores all GLDS datasets matching passed search terms
 
 ## Requirements
 
@@ -37,5 +35,5 @@ top-level directory of the repo:
 $ conda env create --name genefab --file environment-linux.yaml
 $ source activate genefab
 $ python
->>> from genefab import GLDSCollection, MicroarrayExperiment
+>>> from genefab import get_datasets, GLDS
 ```
