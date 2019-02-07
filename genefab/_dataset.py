@@ -1,7 +1,7 @@
 from sys import stderr
 from re import search, IGNORECASE
 from urllib.parse import quote_plus
-from ._util import get_json, FFIELD_ALIASES, FFIELD_VALUES, URL_ROOT
+from ._util import get_json, FFIELD_ALIASES, FFIELD_VALUES, URL_ROOT, GENELAB
 from pandas import DataFrame, concat
 
 
@@ -60,6 +60,22 @@ class GeneLabDataSet():
             Assay(assay_json)
             for assay_json in self._info["assays"].values()
         ]
+ 
+    def _get_file_urls(self):
+        """Get filenames and associated URLs"""
+        if self.accession is None:
+            raise ValueError("Uninitialized GLDS instance")
+        getter_url = "{}/data/glds/files/{}"
+        acc_nr = search(r'\d+$', self.accession).group()
+        files_json = get_json(getter_url.format(URL_ROOT, acc_nr))
+        try:
+            files_data = files_json["studies"][self.accession]["study_files"]
+        except KeyError:
+            raise ValueError("Malformed JSON")
+        return {
+            fd["file_name"]: GENELAB+fd["remote_url"]
+            for fd in files_data
+        }
 
 
 def get_ffield_matches(**kwargs):
