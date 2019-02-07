@@ -1,16 +1,19 @@
 from sys import stderr
 from re import search, IGNORECASE
 from urllib.parse import quote_plus
-from ._util import get_json, FFIELD_ALIASES, FFIELD_VALUES, URL_ROOT, GENELAB
+from ._util import get_json
+from ._util import FFIELD_ALIASES, FFIELD_VALUES, API_ROOT, GENELAB_ROOT
 from pandas import DataFrame, concat
 
 
 class Assay():
     """Stores individual assay metadata"""
     dataframe = None
+    glds_file_urls = {}
  
-    def __init__(self, assay_json):
+    def __init__(self, assay_json, glds_file_urls):
         """Prase JSON into assay metadata"""
+        self.glds_file_urls = glds_file_urls
         self._json = assay_json
         self._raw, self._header = self._json["raw"], self._json["header"]
         field2title = {entry["field"]: entry["title"] for entry in self._header}
@@ -31,18 +34,33 @@ class Assay():
  
     def __repr__(self):
         return repr(self.dataframe)
+ 
+    def get_file_url(self, filemask):
+        """Get URL of file defined by file mask (such as *SRR1781971_*)"""
+        regex_filemask = filemask.replace("*", ".*")
+        matching_names = [
+            filename for filename in self.glds_file_urls.keys()
+            if search(regex_filemask, filename)
+        ]
+        if len(matching_names) == 0:
+            raise ValueError("No URL found")
+        elif len(matching_names) > 1:
+            raise ValueError("Multiple file URLs match name")
+        else:
+            return self.glds_file_urls[matching_names[0]]
 
 
 class GeneLabDataSet():
     """Stores GLDS metadata associated with an accession number"""
     accession = None
     assays = []
+    file_urls = None
  
     def __init__(self, accession):
         """Request JSON representation of ISA metadata and store fields"""
         self.accession = accession
         getter_url = "{}/data/study/data/{}/"
-        data_json = get_json(getter_url.format(URL_ROOT, accession))
+        data_json = get_json(getter_url.format(API_ROOT, accession))
         if len(data_json) > 1:
             raise ValueError("Too many results returned, unexpected behavior")
         else:
@@ -57,25 +75,29 @@ class GeneLabDataSet():
         except KeyError:
             raise ValueError("Malformed JSON")
         self.assays = [
-            Assay(assay_json)
+            Assay(assay_json, glds_file_urls=self._get_file_urls())
             for assay_json in self._info["assays"].values()
         ]
  
-    def _get_file_urls(self):
+    def _get_file_urls(self, force_reload=False):
         """Get filenames and associated URLs"""
         if self.accession is None:
             raise ValueError("Uninitialized GLDS instance")
-        getter_url = "{}/data/glds/files/{}"
-        acc_nr = search(r'\d+$', self.accession).group()
-        files_json = get_json(getter_url.format(URL_ROOT, acc_nr))
-        try:
-            files_data = files_json["studies"][self.accession]["study_files"]
-        except KeyError:
-            raise ValueError("Malformed JSON")
-        return {
-            fd["file_name"]: GENELAB+fd["remote_url"]
-            for fd in files_data
-        }
+        elif (not force_reload) and (self.file_urls is not None):
+            return self.file_urls
+        else:
+            getter_url = "{}/data/glds/files/{}"
+            acc_nr = search(r'\d+$', self.accession).group()
+            files_json = get_json(getter_url.format(API_ROOT, acc_nr))
+            try:
+                filedata = files_json["studies"][self.accession]["study_files"]
+            except KeyError:
+                raise ValueError("Malformed JSON")
+            self.file_urls = {
+                fd["file_name"]: GENELAB_ROOT+fd["remote_url"]
+                for fd in filedata
+            }
+            return self.file_urls
 
 
 def get_ffield_matches(**kwargs):
@@ -105,7 +127,7 @@ def get_datasets(**kwargs):
         for ffield, ffvalue in get_ffield_matches(**kwargs)
     ]
     url = "&".join(
-        [URL_ROOT+"/data/search/?term=GLDS", "type=cgene", "size="+maxcount]
+        [API_ROOT+"/data/search/?term=GLDS", "type=cgene", "size="+maxcount]
         + term_pairs
     )
     try:

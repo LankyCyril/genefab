@@ -2,8 +2,8 @@ from sys import stderr
 from urllib.request import urlopen
 from json import loads
 
-GENELAB = "https://genelab-data.ndc.nasa.gov"
-URL_ROOT = "https://genelab-data.ndc.nasa.gov/genelab"
+GENELAB_ROOT = "https://genelab-data.ndc.nasa.gov"
+API_ROOT = "https://genelab-data.ndc.nasa.gov/genelab"
 
 def get_json(url):
     """HTTP get, decode, parse"""
