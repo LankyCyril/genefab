@@ -68,6 +68,8 @@ class GeneLabDataSet():
         try:
             self.internal_id = self._json["_id"]
             self.metadata_id = self._json["metadata_id"]
+            if len(self._json["foreignFields"]) != 1:
+                raise NotImplementedError("Multiple foreignFields")
             self._isa2json = self._json["foreignFields"][0]["isa2json"]
             self._info = self._isa2json["additionalInformation"]
             for field in "description", "samples", "ontologies", "organisms":
@@ -77,6 +79,13 @@ class GeneLabDataSet():
         self.assays = [
             Assay(assay_json, glds_file_urls=self._get_file_urls())
             for assay_json in self._info["assays"].values()
+        ]
+ 
+    @property
+    def factors(self):
+        """List factors"""
+        return [
+            factor_info["factor"] for factor_info in self.description["factors"]
         ]
  
     def _get_file_urls(self, force_reload=False):
