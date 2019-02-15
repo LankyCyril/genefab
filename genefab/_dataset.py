@@ -55,12 +55,16 @@ class GeneLabDataSet():
     accession = None
     assays = []
     file_urls = None
+    verbose = False
  
-    def __init__(self, accession):
+    def __init__(self, accession, verbose=False):
         """Request JSON representation of ISA metadata and store fields"""
         self.accession = accession
+        self.verbose = verbose
         getter_url = "{}/data/study/data/{}/"
-        data_json = get_json(getter_url.format(API_ROOT, accession))
+        data_json = get_json(
+            getter_url.format(API_ROOT, accession), self.verbose
+        )
         if len(data_json) > 1:
             raise ValueError("Too many results returned, unexpected behavior")
         else:
@@ -105,7 +109,9 @@ class GeneLabDataSet():
         else:
             getter_url = "{}/data/glds/files/{}"
             acc_nr = search(r'\d+$', self.accession).group()
-            files_json = get_json(getter_url.format(API_ROOT, acc_nr))
+            files_json = get_json(
+                getter_url.format(API_ROOT, acc_nr), self.verbose
+            )
             try:
                 filedata = files_json["studies"][self.accession]["study_files"]
             except KeyError:
@@ -139,6 +145,11 @@ def get_datasets(**kwargs):
         del kwargs["maxcount"]
     else:
         maxcount = "25"
+    if "verbose" in kwargs:
+        verbose = bool(kwargs["verbose"])
+        del kwargs["verbose"]
+    else:
+        verbose = False
     term_pairs = [
         "ffield={}&fvalue={}".format(ffield, quote_plus(ffvalue))
         for ffield, ffvalue in get_ffield_matches(**kwargs)
@@ -148,9 +159,9 @@ def get_datasets(**kwargs):
         + term_pairs
     )
     try:
-        json = get_json(url)["hits"]["hits"]
+        json = get_json(url, verbose=verbose)["hits"]["hits"]
     except:
         raise ValueError("Unrecognized JSON structure")
     return [
-        GeneLabDataSet(hit["_id"]) for hit in json
+        GeneLabDataSet(hit["_id"], verbose=verbose) for hit in json
     ]
