@@ -26,7 +26,7 @@ Full requirements can be fulfilled by using the \*.yaml files provided in the
 top-level directory of the repo:
 
 ```
-$ conda env create --name genefab --file environment.yaml
+$ conda env create --name genefab --file environment-linux.yaml
 $ source activate genefab
 $ python
 >>> from genefab import get_datasets, GLDS
