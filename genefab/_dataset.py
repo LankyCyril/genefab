@@ -3,12 +3,13 @@ from re import search, IGNORECASE
 from urllib.parse import quote_plus
 from ._util import get_json
 from ._util import FFIELD_ALIASES, FFIELD_VALUES, API_ROOT, GENELAB_ROOT
-from pandas import DataFrame, concat
+from pandas import concat, Series
+from collections import defaultdict
 
 
 class Assay():
     """Stores individual assay metadata"""
-    dataframe = None
+    metadata = None
     glds_file_urls = {}
  
     def __init__(self, assay_json, glds_file_urls):
@@ -16,24 +17,15 @@ class Assay():
         self.glds_file_urls = glds_file_urls
         self._json = assay_json
         self._raw, self._header = self._json["raw"], self._json["header"]
-        field2title = {entry["field"]: entry["title"] for entry in self._header}
-        if len(field2title) != len(self._header):
+        self._field2title = {
+            entry["field"]: entry["title"] for entry in self._header
+        }
+        if len(self._field2title) != len(self._header):
             raise ValueError("Conflicting IDs of data fields")
-        converted_entries = []
-        for entry in self._raw:
-            converted_entry_data = [
-                [field2title.get(field, field), value]
-                for field, value in entry.items()
-                if value
-            ]
-            converted_entry = DataFrame(converted_entry_data).set_index(0)
-            converted_entry.index.name = None
-            converted_entry = converted_entry[1].rename(None)
-            converted_entries.append(converted_entry)
-        self.dataframe = concat(converted_entries, axis=1).T
- 
-    def __repr__(self):
-        return repr(self.dataframe)
+        self._title2field = defaultdict(set)
+        for field, title in self._field2title.items():
+            self._title2field[title].add(field)
+        self.metadata = concat(map(Series, self._raw), axis=1).T
  
     def get_file_url(self, filemask):
         """Get URL of file defined by file mask (such as *SRR1781971_*)"""
