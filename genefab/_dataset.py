@@ -27,6 +27,12 @@ class Assay():
             self._title2field[title].add(field)
         self.metadata = concat(map(Series, self._raw), axis=1).T
  
+    def __getitem__(self, titles):
+        """Get metadata by field title (rather than internal field id)"""
+        return self.metadata[
+            list(set.union(*[self._title2field[t] for t in titles]))
+        ]
+ 
     def get_file_url(self, filemask):
         """Get URL of file defined by file mask (such as *SRR1781971_*)"""
         regex_filemask = filemask.replace("*", ".*")
