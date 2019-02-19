@@ -6,6 +6,7 @@ from ._util import FFIELD_ALIASES, FFIELD_VALUES, API_ROOT, GENELAB_ROOT
 from pandas import concat, Series
 from pandas.core.indexes.base import Index
 from collections import defaultdict
+from numpy import nan
 
 
 class AssayMetadataLocator():
@@ -57,6 +58,17 @@ class Assay():
         return self.metadata[
             list(set.union(*[self.fields[t] for t in titles]))
         ]
+ 
+    @property
+    def available_file_types(self):
+        """List file types referenced in metadata"""
+        file_types = set()
+        for title in self.fields:
+            if search(r'\bfile\b', title, flags=IGNORECASE):
+                available_files = self[[title]].values.flatten()
+                if not set(available_files) <= {"", None, nan}:
+                    file_types.add(title)
+        return file_types
  
     def get_file_url(self, filemask):
         """Get URL of file defined by file mask (such as *SRR1781971_*)"""
