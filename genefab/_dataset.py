@@ -29,12 +29,14 @@ class AssayMetadataLocator():
 
 class Assay():
     """Stores individual assay metadata"""
+    name = None
     metadata = None
     glds_file_urls = {}
     fields = defaultdict(set)
  
-    def __init__(self, assay_json, glds_file_urls):
+    def __init__(self, assay_name, assay_json, glds_file_urls):
         """Prase JSON into assay metadata"""
+        self.name = assay_name
         self.glds_file_urls = glds_file_urls
         self._json = assay_json
         self._raw, self._header = self._json["raw"], self._json["header"]
@@ -102,8 +104,8 @@ class GeneLabDataSet():
         except KeyError:
             raise ValueError("Malformed JSON")
         self.assays = [
-            Assay(assay_json, glds_file_urls=self._get_file_urls())
-            for assay_json in self._info["assays"].values()
+            Assay(assay_name, assay_json, glds_file_urls=self._get_file_urls())
+            for assay_name, assay_json in self._info["assays"].items()
         ]
  
     @property
