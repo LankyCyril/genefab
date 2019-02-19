@@ -34,6 +34,7 @@ class Assay():
     metadata = None
     glds_file_urls = {}
     fields = defaultdict(set)
+    strict_indexing = True
  
     def __init__(self, assay_name, assay_json, glds_file_urls):
         """Prase JSON into assay metadata"""
@@ -53,11 +54,18 @@ class Assay():
  
     def __getitem__(self, titles):
         """Get metadata by field title (rather than internal field id)"""
-        if not isinstance(titles, (tuple, list, Series, Index)):
+        if isinstance(titles, (tuple, list, Series, Index)):
+            return self.metadata[
+                list(set.union(*[self.fields[t] for t in titles]))
+            ]
+        elif self.strict_indexing:
             raise IndexError("Assay: column indexer must be list-like")
-        return self.metadata[
-            list(set.union(*[self.fields[t] for t in titles]))
-        ]
+        else:
+            subset = self.metadata[list(self.fields[titles])]
+            if subset.shape[1] > 1:
+                return subset
+            else:
+                return subset.iloc[:,0]
  
     @property
     def available_file_types(self):
