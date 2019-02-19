@@ -23,9 +23,13 @@ class AssayMetadataLocator():
                 indices, titles = key
             except ValueError:
                 raise ValueError("Incorrect index for assay metadata")
-            return self.parent[titles].loc[indices]
+            subset = self.parent[titles].loc[indices]
         else: # assume called with .loc[x] and interpret `x` the best we can
-            return self.parent.metadata.loc[key]
+            subset = self.parent.metadata.loc[key]
+        if (subset.shape == (1,)) and (not self.parent.strict_indexing):
+            return subset.iloc[0]
+        else:
+            return subset
 
 
 class Assay():
@@ -55,9 +59,12 @@ class Assay():
     def __getitem__(self, titles):
         """Get metadata by field title (rather than internal field id)"""
         if isinstance(titles, (tuple, list, Series, Index)):
-            return self.metadata[
-                list(set.union(*[self.fields[t] for t in titles]))
-            ]
+            if isinstance(titles, Series) and (titles.dtype == bool):
+                return self.metadata.loc[titles]
+            else:
+                return self.metadata[
+                    list(set.union(*[self.fields[t] for t in titles]))
+                ]
         elif self.strict_indexing:
             raise IndexError("Assay: column indexer must be list-like")
         else:
