@@ -217,6 +217,12 @@ def get_datasets(**kwargs):
         json = get_json(url, verbose=verbose)["hits"]["hits"]
     except:
         raise ValueError("Unrecognized JSON structure")
-    return [
-        GeneLabDataSet(hit["_id"], verbose=verbose) for hit in json
-    ]
+    datasets = []
+    for hit in json:
+        try:
+            datasets.append(GeneLabDataSet(hit["_id"], verbose=verbose))
+        except Exception as e:
+            print(hit["_id"], e)
+    #return [
+    #    GeneLabDataSet(hit["_id"], verbose=verbose) for hit in json
+    #]
