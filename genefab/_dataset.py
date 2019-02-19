@@ -4,13 +4,34 @@ from urllib.parse import quote_plus
 from ._util import get_json
 from ._util import FFIELD_ALIASES, FFIELD_VALUES, API_ROOT, GENELAB_ROOT
 from pandas import concat, Series
+from pandas.core.indexes.base import Index
 from collections import defaultdict
+
+
+class AssayMetadataLocator():
+    """Emulate behavior of Pandas `.loc` for class Assay()"""
+ 
+    def __init__(self, parent):
+        """Point to parent"""
+        self.parent = parent
+ 
+    def __getitem__(self, key):
+        """Query parent.metadata with .loc, using field titles instead of internal field ids"""
+        if isinstance(key, tuple): # called with .loc[x, y]
+            try:
+                indices, titles = key
+            except ValueError:
+                raise ValueError("Incorrect index for assay metadata")
+            return self.parent[titles].loc[indices]
+        else: # assume called with .loc[x] and interpret `x` the best we can
+            return self.parent.metadata.loc[key]
 
 
 class Assay():
     """Stores individual assay metadata"""
     metadata = None
     glds_file_urls = {}
+    loc = None
  
     def __init__(self, assay_json, glds_file_urls):
         """Prase JSON into assay metadata"""
@@ -26,9 +47,12 @@ class Assay():
         for field, title in self._field2title.items():
             self._title2field[title].add(field)
         self.metadata = concat(map(Series, self._raw), axis=1).T
+        self.loc = AssayMetadataLocator(self)
  
     def __getitem__(self, titles):
         """Get metadata by field title (rather than internal field id)"""
+        if not isinstance(titles, (tuple, list, Series, Index)):
+            raise IndexError("Assay: column indexer must be list-like")
         return self.metadata[
             list(set.union(*[self._title2field[t] for t in titles]))
         ]
