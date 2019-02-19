@@ -31,7 +31,7 @@ class Assay():
     """Stores individual assay metadata"""
     metadata = None
     glds_file_urls = {}
-    loc = None
+    fields = defaultdict(set)
  
     def __init__(self, assay_json, glds_file_urls):
         """Prase JSON into assay metadata"""
@@ -43,9 +43,8 @@ class Assay():
         }
         if len(self._field2title) != len(self._header):
             raise ValueError("Conflicting IDs of data fields")
-        self._title2field = defaultdict(set)
         for field, title in self._field2title.items():
-            self._title2field[title].add(field)
+            self.fields[title].add(field)
         self.metadata = concat(map(Series, self._raw), axis=1).T
         self.loc = AssayMetadataLocator(self)
  
@@ -54,7 +53,7 @@ class Assay():
         if not isinstance(titles, (tuple, list, Series, Index)):
             raise IndexError("Assay: column indexer must be list-like")
         return self.metadata[
-            list(set.union(*[self._title2field[t] for t in titles]))
+            list(set.union(*[self.fields[t] for t in titles]))
         ]
  
     def get_file_url(self, filemask):
