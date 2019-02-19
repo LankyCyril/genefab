@@ -78,6 +78,11 @@ class Assay():
                     file_types.add(title)
         return file_types
  
+    @property
+    def available_protocols(self):
+        """List protocol REFs referenced in metadata"""
+        return set(self[["Protocol REF"]].values.flatten()) - {"", None, nan}
+ 
     def get_file_url(self, filemask):
         """Get URL of file defined by file mask (such as *SRR1781971_*)"""
         regex_filemask = filemask.replace("*", ".*")
