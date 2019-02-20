@@ -204,28 +204,20 @@ def get_ffield_matches(**kwargs):
 
 def get_datasets(**kwargs):
     """Match passed regexes and combine into search URL, get JSON and parse for accessions"""
-    if "maxcount" in kwargs:
-        maxcount = str(kwargs["maxcount"])
-        del kwargs["maxcount"]
-    else:
-        maxcount = "25"
-    if "verbose" in kwargs:
-        verbose = bool(kwargs["verbose"])
-        del kwargs["verbose"]
-    else:
-        verbose = False
-    if "assay_strict_indexing" in kwargs:
-        assay_strict_indexing = bool(kwargs["assay_strict_indexing"])
-        del kwargs["assay_strict_indexing"]
-    else:
-        assay_strict_indexing = True
-    term_pairs = [
-        "ffield={}&fvalue={}".format(ffield, quote_plus(ffvalue))
-        for ffield, ffvalue in get_ffield_matches(**kwargs)
-    ]
+    maxcount, verbose, assay_strict_indexing = (
+        str(kwargs.get("maxcount", "25")),
+        kwargs.get("verbose", False),
+        kwargs.get("assay_strict_indexing", True)
+    )
+    for extra_arg in "maxcount", "verbose", "assay_strict_indexing":
+        if extra_arg in kwargs:
+            del kwargs[extra_arg]
     url = "&".join(
         [API_ROOT+"/data/search/?term=GLDS", "type=cgene", "size="+maxcount]
-        + term_pairs
+        + [
+            "ffield={}&fvalue={}".format(ffield, quote_plus(ffvalue))
+            for ffield, ffvalue in get_ffield_matches(**kwargs)
+        ]
     )
     try:
         json = get_json(url, verbose=verbose)["hits"]["hits"]
