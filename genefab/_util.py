@@ -1,6 +1,12 @@
 from sys import stderr
 from urllib.request import urlopen
 from json import loads
+from os.path import join, isdir, isfile
+from os import makedirs, remove
+from requests import get
+from urllib.error import URLError
+from math import ceil
+from tqdm import tqdm
 
 GENELAB_ROOT = "https://genelab-data.ndc.nasa.gov"
 API_ROOT = "https://genelab-data.ndc.nasa.gov/genelab"
@@ -11,6 +17,38 @@ def get_json(url, verbose=False):
         print("Parsing url: ", url, file=stderr)
     with urlopen(url) as response:
         return loads(response.read().decode())
+
+def fetch_file(file_name, url, target_directory, update=False):
+    """Perform checks, download file"""
+    if not isdir(target_directory):
+        if isfile(target_directory):
+            raise OSError("Local storage exists and is not a directory")
+        makedirs(target_directory)
+    target_file = join(target_directory, file_name)
+    if not update:
+        if isdir(target_file):
+            raise OSError("Directory with target name exists: " + target_file)
+        if isfile(target_file):
+            print("Reusing", file_name, file=stderr)
+            return target_file
+    stream = get(url, stream=True)
+    if stream.status_code != 200:
+        raise URLError("{}: status code {}".format(url, stream.status_code))
+    total_bytes = int(stream.headers.get("content-length", 0))
+    total_kb = ceil(total_bytes / 1024)
+    with open(target_file, "wb") as output_handle:
+        written_bytes = 0
+        stream_iterator = tqdm(
+            stream.iter_content(1024), desc="Downloading "+file_name,
+            total=total_kb, unit="KB"
+        )
+        for block in stream_iterator:
+            output_handle.write(block)
+            written_bytes += len(block)
+    if total_bytes != written_bytes:
+        remove(target_file)
+        raise URLError("Failed to download the correct number of bytes")
+    return target_file
 
 FFIELD_VALUES = {
     "Project+Type": [
