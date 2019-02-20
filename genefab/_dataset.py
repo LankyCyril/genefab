@@ -39,7 +39,7 @@ class Assay():
     fields = None
     strict_indexing = True
  
-    def __init__(self, assay_name, assay_json, glds_file_urls):
+    def __init__(self, assay_name, assay_json, glds_file_urls, strict_indexing=True):
         """Prase JSON into assay metadata"""
         self.name = assay_name
         self.glds_file_urls = glds_file_urls
@@ -54,6 +54,7 @@ class Assay():
         for field, title in self._field2title.items():
             self.fields[title].add(field)
         self.metadata = concat(map(Series, self._raw), axis=1).T
+        self.strict_indexing = strict_indexing
         self.loc = AssayMetadataLocator(self)
  
     def __getitem__(self, titles):
@@ -112,7 +113,7 @@ class GeneLabDataSet():
     file_urls = None
     verbose = False
  
-    def __init__(self, accession, verbose=False):
+    def __init__(self, accession, assay_strict_indexing=True, verbose=False):
         """Request JSON representation of ISA metadata and store fields"""
         self.accession = accession
         self.verbose = verbose
@@ -136,7 +137,11 @@ class GeneLabDataSet():
         except KeyError:
             raise ValueError("Malformed JSON")
         self.assays = [
-            Assay(assay_name, assay_json, glds_file_urls=self._get_file_urls())
+            Assay(
+                assay_name, assay_json,
+                glds_file_urls=self._get_file_urls(),
+                strict_indexing=assay_strict_indexing
+            )
             for assay_name, assay_json in self._info["assays"].items()
         ]
  
