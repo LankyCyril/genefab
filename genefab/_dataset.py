@@ -207,16 +207,8 @@ def get_ffield_matches(**kwargs):
         print("\b", file=stderr)
 
 
-def get_datasets(**kwargs):
+def get_datasets(maxcount="25", assay_strict_indexing=True, verbose=False, **kwargs):
     """Match passed regexes and combine into search URL, get JSON and parse for accessions"""
-    maxcount, verbose, assay_strict_indexing = (
-        str(kwargs.get("maxcount", "25")),
-        kwargs.get("verbose", False),
-        kwargs.get("assay_strict_indexing", True)
-    )
-    for extra_arg in "maxcount", "verbose", "assay_strict_indexing":
-        if extra_arg in kwargs:
-            del kwargs[extra_arg]
     url = "&".join(
         [API_ROOT+"/data/search/?term=GLDS", "type=cgene", "size="+maxcount]
         + [
