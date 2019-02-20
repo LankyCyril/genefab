@@ -136,14 +136,18 @@ class GeneLabDataSet():
                 setattr(self, field, self._info[field])
         except KeyError:
             raise ValueError("Malformed JSON")
-        self.assays = [
-            Assay(
-                assay_name, assay_json,
-                glds_file_urls=self._get_file_urls(),
-                strict_indexing=assay_strict_indexing
-            )
-            for assay_name, assay_json in self._info["assays"].items()
-        ]
+        try:
+            self.assays = [
+                Assay(
+                    assay_name, assay_json,
+                    glds_file_urls=self._get_file_urls(),
+                    strict_indexing=assay_strict_indexing
+                )
+                for assay_name, assay_json in self._info["assays"].items()
+            ]
+        except KeyError:
+            print("Malformed assay JSON: {}".format(accession), file=stderr)
+            self.assays = None
  
     @property
     def factors(self):
@@ -222,13 +226,6 @@ def get_datasets(**kwargs):
         json = get_json(url, verbose=verbose)["hits"]["hits"]
     except:
         raise ValueError("Unrecognized JSON structure")
-    datasets = []
-    for hit in json:
-        try:
-            datasets.append(GeneLabDataSet(hit["_id"], verbose=verbose))
-        except Exception as e:
-            print(hit["_id"], e)
-    return datasets
-    #return [
-    #    GeneLabDataSet(hit["_id"], verbose=verbose) for hit in json
-    #]
+    return [
+        GeneLabDataSet(hit["_id"], verbose=verbose) for hit in json
+    ]
