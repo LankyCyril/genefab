@@ -18,7 +18,7 @@ def get_json(url, verbose=False):
     with urlopen(url) as response:
         return loads(response.read().decode())
 
-def fetch_file(file_name, url, target_directory, update=False):
+def fetch_file(file_name, url, target_directory, update=False, verbose=False):
     """Perform checks, download file"""
     if not isdir(target_directory):
         if isfile(target_directory):
@@ -29,7 +29,8 @@ def fetch_file(file_name, url, target_directory, update=False):
         if isdir(target_file):
             raise OSError("Directory with target name exists: " + target_file)
         if isfile(target_file):
-            print("Reusing", file_name, file=stderr)
+            if verbose:
+                print("Reusing", file_name, file=stderr)
             return target_file
     stream = get(url, stream=True)
     if stream.status_code != 200:
@@ -38,10 +39,13 @@ def fetch_file(file_name, url, target_directory, update=False):
     total_kb = ceil(total_bytes / 1024)
     with open(target_file, "wb") as output_handle:
         written_bytes = 0
-        stream_iterator = tqdm(
-            stream.iter_content(1024), desc="Downloading "+file_name,
-            total=total_kb, unit="KB"
-        )
+        if verbose:
+            stream_iterator = tqdm(
+                stream.iter_content(1024), desc="Downloading "+file_name,
+                total=total_kb, unit="KB"
+            )
+        else:
+            stream_iterator = stream.iter_content(1024)
         for block in stream_iterator:
             output_handle.write(block)
             written_bytes += len(block)
