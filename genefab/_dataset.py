@@ -98,7 +98,7 @@ class Assay():
             if search(regex_filemask, filename)
         ]
         if len(matching_names) == 0:
-            raise ValueError("No URL found")
+            return None
         elif len(matching_names) > 1:
             raise ValueError("Multiple file URLs match name")
         else:
