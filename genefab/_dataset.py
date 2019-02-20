@@ -192,28 +192,32 @@ class GeneLabDataSet():
             return self.file_urls
 
 
-def get_ffield_matches(**kwargs):
+def get_ffield_matches(verbose=False, **ffield_kwargs):
     """Expand passed regexes to all matching ffield values"""
-    for ffield_alias, ffregex in kwargs.items():
-        print("looking up", ffield_alias, end="(s): ", file=stderr)
+    for ffield_alias, ffregex in ffield_kwargs.items():
+        if verbose:
+            print("looking up", ffield_alias, end="(s): ", file=stderr)
         if ffield_alias in FFIELD_ALIASES:
             ffield = FFIELD_ALIASES[ffield_alias]
         else:
             raise ValueError("Unrecognized field: " + ffield_alias)
         for ffvalue in FFIELD_VALUES[ffield]:
             if search(ffregex, ffvalue, IGNORECASE):
-                print('"{}"'.format(ffvalue), end=", ", file=stderr)
+                if verbose:
+                    print('"{}"'.format(ffvalue), end=", ", file=stderr)
                 yield ffield, ffvalue
-        print("\b", file=stderr)
+        if verbose:
+            print("\b", file=stderr)
 
 
-def get_datasets(maxcount="25", assay_strict_indexing=True, verbose=False, **kwargs):
+def get_datasets(maxcount="25", assay_strict_indexing=True, verbose=False, **ffield_kwargs):
     """Match passed regexes and combine into search URL, get JSON and parse for accessions"""
     url = "&".join(
         [API_ROOT+"/data/search/?term=GLDS", "type=cgene", "size="+maxcount]
         + [
             "ffield={}&fvalue={}".format(ffield, quote_plus(ffvalue))
-            for ffield, ffvalue in get_ffield_matches(**kwargs)
+            for ffield, ffvalue
+            in get_ffield_matches(verbose=verbose, **ffield_kwargs)
         ]
     )
     try:
