@@ -214,6 +214,11 @@ def get_datasets(**kwargs):
         del kwargs["verbose"]
     else:
         verbose = False
+    if "assay_strict_indexing" in kwargs:
+        assay_strict_indexing = bool(kwargs["assay_strict_indexing"])
+        del kwargs["assay_strict_indexing"]
+    else:
+        assay_strict_indexing = True
     term_pairs = [
         "ffield={}&fvalue={}".format(ffield, quote_plus(ffvalue))
         for ffield, ffvalue in get_ffield_matches(**kwargs)
@@ -227,5 +232,9 @@ def get_datasets(**kwargs):
     except:
         raise ValueError("Unrecognized JSON structure")
     return [
-        GeneLabDataSet(hit["_id"], verbose=verbose) for hit in json
+        GeneLabDataSet(
+            hit["_id"], assay_strict_indexing=assay_strict_indexing,
+            verbose=verbose
+        )
+        for hit in json
     ]
