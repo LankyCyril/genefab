@@ -35,8 +35,8 @@ class Assay():
     """Stores individual assay metadata"""
     name = None
     metadata = None
-    glds_file_urls = {}
-    fields = defaultdict(set)
+    glds_file_urls = None
+    fields = None
     strict_indexing = True
  
     def __init__(self, assay_name, assay_json, glds_file_urls):
@@ -50,6 +50,7 @@ class Assay():
         }
         if len(self._field2title) != len(self._header):
             raise ValueError("Conflicting IDs of data fields")
+        self.fields = defaultdict(set)
         for field, title in self._field2title.items():
             self.fields[title].add(field)
         self.metadata = concat(map(Series, self._raw), axis=1).T
@@ -107,7 +108,7 @@ class Assay():
 class GeneLabDataSet():
     """Stores GLDS metadata associated with an accession number"""
     accession = None
-    assays = []
+    assays = None
     file_urls = None
     verbose = False
  
