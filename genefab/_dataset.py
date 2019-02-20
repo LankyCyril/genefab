@@ -6,6 +6,7 @@ from ._util import FFIELD_ALIASES, FFIELD_VALUES, API_ROOT, GENELAB_ROOT
 from pandas import concat, Series, Index
 from collections import defaultdict
 from numpy import nan
+from os.path import join
 
 
 class AssayMetadataLocator():
@@ -38,11 +39,13 @@ class Assay():
     glds_file_urls = None
     fields = None
     strict_indexing = True
+    storage = None
  
-    def __init__(self, assay_name, assay_json, glds_file_urls, strict_indexing=True):
+    def __init__(self, assay_name, assay_json, glds_file_urls, storage_prefix, strict_indexing=True):
         """Prase JSON into assay metadata"""
         self.name = assay_name
         self.glds_file_urls = glds_file_urls
+        self.storage = join(storage_prefix, assay_name)
         self._json = assay_json
         self._raw, self._header = self._json["raw"], self._json["header"]
         self._field2title = {
@@ -117,11 +120,13 @@ class GeneLabDataSet():
     assays = None
     file_urls = None
     verbose = False
+    storage = None
  
-    def __init__(self, accession, assay_strict_indexing=True, verbose=False):
+    def __init__(self, accession, assay_strict_indexing=True, verbose=False, storage_prefix=".genelab"):
         """Request JSON representation of ISA metadata and store fields"""
         self.accession = accession
         self.verbose = verbose
+        self.storage = join(storage_prefix, accession)
         getter_url = "{}/data/study/data/{}/"
         data_json = get_json(
             getter_url.format(API_ROOT, accession), self.verbose
@@ -146,7 +151,8 @@ class GeneLabDataSet():
                 Assay(
                     assay_name, assay_json,
                     glds_file_urls=self._get_file_urls(),
-                    strict_indexing=assay_strict_indexing
+                    strict_indexing=assay_strict_indexing,
+                    storage_prefix=self.storage
                 )
                 for assay_name, assay_json in self._info["assays"].items()
             ]
@@ -210,7 +216,7 @@ def get_ffield_matches(verbose=False, **ffield_kwargs):
             print("\b", file=stderr)
 
 
-def get_datasets(maxcount="25", assay_strict_indexing=True, verbose=False, **ffield_kwargs):
+def get_datasets(maxcount="25", assay_strict_indexing=True, storage=".genelab", verbose=False, **ffield_kwargs):
     """Match passed regexes and combine into search URL, get JSON and parse for accessions"""
     url = "&".join(
         [API_ROOT+"/data/search/?term=GLDS", "type=cgene", "size="+maxcount]
@@ -227,7 +233,7 @@ def get_datasets(maxcount="25", assay_strict_indexing=True, verbose=False, **ffi
     return [
         GeneLabDataSet(
             hit["_id"], assay_strict_indexing=assay_strict_indexing,
-            verbose=verbose
+            storage_prefix=storage, verbose=verbose
         )
         for hit in json
     ]
