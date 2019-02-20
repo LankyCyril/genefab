@@ -4,9 +4,11 @@ from json import loads
 from os.path import join, isdir, isfile
 from os import makedirs, remove
 from requests import get
+from requests.exceptions import InvalidSchema
 from urllib.error import URLError
 from math import ceil
 from tqdm import tqdm
+from re import sub
 
 GENELAB_ROOT = "https://genelab-data.ndc.nasa.gov"
 API_ROOT = "https://genelab-data.ndc.nasa.gov/genelab"
@@ -18,7 +20,7 @@ def get_json(url, verbose=False):
     with urlopen(url) as response:
         return loads(response.read().decode())
 
-def fetch_file(file_name, url, target_directory, update=False, verbose=False):
+def fetch_file(file_name, url, target_directory, update=False, verbose=False, http_fallback=True):
     """Perform checks, download file"""
     if not isdir(target_directory):
         if isfile(target_directory):
@@ -32,7 +34,13 @@ def fetch_file(file_name, url, target_directory, update=False, verbose=False):
             if verbose:
                 print("Reusing", file_name, file=stderr)
             return target_file
-    stream = get(url, stream=True)
+    try:
+        stream = get(url, stream=True)
+    except InvalidSchema:
+        if http_fallback:
+            stream = get(sub(r'^ftp:\/\/', "http://", url), stream=True)
+        else:
+            raise
     if stream.status_code != 200:
         raise URLError("{}: status code {}".format(url, stream.status_code))
     total_bytes = int(stream.headers.get("content-length", 0))
