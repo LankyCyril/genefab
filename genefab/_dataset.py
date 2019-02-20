@@ -57,7 +57,8 @@ class Assay():
         if len(self.fields["Sample Name"]) != 1:
             raise ValueError("Unexpected number of 'Sample Name' fields")
         else:
-            self.metadata = self.metadata.set_index(self.fields["Sample Name"])
+            sample_name_field = list(self.fields["Sample Name"])[0]
+            self.metadata = self.metadata.set_index(sample_name_field)
         self.strict_indexing = strict_indexing
         self.loc = AssayMetadataLocator(self)
  
