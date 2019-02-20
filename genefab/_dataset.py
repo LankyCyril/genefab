@@ -3,8 +3,7 @@ from re import search, IGNORECASE
 from urllib.parse import quote_plus
 from ._util import get_json
 from ._util import FFIELD_ALIASES, FFIELD_VALUES, API_ROOT, GENELAB_ROOT
-from pandas import concat, Series
-from pandas.core.indexes.base import Index
+from pandas import concat, Series, Index
 from collections import defaultdict
 from numpy import nan
 
@@ -223,6 +222,7 @@ def get_datasets(**kwargs):
             datasets.append(GeneLabDataSet(hit["_id"], verbose=verbose))
         except Exception as e:
             print(hit["_id"], e)
+    return datasets
     #return [
     #    GeneLabDataSet(hit["_id"], verbose=verbose) for hit in json
     #]
