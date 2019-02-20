@@ -54,6 +54,10 @@ class Assay():
         for field, title in self._field2title.items():
             self.fields[title].add(field)
         self.metadata = concat(map(Series, self._raw), axis=1).T
+        if len(self.fields["Sample Name"]) != 1:
+            raise ValueError("Unexpected number of 'Sample Name' fields")
+        else:
+            self.metadata = self.metadata.set_index(self.fields["Sample Name"])
         self.strict_indexing = strict_indexing
         self.loc = AssayMetadataLocator(self)
  
