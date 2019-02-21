@@ -103,7 +103,7 @@ class Assay():
  
     def _get_file_url(self, filemask):
         """Get URL of file defined by file mask (such as *SRR1781971_*)"""
-        regex_filemask = filemask.replace("*", ".*")
+        regex_filemask = filemask.split("/")[0].replace("*", ".*")
         matching_names = [
             filename for filename in self.glds_file_urls.keys()
             if search(regex_filemask, filename)
@@ -152,8 +152,11 @@ class Assay():
             derived_files = derived_files.iloc[:,0]
         sample_dataframes = []
         for sample_name, derived_filename in derived_files.iteritems():
+            filename = safe_file_name(
+                derived_filename, as_mask=True, directory=self.storage
+            )
             sample_dataframe = read_csv(
-                join(self.storage, derived_filename), sep="\t"
+                join(self.storage, filename), sep="\t"
             )
             sample_dataframe["Sample Name"] = sample_name
             sample_dataframes.append(sample_dataframe)
