@@ -1,12 +1,14 @@
 from sys import stderr
-from re import search, IGNORECASE
+from re import search, IGNORECASE, compile
 from urllib.parse import quote_plus
-from ._util import get_json
+from ._util import get_json, fetch_file, flat_extract
 from ._util import FFIELD_ALIASES, FFIELD_VALUES, API_ROOT, GENELAB_ROOT
+from ._checks import safe_file_name
 from pandas import concat, Series, Index
 from collections import defaultdict
 from numpy import nan
 from os.path import join
+from os import walk
 
 
 class AssayMetadataLocator():
@@ -99,7 +101,7 @@ class Assay():
         """List protocol REFs referenced in metadata"""
         return set(self[["Protocol REF"]].values.flatten()) - {"", None, nan}
  
-    def get_file_url(self, filemask):
+    def _get_file_url(self, filemask):
         """Get URL of file defined by file mask (such as *SRR1781971_*)"""
         regex_filemask = filemask.replace("*", ".*")
         matching_names = [
@@ -112,6 +114,37 @@ class Assay():
             raise ValueError("Multiple file URLs match name")
         else:
             return self.glds_file_urls[matching_names[0]]
+ 
+    def _download_target_files(self, catch_all, force_reload=False):
+        """Download files/archives etc that contain files targeted by get_combined_matrix()"""
+        derived_file_fields = [
+            title for title in self.available_file_types
+            if search(catch_all, title, flags=IGNORECASE)
+        ]
+        metadata_file_entries = set(
+            self[derived_file_fields].values.flatten()
+        )
+        internal_file_urls = set(map(
+            self._get_file_url, metadata_file_entries
+        ))
+        external_file_urls = set(filter(
+            compile(r'^(ftp|http|https):\/\/').search, metadata_file_entries
+        ))
+        file_urls = (internal_file_urls | external_file_urls) - {None}
+        for file_url in file_urls:
+            file_name = safe_file_name(file_url)
+            fetch_file(file_name, file_url, self.storage, update=force_reload)
+ 
+    def get_combined_matrix(self, target="Derived Array Data File", catch_all="derived", force_reload=False):
+        """Download (if necessary), parse and combine derived files"""
+        self._download_target_files(catch_all, force_reload=force_reload)
+        filenames = next(walk(self.storage))[2]
+        zips = [filename for filename in filenames if filename.endswith(".zip")]
+        for zip_filename in zips:
+            flat_extract(
+                join(self.storage, zip_filename),
+                target_directory=self.storage
+            )
 
 
 class GeneLabDataSet():

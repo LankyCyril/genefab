@@ -2,13 +2,15 @@ from sys import stderr
 from urllib.request import urlopen
 from json import loads
 from os.path import join, isdir, isfile
-from os import makedirs, remove
+from os import makedirs, remove, rename
 from requests import get
 from requests.exceptions import InvalidSchema
 from urllib.error import URLError
 from math import ceil
 from tqdm import tqdm
 from re import sub
+from zipfile import ZipFile
+from ._checks import safe_file_name
 
 GENELAB_ROOT = "https://genelab-data.ndc.nasa.gov"
 API_ROOT = "https://genelab-data.ndc.nasa.gov/genelab"
@@ -61,6 +63,18 @@ def fetch_file(file_name, url, target_directory, update=False, verbose=False, ht
         remove(target_file)
         raise URLError("Failed to download the correct number of bytes")
     return target_file
+
+def flat_extract(zip_filename, target_directory):
+    """Extract zip file contents into a flat structure, with safety checks"""
+    with ZipFile(zip_filename) as zf:
+        for fileinfo in zf.filelist:
+            if getattr(fileinfo, "file_size", 0): # is not a directory
+                target_filename = safe_file_name(fileinfo.filename)
+                zf.extract(fileinfo.filename, path=target_directory)
+                rename(
+                    join(target_directory, fileinfo.filename),
+                    join(target_directory, target_filename)
+                )
 
 FFIELD_VALUES = {
     "Project+Type": [
