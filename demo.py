@@ -20,10 +20,18 @@ easy_accessions = [
 output_mask = "data/{}-{}.tsv.gz"
 
 for accession in easy_accessions:
-    print("Processing:", accession, file=stderr, flush=True)
     glds = GLDS(accession)
     for assay in glds.assays:
-        matrix = assay.get_combined_matrix()
+        try:
+            if "Comment:  Derived Array Data File Name" in assay.fields:
+                matrix = assay.get_combined_matrix("Comment:  Derived Array Data File Name" )
+            elif "Derived Array Data File Name" in assay.fields:
+                matrix = assay.get_combined_matrix("Derived Array Data File Name")
+            else:
+                matrix = assay.get_combined_matrix()
+        except:
+            print("Something broke for:", accession, file=stderr, flush=True)
+            continue
         matrix.to_csv(
             output_mask.format(accession, assay.name),
             sep="\t", compression="gzip", index=False
