@@ -4,7 +4,7 @@ from urllib.parse import quote_plus
 from ._util import get_json, fetch_file, flat_extract
 from ._util import FFIELD_ALIASES, FFIELD_VALUES, API_ROOT, GENELAB_ROOT
 from ._checks import safe_file_name
-from pandas import concat, Series, Index
+from pandas import concat, Series, Index, read_csv
 from collections import defaultdict
 from numpy import nan
 from os.path import join
@@ -145,6 +145,19 @@ class Assay():
                 join(self.storage, zip_filename),
                 target_directory=self.storage
             )
+        derived_files = self[[target]]
+        if derived_files.shape[1] != 1:
+            raise ValueError("Non unique or absent '{}' field".format(target))
+        else:
+            derived_files = derived_files.iloc[:,0]
+        sample_dataframes = []
+        for sample_name, derived_filename in derived_files.iteritems():
+            sample_dataframe = read_csv(
+                join(self.storage, derived_filename), sep="\t"
+            )
+            sample_dataframe["Sample Name"] = sample_name
+            sample_dataframes.append(sample_dataframe)
+        return concat(sample_dataframes, axis=0, ignore_index=True)
 
 
 class GeneLabDataSet():
