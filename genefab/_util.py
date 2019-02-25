@@ -15,12 +15,14 @@ from ._checks import safe_file_name
 GENELAB_ROOT = "https://genelab-data.ndc.nasa.gov"
 API_ROOT = "https://genelab-data.ndc.nasa.gov/genelab"
 
+
 def get_json(url, verbose=False):
     """HTTP get, decode, parse"""
     if verbose:
         print("Parsing url: ", url, file=stderr)
     with urlopen(url) as response:
         return loads(response.read().decode())
+
 
 def fetch_file(file_name, url, target_directory, update=False, verbose=False, http_fallback=True):
     """Perform checks, download file"""
@@ -64,6 +66,7 @@ def fetch_file(file_name, url, target_directory, update=False, verbose=False, ht
         raise URLError("Failed to download the correct number of bytes")
     return target_file
 
+
 def flat_extract(zip_filename, target_directory):
     """Extract zip file contents into a flat structure, with safety checks"""
     with ZipFile(zip_filename) as zf:
@@ -76,12 +79,14 @@ def flat_extract(zip_filename, target_directory):
                     join(target_directory, target_filename)
                 )
 
+
 def permissive_search_group(expression, string, flags=IGNORECASE):
     """Like re.search(...).group(), but returns None if re.search() is None"""
     return getattr(
         search(expression, string, flags=flags),
         "group", lambda: None
     )()
+
 
 FFIELD_VALUES = {
     "Project+Type": [
@@ -146,6 +151,7 @@ FFIELD_VALUES = {
         "RNA methylation profiling", "transcription profiling"
     ]
 }
+
 
 FFIELD_ALIASES = {
     "ptype": "Project+Type",

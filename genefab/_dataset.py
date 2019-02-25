@@ -14,11 +14,11 @@ from os import walk
 
 class AssayMetadataLocator():
     """Emulate behavior of Pandas `.loc` for class Assay()"""
- 
+
     def __init__(self, parent):
         """Point to parent"""
         self.parent = parent
- 
+
     def __getitem__(self, key):
         """Query parent.metadata with .loc, using field titles instead of internal field ids"""
         if isinstance(key, tuple): # called with .loc[x, y]
@@ -44,7 +44,7 @@ class Assay():
     fields = None
     strict_indexing = True
     storage = None
- 
+
     def __init__(self, parent, name, json, glds_file_urls, storage_prefix, strict_indexing=True):
         """Prase JSON into assay metadata"""
         self.parent = parent
@@ -73,7 +73,7 @@ class Assay():
         # initialize indexing functions:
         self.strict_indexing = strict_indexing
         self.loc = AssayMetadataLocator(self)
- 
+
     def __getitem__(self, titles):
         """Get metadata by field title (rather than internal field id)"""
         if isinstance(titles, (tuple, list, Series, Index)):
@@ -91,7 +91,7 @@ class Assay():
                 return subset
             else:
                 return subset.iloc[:,0]
- 
+
     @property
     def available_file_types(self):
         """List file types referenced in metadata"""
@@ -102,7 +102,7 @@ class Assay():
                 if not set(available_files) <= {"", None, nan}:
                     file_types.add(title)
         return file_types
- 
+
     @property
     def available_derived_file_types(self):
         """List file types with derived data referenced in metadata"""
@@ -110,12 +110,12 @@ class Assay():
             permissive_search_group(r'^.*(processed|derived).+file.*$', ft)
             for ft in self.available_file_types
         } - {None}
- 
+
     @property
     def available_protocols(self):
         """List protocol REFs referenced in metadata"""
         return set(self[["Protocol REF"]].values.flatten()) - {"", None, nan}
- 
+
     def _get_file_url(self, filemask):
         """Get URL of file defined by file mask (such as *SRR1781971_*)"""
         regex_filemask = filemask.split("/")[0].replace("*", ".*")
@@ -129,7 +129,7 @@ class Assay():
             raise GeneLabJSONException("Multiple file URLs match name")
         else:
             return self.glds_file_urls[matching_names[0]]
- 
+
     def _download_archive_files(self, force_reload=False):
         """Download files/archives etc that contain files targeted by get_combined_matrix()"""
         derived_entries = self[list(self.available_derived_file_types)]
@@ -149,7 +149,7 @@ class Assay():
         for file_url in file_urls:
             file_name = safe_file_name(file_url)
             fetch_file(file_name, file_url, self.storage, update=force_reload)
- 
+
     def get_combined_matrix(self, force_reload=False):
         """Download (if necessary), parse and combine derived files"""
         self._download_archive_files(force_reload=force_reload)
@@ -189,22 +189,18 @@ class GeneLabDataSet():
     file_urls = None
     verbose = False
     storage = None
- 
+
     def __init__(self, accession, assay_strict_indexing=True, verbose=False, storage_prefix=".genelab"):
         """Request JSON representation of ISA metadata and store fields"""
         self.accession = accession
         self.verbose = verbose
         self.storage = join(storage_prefix, accession)
-        getter_url = "{}/data/study/data/{}/"
         data_json = get_json(
-            getter_url.format(API_ROOT, accession), self.verbose
+            "{}/data/study/data/{}/".format(API_ROOT, accession), self.verbose
         )
         if len(data_json) > 1:
-            raise GeneLabJSONException(
-                "Too many results returned, unexpected behavior"
-            )
-        else:
-            self._json = data_json[0]
+            raise GeneLabJSONException("Too many results returned")
+        self._json = data_json[0]
         try:
             self.internal_id = self._json["_id"]
             self.metadata_id = self._json["metadata_id"]
@@ -221,10 +217,9 @@ class GeneLabDataSet():
         try:
             self.assays = [
                 Assay(
-                    self, assay_name, assay_json,
+                    self, assay_name, assay_json, storage_prefix=self.storage,
                     glds_file_urls=self._get_file_urls(),
-                    strict_indexing=assay_strict_indexing,
-                    storage_prefix=self.storage
+                    strict_indexing=assay_strict_indexing
                 )
                 for assay_name, assay_json in self._info["assays"].items()
             ]
@@ -232,7 +227,7 @@ class GeneLabDataSet():
             raise GeneLabJSONException(
                 "Malformed assay JSON ({})".format(self.accession)
             )
- 
+
     @property
     def factors(self):
         """List factors"""
