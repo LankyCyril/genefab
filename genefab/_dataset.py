@@ -38,14 +38,16 @@ class AssayMetadataLocator():
 class Assay():
     """Stores individual assay metadata"""
     name = None
+    parent = None
     metadata = None
     glds_file_urls = None
     fields = None
     strict_indexing = True
     storage = None
  
-    def __init__(self, assay_name, assay_json, glds_file_urls, storage_prefix, strict_indexing=True):
+    def __init__(self, parent, assay_name, assay_json, glds_file_urls, storage_prefix, strict_indexing=True):
         """Prase JSON into assay metadata"""
+        self.parent = parent
         self.name = assay_name
         self.glds_file_urls = glds_file_urls
         self.storage = join(storage_prefix, assay_name)
@@ -213,7 +215,7 @@ class GeneLabDataSet():
         try:
             self.assays = [
                 Assay(
-                    assay_name, assay_json,
+                    self, assay_name, assay_json,
                     glds_file_urls=self._get_file_urls(),
                     strict_indexing=assay_strict_indexing,
                     storage_prefix=self.storage
