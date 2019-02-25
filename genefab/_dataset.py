@@ -3,6 +3,7 @@ from re import search, IGNORECASE, compile
 from urllib.parse import quote_plus
 from ._util import get_json, fetch_file, flat_extract, permissive_search_group
 from ._util import FFIELD_ALIASES, FFIELD_VALUES, API_ROOT, GENELAB_ROOT
+from ._exceptions import GeneLabJSONException
 from ._checks import safe_file_name
 from pandas import concat, Series, Index, read_csv
 from collections import defaultdict
@@ -24,7 +25,7 @@ class AssayMetadataLocator():
             try:
                 indices, titles = key
             except ValueError:
-                raise ValueError("Incorrect index for assay metadata")
+                raise IndexError("Incorrect index for assay metadata")
             subset = self.parent[titles].loc[indices]
         else: # assume called with .loc[x] and interpret `x` the best we can
             subset = self.parent.metadata.loc[key]
@@ -54,13 +55,13 @@ class Assay():
             entry["field"]: entry["title"] for entry in self._header
         }
         if len(self._field2title) != len(self._header):
-            raise ValueError("Conflicting IDs of data fields")
+            raise GeneLabJSONException("Conflicting IDs of data fields")
         self.fields = defaultdict(set)
         for field, title in self._field2title.items():
             self.fields[title].add(field)
         self.metadata = concat(map(Series, self._raw), axis=1).T
         if len(self.fields["Sample Name"]) != 1:
-            raise ValueError("Unexpected number of 'Sample Name' fields")
+            raise GeneLabJSONException("Number of 'Sample Name' fields != 1")
         else:
             sample_name_field = list(self.fields["Sample Name"])[0]
             self.metadata = self.metadata.set_index(sample_name_field)
@@ -119,7 +120,7 @@ class Assay():
         if len(matching_names) == 0:
             return None
         elif len(matching_names) > 1:
-            raise ValueError("Multiple file URLs match name")
+            raise GeneLabJSONException("Multiple file URLs match name")
         else:
             return self.glds_file_urls[matching_names[0]]
  
@@ -155,7 +156,9 @@ class Assay():
             )
         derived_files = self[[target]]
         if derived_files.shape[1] != 1:
-            raise ValueError("Non unique or absent '{}' field".format(target))
+            raise GeneLabJSONException(
+                "Non unique or absent '{}' field".format(target)
+            )
         else:
             derived_files = derived_files.iloc[:,0]
         sample_dataframes = []
@@ -189,7 +192,9 @@ class GeneLabDataSet():
             getter_url.format(API_ROOT, accession), self.verbose
         )
         if len(data_json) > 1:
-            raise ValueError("Too many results returned, unexpected behavior")
+            raise GeneLabJSONException(
+                "Too many results returned, unexpected behavior"
+            )
         else:
             self._json = data_json[0]
         try:
@@ -202,7 +207,9 @@ class GeneLabDataSet():
             for field in "description", "samples", "ontologies", "organisms":
                 setattr(self, field, self._info[field])
         except KeyError:
-            raise ValueError("Malformed JSON")
+            raise GeneLabJSONException(
+                "Malformed JSON: {}".format(self.accession)
+            )
         try:
             self.assays = [
                 Assay(
@@ -214,8 +221,9 @@ class GeneLabDataSet():
                 for assay_name, assay_json in self._info["assays"].items()
             ]
         except KeyError:
-            print("Malformed assay JSON: {}".format(accession), file=stderr)
-            self.assays = None
+            raise GeneLabJSONException(
+                "Malformed assay JSON: {}".format(self.accession)
+            )
  
     @property
     def factors(self):
@@ -247,7 +255,7 @@ class GeneLabDataSet():
             try:
                 filedata = files_json["studies"][self.accession]["study_files"]
             except KeyError:
-                raise ValueError("Malformed JSON")
+                raise GeneLabJSONException("Malformed JSON")
             self.file_urls = {
                 fd["file_name"]: GENELAB_ROOT+fd["remote_url"]
                 for fd in filedata
@@ -263,7 +271,7 @@ def get_ffield_matches(verbose=False, **ffield_kwargs):
         if ffield_alias in FFIELD_ALIASES:
             ffield = FFIELD_ALIASES[ffield_alias]
         else:
-            raise ValueError("Unrecognized field: " + ffield_alias)
+            raise IndexError("Unrecognized field: " + ffield_alias)
         for ffvalue in FFIELD_VALUES[ffield]:
             if search(ffregex, ffvalue, IGNORECASE):
                 if verbose:
@@ -286,7 +294,7 @@ def get_datasets(maxcount="25", assay_strict_indexing=True, storage=".genelab", 
     try:
         json = get_json(url, verbose=verbose)["hits"]["hits"]
     except:
-        raise ValueError("Unrecognized JSON structure")
+        raise GeneLabJSONException("Unrecognized JSON structure")
     return [
         GeneLabDataSet(
             hit["_id"], assay_strict_indexing=assay_strict_indexing,
