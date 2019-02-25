@@ -17,22 +17,34 @@ easy_accessions = [
     "GLDS-125",  "GLDS-167",  "GLDS-51",   "GLDS-159"
 ]
 
+# success/failure: GLDS-116
+
+easy_accessions = [
+    "GLDS-50"
+]
+
 output_mask = "data/{}-{}.tsv.gz"
 
 for accession in easy_accessions:
     glds = GLDS(accession)
     for assay in glds.assays:
+        print(assay.metadata.T.to_csv(sep="\t").replace("\t \t", "\tNA\t"))
+        #print(assay.fields.keys())
         try:
-            if "Comment:  Derived Array Data File Name" in assay.fields:
+            if "Comment:  Processed Data Archive file" in assay.fields:
+                matrix = assay.get_combined_matrix("Derived Array Data File", "processed")
+            elif "Comment:  Derived Array Data File Name" in assay.fields:
                 matrix = assay.get_combined_matrix("Comment:  Derived Array Data File Name" )
             elif "Derived Array Data File Name" in assay.fields:
                 matrix = assay.get_combined_matrix("Derived Array Data File Name")
             else:
                 matrix = assay.get_combined_matrix()
         except:
-            print("Something broke for:", accession, file=stderr, flush=True)
+            print("Something broke for:", accession, assay.name, file=stderr, flush=True)
             continue
         matrix.to_csv(
             output_mask.format(accession, assay.name),
             sep="\t", compression="gzip", index=False
         )
+        print("Success:", accession, assay.name, flush=True)
+    break
