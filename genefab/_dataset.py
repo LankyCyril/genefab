@@ -1,7 +1,7 @@
 from sys import stderr
 from re import search, IGNORECASE, compile
 from urllib.parse import quote_plus
-from ._util import get_json, fetch_file, flat_extract
+from ._util import get_json, fetch_file, flat_extract, permissive_search_group
 from ._util import FFIELD_ALIASES, FFIELD_VALUES, API_ROOT, GENELAB_ROOT
 from ._checks import safe_file_name
 from pandas import concat, Series, Index, read_csv
@@ -95,6 +95,14 @@ class Assay():
                 if not set(available_files) <= {"", None, nan}:
                     file_types.add(title)
         return file_types
+ 
+    @property
+    def available_derived_file_types(self):
+        """List file types with derived data referenced in metadata"""
+        return {
+            permissive_search_group(r'processed|derived.+file', ft)
+            for ft in self.available_file_types
+        } - {None}
  
     @property
     def available_protocols(self):

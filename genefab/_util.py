@@ -8,7 +8,7 @@ from requests.exceptions import InvalidSchema
 from urllib.error import URLError
 from math import ceil
 from tqdm import tqdm
-from re import sub
+from re import sub, search, IGNORECASE
 from zipfile import ZipFile
 from ._checks import safe_file_name
 
@@ -75,6 +75,13 @@ def flat_extract(zip_filename, target_directory):
                     join(target_directory, fileinfo.filename),
                     join(target_directory, target_filename)
                 )
+
+def permissive_search_group(expression, string, flags=IGNORECASE):
+    """Like re.search(...).group(), but returns None if re.search() is None"""
+    return getattr(
+        search(expression, string, flags=flags),
+        "group", lambda: None
+    )()
 
 FFIELD_VALUES = {
     "Project+Type": [
