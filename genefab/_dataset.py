@@ -45,14 +45,15 @@ class Assay():
     strict_indexing = True
     storage = None
  
-    def __init__(self, parent, assay_name, assay_json, glds_file_urls, storage_prefix, strict_indexing=True):
+    def __init__(self, parent, name, json, glds_file_urls, storage_prefix, strict_indexing=True):
         """Prase JSON into assay metadata"""
         self.parent = parent
-        self.name = assay_name
+        self.name = name
         self.glds_file_urls = glds_file_urls
-        self.storage = join(storage_prefix, assay_name)
-        self._json = assay_json
+        self.storage = join(storage_prefix, name)
+        self._json = json
         self._raw, self._header = self._json["raw"], self._json["header"]
+        # populate and freeze self.fields (this can be refactored...):
         self._field2title = {
             entry["field"]: entry["title"] for entry in self._header
         }
@@ -61,12 +62,15 @@ class Assay():
         self.fields = defaultdict(set)
         for field, title in self._field2title.items():
             self.fields[title].add(field)
+        self.fields = dict(self.fields)
+        # populate metadata and index with Sample Name:
         self.metadata = concat(map(Series, self._raw), axis=1).T
         if len(self.fields["Sample Name"]) != 1:
             raise GeneLabJSONException("Number of 'Sample Name' fields != 1")
         else:
             sample_name_field = list(self.fields["Sample Name"])[0]
             self.metadata = self.metadata.set_index(sample_name_field)
+        # initialize indexing functions:
         self.strict_indexing = strict_indexing
         self.loc = AssayMetadataLocator(self)
  
