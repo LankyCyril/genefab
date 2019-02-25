@@ -107,7 +107,7 @@ class Assay():
     def available_derived_file_types(self):
         """List file types with derived data referenced in metadata"""
         return {
-            permissive_search_group(r'processed|derived.+file', ft)
+            permissive_search_group(r'^.*(processed|derived).+file.*$', ft)
             for ft in self.available_file_types
         } - {None}
  
@@ -130,29 +130,29 @@ class Assay():
         else:
             return self.glds_file_urls[matching_names[0]]
  
-    def _download_target_files(self, catch_all, force_reload=False):
+    def _download_archive_files(self, force_reload=False):
         """Download files/archives etc that contain files targeted by get_combined_matrix()"""
-        derived_file_fields = [
-            title for title in self.available_file_types
-            if search(catch_all, title, flags=IGNORECASE)
-        ]
-        metadata_file_entries = set(
-            self[derived_file_fields].values.flatten()
-        )
-        internal_file_urls = set(map(
-            self._get_file_url, metadata_file_entries
-        ))
+        derived_entries = self[list(self.available_derived_file_types)]
+        for field in derived_entries.columns:
+            if derived_entries[field].str.endswith(".zip").all():
+                internal_file_urls = set(map(
+                    self._get_file_url, derived_entries[field].values
+                ))
+                break
+        else:
+            internal_file_urls = set()
         external_file_urls = set(filter(
-            compile(r'^(ftp|http|https):\/\/').search, metadata_file_entries
+            compile(r'^(ftp|http|https):\/\/').search,
+            derived_entries.values.flatten()
         ))
         file_urls = (internal_file_urls | external_file_urls) - {None}
         for file_url in file_urls:
             file_name = safe_file_name(file_url)
             fetch_file(file_name, file_url, self.storage, update=force_reload)
  
-    def get_combined_matrix(self, target="Derived Array Data File", catch_all="derived", force_reload=False):
+    def get_combined_matrix(self, force_reload=False):
         """Download (if necessary), parse and combine derived files"""
-        self._download_target_files(catch_all, force_reload=force_reload)
+        self._download_archive_files(force_reload=force_reload)
         filenames = next(walk(self.storage))[2]
         zips = [filename for filename in filenames if filename.endswith(".zip")]
         for zip_filename in zips:
@@ -160,13 +160,15 @@ class Assay():
                 join(self.storage, zip_filename),
                 target_directory=self.storage
             )
-        derived_files = self[[target]]
-        if derived_files.shape[1] != 1:
-            raise GeneLabJSONException(
-                "Non unique or absent '{}' field".format(target)
-            )
+        derived_entries = self[list(self.available_derived_file_types)]
+        for field in derived_entries.columns:
+            if len(set(derived_entries[field])) == derived_entries.shape[0]:
+                derived_files = derived_entries[field]
+                break
         else:
-            derived_files = derived_files.iloc[:,0]
+            raise NotImplementedError(
+                "Derived files not referenced individually"
+            )
         sample_dataframes = []
         for sample_name, derived_filename in derived_files.iteritems():
             filename = safe_file_name(
