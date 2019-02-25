@@ -208,7 +208,7 @@ class GeneLabDataSet():
                 setattr(self, field, self._info[field])
         except KeyError:
             raise GeneLabJSONException(
-                "Malformed JSON: {}".format(self.accession)
+                "Malformed JSON ({})".format(self.accession)
             )
         try:
             self.assays = [
@@ -222,7 +222,7 @@ class GeneLabDataSet():
             ]
         except KeyError:
             raise GeneLabJSONException(
-                "Malformed assay JSON: {}".format(self.accession)
+                "Malformed assay JSON ({})".format(self.accession)
             )
  
     @property
@@ -281,24 +281,35 @@ def get_ffield_matches(verbose=False, **ffield_kwargs):
             print("\b", file=stderr)
 
 
-def get_datasets(maxcount="25", assay_strict_indexing=True, storage=".genelab", verbose=False, **ffield_kwargs):
+def get_datasets(maxcount="25", assay_strict_indexing=True, storage=".genelab", verbose=False, onerror="warn", **ffield_kwargs):
     """Match passed regexes and combine into search URL, get JSON and parse for accessions"""
-    url = "&".join(
-        [API_ROOT+"/data/search/?term=GLDS", "type=cgene", "size="+maxcount]
-        + [
-            "ffield={}&fvalue={}".format(ffield, quote_plus(ffvalue))
-            for ffield, ffvalue
-            in get_ffield_matches(verbose=verbose, **ffield_kwargs)
-        ]
-    )
+    url_lead_components = [
+        API_ROOT+"/data/search/?term=GLDS", "type=cgene", "size="+str(maxcount)
+    ]
+    url_ffield_components = [
+        "ffield={}&fvalue={}".format(ffield, quote_plus(ffvalue))
+        for ffield, ffvalue
+        in get_ffield_matches(verbose=verbose, **ffield_kwargs)
+    ]
+    url = "&".join(url_lead_components + url_ffield_components)
     try:
         json = get_json(url, verbose=verbose)["hits"]["hits"]
     except:
         raise GeneLabJSONException("Unrecognized JSON structure")
-    return [
-        GeneLabDataSet(
-            hit["_id"], assay_strict_indexing=assay_strict_indexing,
-            storage_prefix=storage, verbose=verbose
-        )
-        for hit in json
-    ]
+    datasets = []
+    for hit in json:
+        try:
+            datasets.append(
+                GeneLabDataSet(
+                    hit["_id"], assay_strict_indexing=assay_strict_indexing,
+                    storage_prefix=storage, verbose=verbose
+                )
+            )
+        except GeneLabJSONException as e:
+            if onerror == "ignore":
+                pass
+            elif onerror == "warn":
+                print("Warning:", e, file=stderr)
+            else:
+                raise
+    return datasets
