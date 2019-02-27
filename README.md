@@ -87,6 +87,8 @@ data into a single DataFrame.
 If derived data is referenced in the metadata individually for each sample,
 returns an instance of `PerSampleMatrix`, which inherits from `pandas.DataFrame`
 and acts like one.  
+If derived data is referenced in one "data matrix" file, assumes a two-line
+header and returns an instance of `DataMatrix` (also just a DataFrame).  
 If derived data is referenced in combined, complex files, will in the future
 return an instance of `CompoundMatrix`, but currently fails with a
 `NotImplementedError`.

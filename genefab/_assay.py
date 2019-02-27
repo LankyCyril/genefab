@@ -10,12 +10,9 @@ from os import walk
 from os.path import join
 
 
-class PerSampleMatrix(DataFrame):
-    pass
-
-
-class CompoundMatrix(DataFrame):
-    pass
+class PerSampleMatrix(DataFrame): pass
+class DataMatrix(DataFrame): pass
+class CompoundMatrix(DataFrame): pass
 
 
 class AssayMetadataLocator():
@@ -123,6 +120,14 @@ class Assay():
         } - {None}
 
     @property
+    def available_derived_matrix_file_types(self):
+        """List file types with derived data referenced in metadata"""
+        return {
+            permissive_search_group(r'^.*(processed|derived).+matrix.+file.*$', ft)
+            for ft in self.available_file_types
+        } - {None}
+
+    @property
     def available_protocols(self):
         """List protocol REFs referenced in metadata"""
         if "Protocol REF" in self.fields:
@@ -191,6 +196,22 @@ class Assay():
             concat(sample_dataframes, axis=0, ignore_index=True)
         )
 
+    def _matrix_from_datamatrix(self, derived_files):
+        """Assuming a single data matrix referenced in metadata, try parsing to expected structure"""
+        derived_files_set = set(derived_files)
+        if len(derived_files_set) == 1:
+            filename = safe_file_name(
+                derived_files_set.pop(), as_mask=True, directory=self.storage
+            )
+            return DataMatrix(
+                read_csv(
+                    join(self.storage, filename), sep="\t",
+                    header=[0, 1], index_col=0
+                )
+            )
+        else:
+            raise NotImplementedError("Multiple data matrices referenced")
+
     def get_combined_matrix(self, force_reload=False):
         """Download (if necessary), extract, parse and combine derived files"""
         self._download_archive_files(force_reload=force_reload)
@@ -205,7 +226,19 @@ class Assay():
                     pass
                 else:
                     return matrix
-        else:
-            raise NotImplementedError(
-                "Derived files not referenced individually"
-            )
+        if self.available_derived_matrix_file_types:
+            derived_entries = self[
+                list(self.available_derived_matrix_file_types)
+            ]
+            for field in derived_entries.columns:
+                try:
+                    matrix = self._matrix_from_datamatrix(
+                        derived_entries[field]
+                    )
+                except (ParserError, NotImplementedError):
+                    pass
+                else:
+                    return matrix
+        raise NotImplementedError(
+            "Derived files not referenced individually or as a data matrix"
+        )
