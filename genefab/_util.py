@@ -20,7 +20,7 @@ API_ROOT = "https://genelab-data.ndc.nasa.gov/genelab"
 def get_json(url, verbose=False):
     """HTTP get, decode, parse"""
     if verbose:
-        print("Parsing url: ", url, file=stderr)
+        print("Parsing url:", url, file=stderr)
     with urlopen(url) as response:
         return loads(response.read().decode())
 
