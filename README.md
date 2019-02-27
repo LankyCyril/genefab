@@ -5,12 +5,15 @@
 ```
 from genefab import GeneLabDataSet
 
-glds = GeneLabDataSet("GLDS-182")
+glds = GeneLabDataSet("GLDS-158")
 assay = glds.assays[0]
 matrix = assay.get_combined_matrix()
-filename = "GLDS-182-" + assay.name + ".tsv"
+filename = "GLDS-158-" + assay.name + ".tsv"
 matrix.to_csv(filename, sep="\t", index=False)
 ```
+
+Additionally, see `demo.py`, which also has code for collecting statistics on
+the currently supported and unsupported transcription datasets.
 
 ## Description
 

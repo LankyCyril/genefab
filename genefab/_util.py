@@ -10,6 +10,7 @@ from math import ceil
 from tqdm import tqdm
 from re import sub, search, IGNORECASE
 from zipfile import ZipFile
+from subprocess import call
 from ._checks import safe_file_name
 
 GENELAB_ROOT = "https://genelab-data.ndc.nasa.gov"
@@ -19,7 +20,7 @@ API_ROOT = "https://genelab-data.ndc.nasa.gov/genelab"
 def get_json(url, verbose=False):
     """HTTP get, decode, parse"""
     if verbose:
-        print("Parsing url: ", url, file=stderr)
+        print("Parsing url:", url, file=stderr)
     with urlopen(url) as response:
         return loads(response.read().decode())
 
@@ -78,6 +79,16 @@ def flat_extract(zip_filename, target_directory):
                     join(target_directory, fileinfo.filename),
                     join(target_directory, target_filename)
                 )
+
+
+def flat_gunzip(gz_filename, target_directory):
+    """Extract gzipped file contents into a flat structure (in case of TARs), with safety checks"""
+    try:
+        returncode = call(["gunzip", gz_filename], cwd=target_directory)
+        if returncode != 0:
+            raise FileNotFoundError
+    except FileNotFoundError:
+        raise OSError("Could not gunzip file: '{}'".format(gz_filename))
 
 
 def permissive_search_group(expression, string, flags=IGNORECASE):
