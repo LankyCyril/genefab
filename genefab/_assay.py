@@ -188,7 +188,7 @@ class Assay():
                 derived_filename, as_mask=True, directory=self.storage
             )
             sample_dataframe = read_csv(
-                join(self.storage, filename), sep="\t"
+                join(self.storage, filename), sep="\t", comment="#"
             )
             sample_dataframe["Sample Name"] = sample_name
             sample_dataframes.append(sample_dataframe)
@@ -205,7 +205,7 @@ class Assay():
             )
             return DataMatrix(
                 read_csv(
-                    join(self.storage, filename), sep="\t",
+                    join(self.storage, filename), sep="\t", comment="#",
                     header=[0, 1], index_col=0
                 )
             )
@@ -240,5 +240,5 @@ class Assay():
                 else:
                     return matrix
         raise NotImplementedError(
-            "Derived files not referenced individually or as a data matrix"
+            "Derived files not referenced individually or as single data matrix"
         )

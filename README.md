@@ -84,12 +84,14 @@ checking whether derived data is available:
 
 `Assay.get_combined_matrix()` attempts to download, parse and combine derived
 data into a single DataFrame.  
-If derived data is referenced in the metadata individually for each sample,
+* If derived data is referenced in the metadata individually for each sample,
 returns an instance of `PerSampleMatrix`, which inherits from `pandas.DataFrame`
 and acts like one.  
-If derived data is referenced in one "data matrix" file, assumes a two-line
+`PerSampleMatrix` are long-form (narrow), the index is numeric.
+* If derived data is referenced in one "data matrix" file, assumes a two-line
 header and returns an instance of `DataMatrix` (also just a DataFrame).  
-If derived data is referenced in combined, complex files, will in the future
+`DataMatrix` are wide-form, the index is meaningful.
+* If derived data is referenced in combined, complex files, will in the future
 return an instance of `CompoundMatrix`, but currently fails with a
 `NotImplementedError`.
 
