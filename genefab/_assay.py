@@ -120,7 +120,13 @@ class Assay():
     @property
     def available_protocols(self):
         """List protocol REFs referenced in metadata"""
-        return set(self[["Protocol REF"]].values.flatten()) - {"", None, nan}
+        if "Protocol REF" in self.fields:
+            return (
+                set(self[["Protocol REF"]].values.flatten()) -
+                {"", None, nan}
+            )
+        else:
+            return set()
 
     def _get_file_url(self, filemask):
         """Get URL of file defined by file mask (such as *SRR1781971_*)"""
