@@ -1,5 +1,5 @@
 from re import search, IGNORECASE, compile
-from ._util import fetch_file, flat_extract, permissive_search_group
+from ._util import fetch_file, flat_extract, flat_gunzip, permissive_search_group
 from ._checks import safe_file_name
 from ._exceptions import GeneLabJSONException
 from pandas import concat, Series, Index, read_csv
@@ -130,33 +130,41 @@ class Assay():
     def _download_archive_files(self, force_reload=False):
         """Download files/archives etc that contain files targeted by get_combined_matrix()"""
         derived_entries = self[list(self.available_derived_file_types)]
+        print(derived_entries.to_csv())
+        print(self.glds_file_urls)
+        internal_file_urls = set()
         for field in derived_entries.columns:
-            if derived_entries[field].str.endswith(".zip").all():
-                internal_file_urls = set(map(
-                    self._get_file_url, derived_entries[field].values
-                ))
-                break
-        else:
-            internal_file_urls = set()
+            internal_file_urls |= set(map(
+                self._get_file_url, derived_entries[field].values
+            ))
         external_file_urls = set(filter(
             compile(r'^(ftp|http|https):\/\/').search,
             derived_entries.values.flatten()
         ))
         file_urls = (internal_file_urls | external_file_urls) - {None}
+        if not file_urls:
+            raise GeneLabJSONException("Nothing to download")
         for file_url in file_urls:
             file_name = safe_file_name(file_url)
             fetch_file(file_name, file_url, self.storage, update=force_reload)
 
+    def _extract_archive_files(self):
+        """Extract all files in current assay's storage"""
+        for filename in next(walk(self.storage))[2]:
+            if filename.endswith(".zip"):
+                flat_extract(
+                    join(self.storage, filename),
+                    target_directory=self.storage
+                )
+            elif filename.endswith(".gz"):
+                flat_gunzip(
+                    filename, target_directory=self.storage
+                )
+
     def get_combined_matrix(self, force_reload=False):
-        """Download (if necessary), parse and combine derived files"""
+        """Download (if necessary), extract, parse and combine derived files"""
         self._download_archive_files(force_reload=force_reload)
-        filenames = next(walk(self.storage))[2]
-        zips = [filename for filename in filenames if filename.endswith(".zip")]
-        for zip_filename in zips:
-            flat_extract(
-                join(self.storage, zip_filename),
-                target_directory=self.storage
-            )
+        self._extract_archive_files()
         derived_entries = self[list(self.available_derived_file_types)]
         for field in derived_entries.columns:
             if len(set(derived_entries[field])) == derived_entries.shape[0]:
