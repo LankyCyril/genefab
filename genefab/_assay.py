@@ -104,7 +104,7 @@ class Assay():
     def available_derived_file_types(self):
         """List file types with derived data referenced in metadata"""
         return {
-            permissive_search_group(r'^.*(processed|derived).+arr.+file.*$', ft)
+            permissive_search_group(r'^.*(processed|derived).+file.*$', ft)
             for ft in self.available_file_types
         } - {None}
 
