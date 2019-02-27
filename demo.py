@@ -10,8 +10,7 @@ print(*header, sep="\t")
 
 for dataset in datasets:
     for assay in dataset.assays:
-        #if ("nucleic acid hybridization" in assay.available_protocols) and assay.available_derived_file_types:
-        if assay.available_derived_file_types:
+        if assay.has_arrays and assay.available_derived_file_types:
             try:
                 matrix = assay.get_combined_matrix()
             except Exception as e:

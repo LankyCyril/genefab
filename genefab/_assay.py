@@ -99,6 +99,11 @@ class Assay():
                 return subset.iloc[:,0]
 
     @property
+    def has_arrays(self):
+        """Boolean flag, True if has 'Array Design REF', False otherwise"""
+        return ("Array Design REF" in self.fields)
+
+    @property
     def available_file_types(self):
         """List file types referenced in metadata"""
         file_types = set()

@@ -64,6 +64,10 @@ not extra careful.
 Instances of `Assay` can also be indexed with `.loc[]` and with boolean queries,
 just like in pandas.
 
+`Assay.has_arrays` is a boolean flag that is set to `True` if metadata suggests
+that the assay has array data (simply, if assay metadata contains fields with
+name "Array Design REF".
+
 `Assay.available_protocols` returns a set with all "Protocol REF" values
 referenced by the assay metadata; this is useful for checks like
 `if "nucleic acid hybridization" in assay.available_protocols: ...`.
