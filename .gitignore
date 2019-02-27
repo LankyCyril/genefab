@@ -7,3 +7,6 @@ GeneFab.ipynb
 sandbox
 sandbox.py
 genefab/__init__.pyc
+sandbox*.ipynb
+data
+.genelab

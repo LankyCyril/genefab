@@ -2,7 +2,15 @@
 
 ## Quick start (demo)
 
-https://github.com/LankyCyril/genefab/blob/master/genefab-demo.ipynb
+```
+from genefab import GeneLabDataSet
+
+glds = GeneLabDataSet("GLDS-182")
+assay = glds.assays[0]
+matrix = assay.get_combined_matrix()
+filename = "GLDS-182-" + assay.name + ".tsv"
+matrix.to_csv(filename, sep="\t", index=False)
+```
 
 ## Description
 
@@ -19,6 +27,8 @@ stores all GLDS datasets matching passed search terms
 
 Python packages:
 * pandas
+* requests
+* tqdm
 
 It is recommended to use a user installed
 [Conda](https://www.anaconda.com/download/) environment.  
