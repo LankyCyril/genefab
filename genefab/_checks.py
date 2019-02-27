@@ -1,5 +1,6 @@
 from os import walk
 from re import search
+from ._exceptions import GeneLabFileException
 
 def safe_file_name(compound_name, as_mask=False, directory="."):
     simplified_name = compound_name.split("/")[-1].lstrip("~")
@@ -13,5 +14,11 @@ def safe_file_name(compound_name, as_mask=False, directory="."):
         ]
         if len(candidate_filenames) == 1:
             return candidate_filenames[0]
+        elif len(candidate_filenames) == 0:
+            raise GeneLabFileException(
+                "No files matching '{}'".format(simplified_name)
+            )
         else:
-            raise ValueError("Multiple or no files matching " + simplified_name)
+            raise GeneLabFileException(
+                "Multiple files matching '{}'".format(simplified_name)
+            )
