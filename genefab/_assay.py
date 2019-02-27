@@ -139,8 +139,6 @@ class Assay():
     def _download_archive_files(self, force_reload=False):
         """Download files/archives etc that contain files targeted by get_combined_matrix()"""
         derived_entries = self[list(self.available_derived_file_types)]
-        print(derived_entries.to_csv())
-        print(self.glds_file_urls)
         internal_file_urls = set()
         for field in derived_entries.columns:
             internal_file_urls |= set(map(
