@@ -1,12 +1,21 @@
 from re import search, IGNORECASE, compile
-from ._util import fetch_file, flat_extract, flat_gunzip, permissive_search_group
+from ._util import fetch_file, flat_extract, permissive_search_group
 from ._checks import safe_file_name
 from ._exceptions import GeneLabJSONException
-from pandas import concat, Series, Index, read_csv
+from pandas import concat, Series, Index, read_csv, DataFrame
+from pandas.errors import ParserError
 from collections import defaultdict
 from numpy import nan
 from os import walk
 from os.path import join
+
+
+class PerSampleMatrix(DataFrame):
+    pass
+
+
+class CompoundMatrix(DataFrame):
+    pass
 
 
 class AssayMetadataLocator():
@@ -156,24 +165,9 @@ class Assay():
                     join(self.storage, filename),
                     target_directory=self.storage
                 )
-            elif filename.endswith(".gz"):
-                flat_gunzip(
-                    filename, target_directory=self.storage
-                )
 
-    def get_combined_matrix(self, force_reload=False):
-        """Download (if necessary), extract, parse and combine derived files"""
-        self._download_archive_files(force_reload=force_reload)
-        self._extract_archive_files()
-        derived_entries = self[list(self.available_derived_file_types)]
-        for field in derived_entries.columns:
-            if len(set(derived_entries[field])) == derived_entries.shape[0]:
-                derived_files = derived_entries[field]
-                break
-        else:
-            raise NotImplementedError(
-                "Derived files not referenced individually"
-            )
+    def _matrix_from_samples(self, derived_files):
+        """Make combined matrix from individually referenced derived data files"""
         sample_dataframes = []
         for sample_name, derived_filename in derived_files.iteritems():
             filename = safe_file_name(
@@ -184,4 +178,25 @@ class Assay():
             )
             sample_dataframe["Sample Name"] = sample_name
             sample_dataframes.append(sample_dataframe)
-        return concat(sample_dataframes, axis=0, ignore_index=True)
+        return PerSampleMatrix(
+            concat(sample_dataframes, axis=0, ignore_index=True)
+        )
+
+    def get_combined_matrix(self, force_reload=False):
+        """Download (if necessary), extract, parse and combine derived files"""
+        self._download_archive_files(force_reload=force_reload)
+        self._extract_archive_files()
+        derived_entries = self[list(self.available_derived_file_types)]
+        for field in derived_entries.columns:
+            if len(set(derived_entries[field])) == derived_entries.shape[0]:
+                derived_files = derived_entries[field]
+                try:
+                    matrix = self._matrix_from_samples(derived_files)
+                except ParserError:
+                    pass
+                else:
+                    return matrix
+        else:
+            raise NotImplementedError(
+                "Derived files not referenced individually"
+            )
