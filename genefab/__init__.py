@@ -1,3 +1,3 @@
-from ._dataset import GLDS
-from ._collection import GLDSCollection
-from ._microarray import MicroarrayExperiment
+from ._dataset import get_datasets, GeneLabDataSet
+from ._exceptions import GeneLabJSONException
+GLDS = GeneLabDataSet

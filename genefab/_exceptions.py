@@ -1,0 +1,2 @@
+class GeneLabJSONException(Exception):
+    pass
