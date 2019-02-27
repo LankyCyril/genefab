@@ -12,6 +12,9 @@ filename = "GLDS-158-" + assay.name + ".tsv"
 matrix.to_csv(filename, sep="\t", index=False)
 ```
 
+Additionally, see `demo.py`, which also has code for collecting statistics on
+the currently supported and unsupported transcription datasets.
+
 ## Description
 
 Implements classes and methods:
