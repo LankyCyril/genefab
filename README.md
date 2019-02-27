@@ -30,10 +30,10 @@ a simple example being `organism="mus", assay="transcription"`;
   * `onerror` controls what happens if an error occurs when accessing a dataset;
 when `onerror="warn"` (default), prints a warning to stderr and continues; if
 it is `"ignore"`, continues silently; otherwise raises the error and fails
-  * `assay_strict_indexing` (default `False`) is inherited by the instances of
+  * `assay_strict_indexing` (default `True`) is inherited by the instances of
 `Assay` inside each `GeneLabDataSet` (see below).
 
-### GeneLabDataSet(accession) (and its alias GLDS(accession))
+### GeneLabDataSet(accession), and its alias GLDS(accession)
 
 Initializes a GeneLabDataSet instance corresponding to `accession`.  
 Additional arguments are `assay_strict_indexing` (see notes for `get_datasets`
@@ -66,7 +66,7 @@ just like in pandas.
 
 `Assay.has_arrays` is a boolean flag that is set to `True` if metadata suggests
 that the assay has array data (simply, if assay metadata contains fields with
-name "Array Design REF".
+name "Array Design REF").
 
 `Assay.available_protocols` returns a set with all "Protocol REF" values
 referenced by the assay metadata; this is useful for checks like
