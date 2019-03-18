@@ -49,7 +49,7 @@ class Assay():
     storage = None
 
     def __init__(self, parent, name, json, glds_file_urls, storage_prefix, strict_indexing=True):
-        """Prase JSON into assay metadata"""
+        """Parse JSON into assay metadata"""
         self.parent = parent
         self.name = name
         self.glds_file_urls = glds_file_urls

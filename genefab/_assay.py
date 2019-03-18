@@ -31,7 +31,7 @@ class AssayMetadata():
     """Makes individual assay metadata accessible with Pandas-like indexing"""
 
     def __init__(self, parent):
-        """Inherit values from parent Assay()"""
+        """Point to parent and initialize children"""
         self.parent = parent
         self.loc = AssayMetadataLocator(self)
 
