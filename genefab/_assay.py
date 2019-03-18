@@ -39,10 +39,14 @@ class AssayMetadata():
         """Get metadata by field title (rather than internal field id)"""
         if isinstance(patterns, Series) and (patterns.dtype == bool):
             return self.parent.raw_metadata.loc[patterns]
-        elif isinstance(patterns, (tuple, list, set, Series, Index)):
+        if isinstance(patterns, dict):
+            _patterns = list(patterns.keys())
+        else:
+            _patterns = patterns
+        if isinstance(_patterns, (tuple, list, set, Series, Index)):
             titles = set.union(*[
                 self.parent._match_field_titles(p, method=fullmatch)
-                for p in patterns
+                for p in _patterns
             ])
             if titles:
                 return self.parent.raw_metadata[
@@ -100,6 +104,14 @@ class Assay():
         return {
             title for title in self.fields
             if method(pattern, title, flags=flags)
+        }
+
+    @property
+    def factors(self):
+        """Get factor names and their values"""
+        return {
+            field_title: set(self.metadata[[field_title]].values.flatten())
+            for field_title in self._match_field_titles(r'^factor value:  ')
         }
 
     @property
