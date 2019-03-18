@@ -1,9 +1,10 @@
 from os.path import join
-from ._exceptions import GeneLabJSONException
+from ._exceptions import GeneLabJSONException, GeneLabFileException
 from collections import defaultdict
-from pandas import concat, Series, Index, DataFrame
-from re import search, fullmatch, IGNORECASE
+from pandas import concat, Series, Index, DataFrame, read_csv
+from re import search, fullmatch, split, IGNORECASE
 from numpy import nan
+from ._util import fetch_file
 
 
 class AssayMetadataLocator():
@@ -63,8 +64,10 @@ class Assay():
     fields = None
     storage = None
 
+    _processed_data = None
+
     def __init__(self, parent, name, json, glds_file_urls, storage_prefix):
-        """Prase JSON into assay metadata"""
+        """Parse JSON into assay metadata"""
         self.parent = parent
         self.name = name
         self.glds_file_urls = glds_file_urls
@@ -121,3 +124,57 @@ class Assay():
             if not set(available_files) <= {"", None, nan}:
                 file_types.add(title)
         return file_types
+
+    def _get_file_url(self, filemask):
+        """Get URL of file defined by file mask (such as *SRR1781971_*)"""
+        regex_filemask = filemask.split("/")[0].replace("*", ".*")
+        matching_names = {
+            filename for filename in self.glds_file_urls.keys()
+            if search(regex_filemask, filename)
+        }
+        if len(matching_names) == 0:
+            return None
+        elif len(matching_names) > 1:
+            raise GeneLabJSONException("Multiple file URLs match name")
+        else:
+            return self.glds_file_urls[matching_names.pop()]
+
+    def get_processed_data(self, force_redownload=False):
+        """Get processed data from file(s) listed under 'normalized annotated data files'"""
+        meta_files = self.metadata[[".*normalized annotated data files.*"]]
+        if len(meta_files):
+            filenames = set.union(*(
+                set(split(r'\s*,\s*', entry))
+                for entry in meta_files.values.flatten()
+            ))
+            target_filenames = {
+                filename for filename in filenames
+                if not search(r'\.rda(ta)?(\.gz)?$', filename)
+            }
+            if len(target_filenames) == 0:
+                raise GeneLabFileException(
+                    "No suitable normalized annotated data files found"
+                )
+            elif len(target_filenames) > 1:
+                raise GeneLabFileException(
+                    "Multiple normalized annotated data files found"
+                )
+            else:
+                filename = target_filenames.pop()
+                url = self._get_file_url(filename)
+                fetch_file(filename, url, self.storage, update=force_redownload)
+                self._processed_data = read_csv(
+                    join(self.storage, filename), sep="\t", index_col=0
+                )
+        else:
+            self._processed_data = DataFrame()
+
+    @property
+    def processed_data(self):
+        if self._processed_data is None:
+            self.get_processed_data()
+        return self._processed_data
+
+    # aliases:
+    @property
+    def normalized_annotated_data(self): return self.processed_data
