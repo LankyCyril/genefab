@@ -17,7 +17,7 @@ class GeneLabDataSet():
     verbose = False
     storage = None
 
-    def __init__(self, accession, assay_strict_indexing=True, verbose=False, storage_prefix=".genelab", assay_class=Assay):
+    def __init__(self, accession, verbose=False, storage_prefix=".genelab", assay_class=Assay):
         """Request JSON representation of ISA metadata and store fields"""
         self.accession = accession
         self.verbose = verbose
@@ -45,8 +45,7 @@ class GeneLabDataSet():
             self.assays = [
                 assay_class(
                     self, assay_name, assay_json, storage_prefix=self.storage,
-                    glds_file_urls=self._get_file_urls(),
-                    strict_indexing=assay_strict_indexing
+                    glds_file_urls=self._get_file_urls()
                 )
                 for assay_name, assay_json in self._info["assays"].items()
             ]
@@ -111,7 +110,7 @@ def get_ffield_matches(verbose=False, **ffield_kwargs):
             print("\b", file=stderr)
 
 
-def get_datasets(maxcount="25", assay_strict_indexing=True, storage=".genelab", verbose=False, onerror="warn", **ffield_kwargs):
+def get_datasets(maxcount="25", storage=".genelab", verbose=False, onerror="warn", **ffield_kwargs):
     """Match passed regexes and combine into search URL, get JSON and parse for accessions"""
     url_lead_components = [
         API_ROOT+"/data/search/?term=GLDS", "type=cgene", "size="+str(maxcount)
@@ -131,8 +130,7 @@ def get_datasets(maxcount="25", assay_strict_indexing=True, storage=".genelab", 
         try:
             datasets.append(
                 GeneLabDataSet(
-                    hit["_id"], assay_strict_indexing=assay_strict_indexing,
-                    storage_prefix=storage, verbose=verbose
+                    hit["_id"], storage_prefix=storage, verbose=verbose
                 )
             )
         except GeneLabJSONException as e:
