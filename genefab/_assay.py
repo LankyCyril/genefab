@@ -64,6 +64,7 @@ class Assay():
     fields = None
     storage = None
 
+    _normalized_data = None
     _processed_data = None
 
     def __init__(self, parent, name, json, glds_file_urls, storage_prefix):
@@ -139,9 +140,9 @@ class Assay():
         else:
             return self.glds_file_urls[matching_names.pop()]
 
-    def get_processed_data(self, force_redownload=False):
-        """Get processed data from file(s) listed under 'normalized annotated data files'"""
-        meta_files = self.metadata[[".*normalized annotated data files.*"]]
+    def _read_data_from(self, field_title, sep="\t", blacklist_regex=None, force_redownload=False):
+        """Download (if necessary) and parse data contained in a single target file linked to by target field"""
+        meta_files = self.metadata[[field_title]]
         if len(meta_files):
             filenames = set.union(*(
                 set(split(r'\s*,\s*', entry))
@@ -149,7 +150,7 @@ class Assay():
             ))
             target_filenames = {
                 filename for filename in filenames
-                if not search(r'\.rda(ta)?(\.gz)?$', filename)
+                if not search(blacklist_regex, filename)
             }
             if len(target_filenames) == 0:
                 raise GeneLabFileException(
@@ -163,11 +164,33 @@ class Assay():
                 filename = target_filenames.pop()
                 url = self._get_file_url(filename)
                 fetch_file(filename, url, self.storage, update=force_redownload)
-                self._processed_data = read_csv(
-                    join(self.storage, filename), sep="\t", index_col=0
+                return read_csv(
+                    join(self.storage, filename), sep=sep, index_col=0
                 )
         else:
-            self._processed_data = DataFrame()
+            return DataFrame()
+
+    def get_normalized_data(self, force_redownload=False):
+        """Get normalized data from file(s) listed under 'normalized data files'"""
+        self._normalized_data = self._read_data_from(
+            ".*normalized data files.*",
+            blacklist_regex=r'\.rda(ta)?(\.gz)?$',
+            force_redownload=force_redownload
+        )
+
+    @property
+    def normalized_data(self):
+        if self._normalized_data is None:
+            self.get_normalized_data()
+        return self._normalized_data
+
+    def get_processed_data(self, force_redownload=False):
+        """Get processed data from file(s) listed under 'normalized annotated data files'"""
+        self._processed_data = self._read_data_from(
+            ".*normalized annotated data files.*",
+            blacklist_regex=r'\.rda(ta)?(\.gz)?$',
+            force_redownload=force_redownload
+        )
 
     @property
     def processed_data(self):
@@ -175,6 +198,11 @@ class Assay():
             self.get_processed_data()
         return self._processed_data
 
-    # aliases:
+    # alias:
+    def get_normalized_annotated_data(self, force_redownload=False):
+        self.get_processed_data(force_redownload=force_redownload)
+
+    # alias:
     @property
-    def normalized_annotated_data(self): return self.processed_data
+    def normalized_annotated_data(self):
+        return self.processed_data
