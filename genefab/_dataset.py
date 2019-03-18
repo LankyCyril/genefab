@@ -5,6 +5,7 @@ from ._util import get_json
 from ._util import FFIELD_ALIASES, FFIELD_VALUES, API_ROOT, GENELAB_ROOT
 from ._exceptions import GeneLabJSONException
 from ._assay import Assay
+from ._legacy_assay import Assay as LegacyAssay
 from os.path import join
 
 
@@ -16,7 +17,7 @@ class GeneLabDataSet():
     verbose = False
     storage = None
 
-    def __init__(self, accession, assay_strict_indexing=True, verbose=False, storage_prefix=".genelab"):
+    def __init__(self, accession, assay_strict_indexing=True, verbose=False, storage_prefix=".genelab", assay_class=Assay):
         """Request JSON representation of ISA metadata and store fields"""
         self.accession = accession
         self.verbose = verbose
@@ -42,7 +43,7 @@ class GeneLabDataSet():
             )
         try:
             self.assays = [
-                Assay(
+                assay_class(
                     self, assay_name, assay_json, storage_prefix=self.storage,
                     glds_file_urls=self._get_file_urls(),
                     strict_indexing=assay_strict_indexing
