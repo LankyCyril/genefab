@@ -73,16 +73,12 @@ class AssayMetadata():
 class Assay():
     """Stores individual assay information and metadata in raw form"""
     name = None
-    parent = None
-    raw_metadata = None
-    metadata = None
-    glds_file_urls = None
-    fields = None
+    fields, raw_metadata, metadata = None, None, None
+    parent, glds_file_urls = None, None
     storage = None
 
-    _normalized_data = None
-    _processed_data = None
-    _indexed_by = None
+    _normalized_data, _processed_data = None, None
+    _indexed_by, _field_indexed_by = None, None
 
     def __init__(self, parent, name, json, glds_file_urls, storage_prefix, index_by="Sample Name"):
         """Parse JSON into assay metadata"""
