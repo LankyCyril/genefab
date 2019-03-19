@@ -48,7 +48,7 @@ class Assay():
     strict_indexing = True
     storage = None
 
-    def __init__(self, parent, name, json, glds_file_urls, storage_prefix, strict_indexing=True):
+    def __init__(self, parent, name, json, glds_file_urls, storage_prefix, strict_indexing=True, **kwargs):
         """Parse JSON into assay metadata"""
         self.parent = parent
         self.name = name

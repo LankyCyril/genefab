@@ -71,7 +71,7 @@ class Assay():
     _normalized_data = None
     _processed_data = None
 
-    def __init__(self, parent, name, json, glds_file_urls, storage_prefix):
+    def __init__(self, parent, name, json, glds_file_urls, storage_prefix, index_by="Sample Name"):
         """Parse JSON into assay metadata"""
         self.parent = parent
         self.name = name
@@ -91,11 +91,17 @@ class Assay():
         self.fields = dict(self.fields)
         # populate metadata and index with Sample Name:
         self.raw_metadata = concat(map(Series, self._raw), axis=1).T
-        if len(self.fields["Sample Name"]) != 1:
-            raise GeneLabJSONException("Number of 'Sample Name' fields != 1")
+        if index_by not in self.fields:
+            raise GeneLabJSONException(
+                "Cannot index by nonexistent field: '{}'".format(index_by)
+            )
+        elif len(self.fields[index_by]) != 1:
+            raise GeneLabJSONException(
+                "Cannot index by ambiguous field: '{}'".format(index_by)
+            )
         else:
-            sample_name_field = list(self.fields["Sample Name"])[0]
-            self.raw_metadata = self.raw_metadata.set_index(sample_name_field)
+            index_field = list(self.fields[index_by])[0]
+            self.raw_metadata = self.raw_metadata.set_index(index_field)
         # initialize indexing functions:
         self.metadata = AssayMetadata(self)
 
