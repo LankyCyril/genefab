@@ -159,31 +159,41 @@ class Assay():
         else:
             return self.glds_file_urls[matching_names.pop()]
 
+    def _get_unique_field_from_title(self, title):
+        """Get unique raw metadata column name; fail if anything is ambiguous"""
+        matching_titles = self._match_field_titles(title)
+        if len(matching_titles) == 0:
+            raise IndexError("Nonexistent '{}'".format(title))
+        elif len(matching_titles) > 1:
+            raise IndexError("Ambiguous '{}'".format(title))
+        else:
+            matching_fields = self.fields[matching_titles.pop()]
+        if len(matching_fields) == 0:
+            raise IndexError("Nonexistent '{}'".format(title))
+        elif len(matching_fields) > 1:
+            raise IndexError("Ambiguous '{}'".format(title))
+        else:
+            return list(matching_fields)[0]
+
     def _translate_data_sample_names(self, data, data_columns="hybridization assay name"):
         """Convert data header to match metadata index"""
-        if not search(data_columns, self._indexed_by, flags=IGNORECASE):
-            column_translator = self.metadata[
-                self._match_field_titles(data_columns)
-            ]
-            _h, _w = column_translator.shape
-            if _w == 1:
-                if len(set(column_translator.index)) == _h:
-                    if len(set(column_translator.values.flatten())) == _h:
-                        translated_data = data.copy()
-                        column_translator = column_translator \
-                            .reset_index() \
-                            .set_index(column_translator.columns[0])
-                        translated_data.columns = [
-                            column_translator.loc[colname].values[0]
-                            for colname in data.columns
-                        ]
-                        return translated_data
-            else:
-                raise IndexError("Cannot reindex '{}' to ambiguous '{}".format(
-                    self._indexed_by, data_columns
-                ))
+        field_from = self._get_unique_field_from_title(data_columns)
+        field_to = self._get_unique_field_from_title(self._indexed_by)
+        column_from, column_to = (
+            self.raw_metadata.reset_index()[field_from],
+            self.raw_metadata.reset_index()[field_to]
+        )
+        if len(column_from) == len(set(column_from)) == len(set(column_to)):
+            column_translator = dict(zip(column_from, column_to))
         else:
-            return data
+            raise IndexError("Cannot reindex '{}' to ambiguous '{}'".format(
+                self._indexed_by, data_columns
+            ))
+        translated_data = data.copy()
+        translated_data.columns = [
+            column_translator[colname] for colname in data.columns
+        ]
+        return translated_data
 
     def _read_data_from(self, field_title, blacklist_regex, force_redownload, translate_sample_names, data_columns, sep="\t"):
         """Download (if necessary) and parse data contained in a single target file linked to by target field"""
