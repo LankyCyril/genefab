@@ -92,17 +92,16 @@ class Assay():
         self.fields = dict(self.fields)
         # populate metadata and index with Sample Name:
         self.raw_metadata = concat(map(Series, self._raw), axis=1).T
-        if index_by not in self.fields:
+        index_fields = self._match_field_titles(index_by)
+        if len(index_fields) != 1:
             raise GeneLabJSONException(
-                "Cannot index by nonexistent field: '{}'".format(index_by)
-            )
-        elif len(self.fields[index_by]) != 1:
-            raise GeneLabJSONException(
-                "Cannot index by ambiguous field: '{}'".format(index_by)
+                "Cannot index by non-existent or ambiguous field: '{}'".format(
+                    index_by
+                )
             )
         else:
             self._indexed_by = index_by
-            index_field = list(self.fields[index_by])[0]
+            index_field = list(self.fields[index_fields.pop()])[0]
             self.raw_metadata = self.raw_metadata.set_index(index_field)
         # initialize indexing functions:
         self.metadata = AssayMetadata(self)
