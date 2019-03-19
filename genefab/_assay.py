@@ -35,6 +35,18 @@ class AssayMetadata():
         self.parent = parent
         self.loc = AssayMetadataLocator(self)
 
+    def __repr__(self):
+        """Short description of fields and samples"""
+        return "\n".join([
+            "Fields: [" + ", ".join(
+                repr(k) for k in self.parent.fields.keys()
+            ) + "]",
+            "Samples: [" + ", ".join(
+                repr(ix) for ix in self.parent.raw_metadata.index
+            ) + "]",
+            "Factors: " + repr(self.parent.factors)
+        ])
+
     def __getitem__(self, patterns):
         """Get metadata by field title (rather than internal field id)"""
         if isinstance(patterns, Series) and (patterns.dtype == bool):
