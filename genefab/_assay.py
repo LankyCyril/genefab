@@ -70,6 +70,7 @@ class Assay():
 
     _normalized_data = None
     _processed_data = None
+    _indexed_by = None
 
     def __init__(self, parent, name, json, glds_file_urls, storage_prefix, index_by="Sample Name"):
         """Parse JSON into assay metadata"""
@@ -100,6 +101,7 @@ class Assay():
                 "Cannot index by ambiguous field: '{}'".format(index_by)
             )
         else:
+            self._indexed_by = index_by
             index_field = list(self.fields[index_by])[0]
             self.raw_metadata = self.raw_metadata.set_index(index_field)
         # initialize indexing functions:
@@ -158,17 +160,41 @@ class Assay():
         else:
             return self.glds_file_urls[matching_names.pop()]
 
-    def _read_data_from(self, field_title, sep="\t", blacklist_regex=None, force_redownload=False):
+    def _translate_data_sample_names(self, data, data_columns="hybridization assay name"):
+        """Convert data header to match metadata index"""
+        if not search(data_columns, self._indexed_by, flags=IGNORECASE):
+            column_translator = self.metadata[
+                self._match_field_titles(data_columns)
+            ]
+            _h, _w = column_translator.shape
+            if _w == 1:
+                if len(set(column_translator.index)) == _h:
+                    if len(set(column_translator.values.flatten())) == _h:
+                        translated_data = data.copy()
+                        column_translator = column_translator \
+                            .reset_index() \
+                            .set_index(column_translator.columns[0])
+                        translated_data.columns = [
+                            column_translator.loc[colname].values[0]
+                            for colname in data.columns
+                        ]
+                        return translated_data
+            else:
+                raise IndexError("Cannot reindex '{}' to ambiguous '{}".format(
+                    self._indexed_by, data_columns
+                ))
+        else:
+            return data
+
+    def _read_data_from(self, field_title, blacklist_regex, force_redownload, translate_sample_names, data_columns, sep="\t"):
         """Download (if necessary) and parse data contained in a single target file linked to by target field"""
         meta_files = self.metadata[[field_title]]
         if len(meta_files):
             filenames = set.union(*(
-                set(split(r'\s*,\s*', entry))
-                for entry in meta_files.values.flatten()
+                set(split(r'\s*,\s*', e)) for e in meta_files.values.flatten()
             ))
             target_filenames = {
-                filename for filename in filenames
-                if not search(blacklist_regex, filename)
+                fn for fn in filenames if not search(blacklist_regex, fn)
             }
             if len(target_filenames) == 0:
                 raise GeneLabFileException(
@@ -182,18 +208,24 @@ class Assay():
                 filename = target_filenames.pop()
                 url = self._get_file_url(filename)
                 fetch_file(filename, url, self.storage, update=force_redownload)
-                return read_csv(
-                    join(self.storage, filename), sep=sep, index_col=0
-                )
+                csv = join(self.storage, filename)
+                data = read_csv(csv, sep=sep, index_col=0)
+                if translate_sample_names:
+                    data = self._translate_data_sample_names(
+                        data, data_columns=data_columns
+                    )
         else:
-            return DataFrame()
+            data = DataFrame()
+        return data
 
-    def get_normalized_data(self, force_redownload=False):
+    def get_normalized_data(self, force_redownload=False, translate_sample_names=True, data_columns="hybridization assay name"):
         """Get normalized data from file(s) listed under 'normalized data files'"""
         self._normalized_data = self._read_data_from(
             ".*normalized data files.*",
             blacklist_regex=r'\.rda(ta)?(\.gz)?$',
-            force_redownload=force_redownload
+            force_redownload=force_redownload,
+            translate_sample_names=translate_sample_names,
+            data_columns=data_columns
         )
 
     @property
@@ -202,12 +234,14 @@ class Assay():
             self.get_normalized_data()
         return self._normalized_data
 
-    def get_processed_data(self, force_redownload=False):
+    def get_processed_data(self, force_redownload=False, translate_sample_names=True, data_columns="hybridization assay name"):
         """Get processed data from file(s) listed under 'normalized annotated data files'"""
         self._processed_data = self._read_data_from(
             ".*normalized annotated data files.*",
             blacklist_regex=r'\.rda(ta)?(\.gz)?$',
-            force_redownload=force_redownload
+            force_redownload=force_redownload,
+            translate_sample_names=translate_sample_names,
+            data_columns=data_columns
         )
 
     @property
