@@ -190,9 +190,20 @@ class Assay():
                 self._indexed_by, data_columns
             ))
         translated_data = data.copy()
-        translated_data.columns = [
-            column_translator[colname] for colname in data.columns
-        ]
+        translated_columns = []
+        for column in data.columns:
+            matching_keys = {
+                k for k in column_translator.keys() if search(k, column)
+            }
+            if len(matching_keys) == 1:
+                translated_columns.append(
+                    column_translator[matching_keys.pop()]
+                )
+            else:
+                raise IndexError("Cannot reindex '{}' to ambiguous '{}'".format(
+                    self._indexed_by, data_columns
+                ))
+        translated_data.columns = translated_columns
         return translated_data
 
     def _read_data_from(self, field_title, blacklist_regex, force_redownload, translate_sample_names, data_columns, sep="\t"):
@@ -220,12 +231,13 @@ class Assay():
                 csv = join(self.storage, filename)
                 data = read_csv(csv, sep=sep, index_col=0)
                 if translate_sample_names:
-                    data = self._translate_data_sample_names(
+                    return self._translate_data_sample_names(
                         data, data_columns=data_columns
                     )
+                else:
+                    return data
         else:
-            data = DataFrame()
-        return data
+            return None
 
     def get_normalized_data(self, force_redownload=False, translate_sample_names=True, data_columns="hybridization assay name"):
         """Get normalized data from file(s) listed under 'normalized data files'"""
