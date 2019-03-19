@@ -102,19 +102,12 @@ class Assay():
         for field, title in self._field2title.items():
             self.fields[title].add(field)
         self.fields = dict(self.fields)
-        # populate metadata and index with Sample Name:
+        # populate metadata and index with `index_by`:
         self.raw_metadata = concat(map(Series, self._raw), axis=1).T
-        index_fields = self._match_field_titles(index_by)
-        if len(index_fields) != 1:
-            raise GeneLabJSONException(
-                "Cannot index by non-existent or ambiguous field: '{}'".format(
-                    index_by
-                )
-            )
-        else:
-            self._indexed_by = index_by
-            index_field = list(self.fields[index_fields.pop()])[0]
-            self.raw_metadata = self.raw_metadata.set_index(index_field)
+        self._field_indexed_by = self._get_unique_field_from_title(index_by)
+        self._indexed_by = index_by
+        self.raw_metadata = self.raw_metadata.set_index(self._field_indexed_by)
+        del self.fields[index_by]
         # initialize indexing functions:
         self.metadata = AssayMetadata(self)
 
@@ -124,6 +117,22 @@ class Assay():
             title for title in self.fields
             if method(pattern, title, flags=flags)
         }
+
+    def _get_unique_field_from_title(self, title):
+        """Get unique raw metadata column name; fail if anything is ambiguous"""
+        matching_titles = self._match_field_titles(title)
+        if len(matching_titles) == 0:
+            raise IndexError("Nonexistent '{}'".format(title))
+        elif len(matching_titles) > 1:
+            raise IndexError("Ambiguous '{}'".format(title))
+        else:
+            matching_fields = self.fields[matching_titles.pop()]
+        if len(matching_fields) == 0:
+            raise IndexError("Nonexistent '{}'".format(title))
+        elif len(matching_fields) > 1:
+            raise IndexError("Ambiguous '{}'".format(title))
+        else:
+            return list(matching_fields)[0]
 
     @property
     def factors(self):
@@ -171,26 +180,10 @@ class Assay():
         else:
             return self.glds_file_urls[matching_names.pop()]
 
-    def _get_unique_field_from_title(self, title):
-        """Get unique raw metadata column name; fail if anything is ambiguous"""
-        matching_titles = self._match_field_titles(title)
-        if len(matching_titles) == 0:
-            raise IndexError("Nonexistent '{}'".format(title))
-        elif len(matching_titles) > 1:
-            raise IndexError("Ambiguous '{}'".format(title))
-        else:
-            matching_fields = self.fields[matching_titles.pop()]
-        if len(matching_fields) == 0:
-            raise IndexError("Nonexistent '{}'".format(title))
-        elif len(matching_fields) > 1:
-            raise IndexError("Ambiguous '{}'".format(title))
-        else:
-            return list(matching_fields)[0]
-
     def _translate_data_sample_names(self, data, data_columns="hybridization assay name"):
         """Convert data header to match metadata index"""
         field_from = self._get_unique_field_from_title(data_columns)
-        field_to = self._get_unique_field_from_title(self._indexed_by)
+        field_to = self._field_indexed_by
         column_from, column_to = (
             self.raw_metadata.reset_index()[field_from],
             self.raw_metadata.reset_index()[field_to]
