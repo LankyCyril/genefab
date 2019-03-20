@@ -2,7 +2,7 @@ from os.path import join
 from ._exceptions import GeneLabJSONException, GeneLabFileException
 from collections import defaultdict
 from pandas import concat, Series, Index, DataFrame, read_csv
-from re import search, fullmatch, split, IGNORECASE
+from re import search, split, IGNORECASE
 from numpy import nan
 from ._util import fetch_file
 
@@ -83,7 +83,7 @@ class AssayMetadata():
             "Fields: [" + ", ".join(
                 repr(k) for k in self.parent.fields.keys()
             ) + "]",
-            "Factors: " + repr(self.parent.factors)
+            "Factor values: " + repr(self.parent.factor_values)
         ])
 
     def __getitem__(self, patterns):
@@ -95,18 +95,14 @@ class AssayMetadata():
                 return self.parent.raw_metadata.loc[indexer]
             else:
                 raise IndexError("Cannot index by arbitrary DataFrame")
-        if isinstance(patterns, dict):
-            _patterns = list(patterns.keys())
-        else:
-            _patterns = patterns
-        if isinstance(_patterns, (tuple, list, set, Series, Index)):
-            titles = set.union(*[
-                self.parent._match_field_titles(p, method=fullmatch)
-                for p in _patterns
-            ])
+        if isinstance(patterns, (tuple, list, set, Series, Index)):
+            titles = set.union(*(
+                self.parent._match_field_titles(p)
+                for p in patterns
+            ))
             if titles:
                 return self.parent.raw_metadata[
-                    list(set.union(*[self.parent.fields[t] for t in titles]))
+                    list(set.union(*(self.parent.fields[t] for t in titles)))
                 ]
             else:
                 return DataFrame()
@@ -188,12 +184,36 @@ class Assay():
             return list(matching_fields)[0]
 
     @property
-    def factors(self):
+    def factor_values(self):
         """Get factor names and their values"""
         return {
             field_title: set(self.metadata[[field_title]].values.flatten())
             for field_title in self._match_field_titles(r'^factor value:  ')
         }
+
+    @property
+    def factors(self):
+        """Get DataFrame of samples and factors in human-readable form"""
+        factor_field2title = {}
+        for factor in self.factor_values:
+            factor_titles = self.fields[factor]
+            if len(factor_titles) != 1:
+                raise GeneLabJSONException(
+                    "Nonexistent or ambiguous factor fields: '{}'".format(
+                        factor
+                    )
+                )
+            else:
+                factor_field2title[list(factor_titles)[0]] = factor
+        raw_factors_dataframe = self.metadata[list(self.factor_values.keys())]
+        factors_dataframe = raw_factors_dataframe.copy()
+        factors_dataframe.columns = [
+            factor_field2title[field] for field in raw_factors_dataframe.columns
+        ]
+        factors_dataframe.index.name, factors_dataframe.columns.name = (
+            self._indexed_by, "Factor"
+        )
+        return factors_dataframe
 
     @property
     def samples(self):
@@ -271,7 +291,9 @@ class Assay():
                 raise IndexError("Cannot reindex '{}' to ambiguous '{}'".format(
                     self._indexed_by, data_columns
                 ))
-        translated_data.columns = translated_columns
+        translated_data.columns = Index(
+            translated_columns, name=data.columns.name
+        )
         return translated_data
 
     def _read_data_from(self, field_title, blacklist_regex, force_redownload, translate_sample_names, data_columns, sep="\t"):
@@ -298,6 +320,7 @@ class Assay():
                 fetch_file(filename, url, self.storage, update=force_redownload)
                 csv = join(self.storage, filename)
                 data = read_csv(csv, sep=sep, index_col=0)
+                data.columns.name = self._indexed_by
                 if translate_sample_names:
                     return self._translate_data_sample_names(
                         data, data_columns=data_columns
