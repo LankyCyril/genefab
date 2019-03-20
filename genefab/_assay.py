@@ -207,10 +207,12 @@ class Assay():
                 factor_field2title[list(factor_titles)[0]] = factor
         raw_factors_dataframe = self.metadata[list(self.factor_values.keys())]
         factors_dataframe = raw_factors_dataframe.copy()
-        factors_dataframe.index.name = self._indexed_by
         factors_dataframe.columns = [
             factor_field2title[field] for field in raw_factors_dataframe.columns
         ]
+        factors_dataframe.index.name, factors_dataframe.columns.name = (
+            self._indexed_by, "Factor"
+        )
         return factors_dataframe
 
     @property
@@ -289,7 +291,9 @@ class Assay():
                 raise IndexError("Cannot reindex '{}' to ambiguous '{}'".format(
                     self._indexed_by, data_columns
                 ))
-        translated_data.columns = translated_columns
+        translated_data.columns = Index(
+            translated_columns, name=data.columns.name
+        )
         return translated_data
 
     def _read_data_from(self, field_title, blacklist_regex, force_redownload, translate_sample_names, data_columns, sep="\t"):
@@ -316,6 +320,7 @@ class Assay():
                 fetch_file(filename, url, self.storage, update=force_redownload)
                 csv = join(self.storage, filename)
                 data = read_csv(csv, sep=sep, index_col=0)
+                data.columns.name = self._indexed_by
                 if translate_sample_names:
                     return self._translate_data_sample_names(
                         data, data_columns=data_columns
