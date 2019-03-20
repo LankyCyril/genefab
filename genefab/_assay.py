@@ -101,16 +101,20 @@ class Assay():
         # populate metadata and index with `index_by`:
         self.raw_metadata = concat(map(Series, self._raw), axis=1).T
         self._field_indexed_by = self._get_unique_field_from_title(index_by)
-        self._indexed_by = index_by
+        self._indexed_by = self._match_field_titles(index_by).pop()
         self.raw_metadata = self.raw_metadata.set_index(self._field_indexed_by)
-        del self.fields[index_by]
+        del self.fields[self._indexed_by]
         # initialize indexing functions:
         self.metadata = AssayMetadata(self)
 
     def _match_field_titles(self, pattern, flags=IGNORECASE, method=search):
         """Find fields matching pattern"""
+        if self._indexed_by:
+            field_pool = set(self.fields) | {self._indexed_by}
+        else:
+            field_pool = self.fields
         return {
-            title for title in self.fields
+            title for title in field_pool
             if method(pattern, title, flags=flags)
         }
 
@@ -122,7 +126,11 @@ class Assay():
         elif len(matching_titles) > 1:
             raise IndexError("Ambiguous '{}'".format(title))
         else:
-            matching_fields = self.fields[matching_titles.pop()]
+            matching_title = matching_titles.pop()
+            if matching_title == self._indexed_by:
+                matching_fields = {self._field_indexed_by}
+            else:
+                matching_fields = self.fields[matching_title]
         if len(matching_fields) == 0:
             raise IndexError("Nonexistent '{}'".format(title))
         elif len(matching_fields) > 1:
@@ -147,10 +155,15 @@ class Assay():
         return len(self._match_field_titles("normalized data files")) > 0
 
     @property
-    def has_normalized_annotated_data(self):
+    def has_processed_data(self):
         return (
             len(self._match_field_titles("normalized annotated data files")) > 0
         )
+
+    # alias:
+    @property
+    def has_normalized_annotated_data(self):
+        return self.has_processed_data
 
     @property
     def available_file_types(self):
