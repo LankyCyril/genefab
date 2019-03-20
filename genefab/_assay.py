@@ -2,7 +2,7 @@ from os.path import join
 from ._exceptions import GeneLabJSONException, GeneLabFileException
 from collections import defaultdict
 from pandas import concat, Series, Index, DataFrame, read_csv
-from re import search, fullmatch, split, IGNORECASE
+from re import search, split, IGNORECASE
 from numpy import nan
 from ._util import fetch_file
 
@@ -96,13 +96,13 @@ class AssayMetadata():
             else:
                 raise IndexError("Cannot index by arbitrary DataFrame")
         if isinstance(patterns, (tuple, list, set, Series, Index)):
-            titles = set.union(*[
-                self.parent._match_field_titles(p, method=fullmatch)
+            titles = set.union(*(
+                self.parent._match_field_titles(p)
                 for p in patterns
-            ])
+            ))
             if titles:
                 return self.parent.raw_metadata[
-                    list(set.union(*[self.parent.fields[t] for t in titles]))
+                    list(set.union(*(self.parent.fields[t] for t in titles)))
                 ]
             else:
                 return DataFrame()
