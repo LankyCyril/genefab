@@ -2,7 +2,7 @@ from os.path import join
 from ._exceptions import GeneLabJSONException, GeneLabFileException
 from collections import defaultdict
 from pandas import concat, Series, Index, DataFrame, read_csv
-from re import search, split, IGNORECASE
+from re import search, fullmatch, split, IGNORECASE
 from numpy import nan
 from ._util import fetch_file
 
@@ -50,8 +50,8 @@ class AssayMetadataLocator():
             else:
                 row_subset = self.parent.loc[indices]
                 field_titles = set.union(*(
-                    self.parent.parent._match_field_titles(title)
-                    for title in titles
+                    self.parent.parent._match_field_titles(t, method=fullmatch)
+                    for t in titles
                 ))
                 fields = set.union(*(
                     self.parent.parent.fields[title]
@@ -97,7 +97,7 @@ class AssayMetadata():
                 raise IndexError("Cannot index by arbitrary DataFrame")
         if isinstance(patterns, (tuple, list, set, Series, Index)):
             titles = set.union(*(
-                self.parent._match_field_titles(p)
+                self.parent._match_field_titles(p, method=fullmatch)
                 for p in patterns
             ))
             if titles:
@@ -146,7 +146,12 @@ class Assay():
         # populate metadata and index with `index_by`:
         self.raw_metadata = concat(map(Series, self._raw), axis=1).T
         self._field_indexed_by = self._get_unique_field_from_title(index_by)
-        self._indexed_by = self._match_field_titles(index_by).pop()
+        maybe_indexed_by = self._match_field_titles(index_by, method=fullmatch)
+        if len(maybe_indexed_by) != 1:
+            raise IndexError(
+                "Nonexistent or ambiguous index_by value: '{}'".format(index_by)
+            )
+        self._indexed_by = maybe_indexed_by.pop()
         self.raw_metadata = self.raw_metadata.set_index(self._field_indexed_by)
         del self.fields[self._indexed_by]
         # initialize indexing functions:
@@ -339,12 +344,14 @@ class Assay():
             translate_sample_names=translate_sample_names,
             data_columns=data_columns
         )
+        return self._normalized_data
 
     @property
     def normalized_data(self):
         if self._normalized_data is None:
-            self.get_normalized_data()
-        return self._normalized_data
+            return self.get_normalized_data()
+        else:
+            return self._normalized_data
 
     def get_processed_data(self, force_redownload=False, translate_sample_names=True, data_columns="hybridization assay name"):
         """Get processed data from file(s) listed under 'normalized annotated data files'"""
@@ -355,16 +362,18 @@ class Assay():
             translate_sample_names=translate_sample_names,
             data_columns=data_columns
         )
+        return self._processed_data
 
     @property
     def processed_data(self):
         if self._processed_data is None:
-            self.get_processed_data()
-        return self._processed_data
+            return self.get_processed_data()
+        else:
+            return self._processed_data
 
     # alias:
     def get_normalized_annotated_data(self, force_redownload=False):
-        self.get_processed_data(force_redownload=force_redownload)
+        return self.get_processed_data(force_redownload=force_redownload)
 
     # alias:
     @property
