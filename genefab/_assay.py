@@ -344,12 +344,14 @@ class Assay():
             translate_sample_names=translate_sample_names,
             data_columns=data_columns
         )
+        return self._normalized_data
 
     @property
     def normalized_data(self):
         if self._normalized_data is None:
-            self.get_normalized_data()
-        return self._normalized_data
+            return self.get_normalized_data()
+        else:
+            return self._normalized_data
 
     def get_processed_data(self, force_redownload=False, translate_sample_names=True, data_columns="hybridization assay name"):
         """Get processed data from file(s) listed under 'normalized annotated data files'"""
@@ -360,16 +362,18 @@ class Assay():
             translate_sample_names=translate_sample_names,
             data_columns=data_columns
         )
+        return self._processed_data
 
     @property
     def processed_data(self):
         if self._processed_data is None:
-            self.get_processed_data()
-        return self._processed_data
+            return self.get_processed_data()
+        else:
+            return self._processed_data
 
     # alias:
     def get_normalized_annotated_data(self, force_redownload=False):
-        self.get_processed_data(force_redownload=force_redownload)
+        return self.get_processed_data(force_redownload=force_redownload)
 
     # alias:
     @property
