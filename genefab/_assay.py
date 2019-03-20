@@ -7,6 +7,32 @@ from numpy import nan
 from ._util import fetch_file
 
 
+class MetadataRow():
+    """Implements a slice of assay metadata for one sample, Series-like"""
+
+    def __init__(self, parent, sample, raw_row):
+        """Inherit from parent(s)"""
+        self.parent = parent
+        self.sample = sample
+        self.raw_row = raw_row.copy()
+
+    def __getitem__(self, key):
+        """Reuse parent methods"""
+        if isinstance(key, str):
+            return self.parent.metadata.loc[self.sample, [key]].iloc[0]
+        else:
+            return self.parent.metadata.loc[self.sample, key]
+
+    def __repr__(self):
+        """Short description of fields and samples"""
+        return "\n".join([
+            "Sample: " + self.sample,
+            "Fields: [" + ", ".join(
+                repr(k) for k in self.parent.fields.keys()
+            ) + "]"
+        ])
+
+
 class AssayMetadataLocator():
     """Emulate behavior of Pandas `.loc` for class AssayMetadata()"""
 
@@ -22,9 +48,22 @@ class AssayMetadataLocator():
             except ValueError:
                 raise IndexError("Incorrect index for assay metadata")
             else:
-                return self.parent[titles].loc[indices]
+                row_subset = self.parent.loc[indices]
+                field_titles = set.union(*(
+                    self.parent.parent._match_field_titles(title)
+                    for title in titles
+                ))
+                fields = set.union(*(
+                    self.parent.parent.fields[title]
+                    for title in field_titles
+                ))
+                return row_subset[list(fields)]
         else: # assume called with .loc[x] and interpret `x` the best we can
-            return self.parent.parent.raw_metadata.loc[key]
+            if isinstance(key, DataFrame) and (key.shape[1] == 1):
+                # assume being indexed by boolean column, delegate to parent[]:
+                return self.parent[key]
+            else:
+                return self.parent.parent.raw_metadata.loc[key]
 
 
 class AssayMetadata():
@@ -38,19 +77,24 @@ class AssayMetadata():
     def __repr__(self):
         """Short description of fields and samples"""
         return "\n".join([
-            "Fields: [" + ", ".join(
-                repr(k) for k in self.parent.fields.keys()
-            ) + "]",
             "Samples: [" + ", ".join(
                 repr(ix) for ix in self.parent.raw_metadata.index
+            ) + "]",
+            "Fields: [" + ", ".join(
+                repr(k) for k in self.parent.fields.keys()
             ) + "]",
             "Factors: " + repr(self.parent.factors)
         ])
 
     def __getitem__(self, patterns):
         """Get metadata by field title (rather than internal field id)"""
-        if isinstance(patterns, Series) and (patterns.dtype == bool):
-            return self.parent.raw_metadata.loc[patterns]
+        if isinstance(patterns, DataFrame) and (patterns.shape[1] == 1):
+            # assume being indexed by boolean column, check if able to coerce:
+            indexer = patterns.iloc[:,0]
+            if indexer.dtype == bool:
+                return self.parent.raw_metadata.loc[indexer]
+            else:
+                raise IndexError("Cannot index by arbitrary DataFrame")
         if isinstance(patterns, dict):
             _patterns = list(patterns.keys())
         else:
@@ -68,6 +112,11 @@ class AssayMetadata():
                 return DataFrame()
         else:
             raise IndexError("AssayMetadata: column indexer must be list-like")
+
+    def iterrows(self):
+        """Iterate over metadata slices for each sample"""
+        for sample, raw_row in self.parent.raw_metadata.iterrows():
+            yield sample, MetadataRow(self.parent, sample, raw_row)
 
 
 class Assay():
