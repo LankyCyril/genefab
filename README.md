@@ -2,20 +2,11 @@
 
 ## Quick start (demo)
 
-```
-from genefab import GeneLabDataSet
-
-```
-
-Under construction lol
+https://github.com/LankyCyril/genefab/blob/development/genefab-demo.ipynb
 
 ## Description
 
-### GeneLabDataSet(accession), and its alias GLDS(accession)
-
-### Assay()
-
-Instances of this class are generated and contained by `GeneLabDataSet`.
+Under construction...
 
 ## Requirements
 
