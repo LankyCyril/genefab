@@ -83,7 +83,7 @@ class AssayMetadata():
             "Fields: [" + ", ".join(
                 repr(k) for k in self.parent.fields.keys()
             ) + "]",
-            "Factors: " + repr(self.parent.factors)
+            "Factor values: " + repr(self.parent.factor_values)
         ])
 
     def __getitem__(self, patterns):
@@ -95,14 +95,10 @@ class AssayMetadata():
                 return self.parent.raw_metadata.loc[indexer]
             else:
                 raise IndexError("Cannot index by arbitrary DataFrame")
-        if isinstance(patterns, dict):
-            _patterns = list(patterns.keys())
-        else:
-            _patterns = patterns
-        if isinstance(_patterns, (tuple, list, set, Series, Index)):
+        if isinstance(patterns, (tuple, list, set, Series, Index)):
             titles = set.union(*[
                 self.parent._match_field_titles(p, method=fullmatch)
-                for p in _patterns
+                for p in patterns
             ])
             if titles:
                 return self.parent.raw_metadata[
@@ -188,12 +184,34 @@ class Assay():
             return list(matching_fields)[0]
 
     @property
-    def factors(self):
+    def factor_values(self):
         """Get factor names and their values"""
         return {
             field_title: set(self.metadata[[field_title]].values.flatten())
             for field_title in self._match_field_titles(r'^factor value:  ')
         }
+
+    @property
+    def factors(self):
+        """Get DataFrame of samples and factors in human-readable form"""
+        factor_field2title = {}
+        for factor in self.factor_values:
+            factor_titles = self.fields[factor]
+            if len(factor_titles) != 1:
+                raise GeneLabJSONException(
+                    "Nonexistent or ambiguous factor fields: '{}'".format(
+                        factor
+                    )
+                )
+            else:
+                factor_field2title[list(factor_titles)[0]] = factor
+        raw_factors_dataframe = self.metadata[list(self.factor_values.keys())]
+        factors_dataframe = raw_factors_dataframe.copy()
+        factors_dataframe.index.name = self._indexed_by
+        factors_dataframe.columns = [
+            factor_field2title[field] for field in raw_factors_dataframe.columns
+        ]
+        return factors_dataframe
 
     @property
     def samples(self):
