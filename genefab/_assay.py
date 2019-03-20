@@ -7,6 +7,32 @@ from numpy import nan
 from ._util import fetch_file
 
 
+class MetadataRow():
+    """Implements a slice of assay metadata for one sample, Series-like"""
+
+    def __init__(self, parent, sample, raw_row):
+        """Inherit from parent(s)"""
+        self.parent = parent
+        self.sample = sample
+        self.raw_row = raw_row.copy()
+
+    def __getitem__(self, key):
+        """Reuse parent methods"""
+        if isinstance(key, str):
+            return self.parent.metadata.loc[self.sample, [key]].iloc[0]
+        else:
+            return self.parent.metadata.loc[self.sample, key]
+
+    def __repr__(self):
+        """Short description of fields and samples"""
+        return "\n".join([
+            "Sample: " + self.sample,
+            "Fields: [" + ", ".join(
+                repr(k) for k in self.parent.fields.keys()
+            ) + "]"
+        ])
+
+
 class AssayMetadataLocator():
     """Emulate behavior of Pandas `.loc` for class AssayMetadata()"""
 
@@ -51,11 +77,11 @@ class AssayMetadata():
     def __repr__(self):
         """Short description of fields and samples"""
         return "\n".join([
-            "Fields: [" + ", ".join(
-                repr(k) for k in self.parent.fields.keys()
-            ) + "]",
             "Samples: [" + ", ".join(
                 repr(ix) for ix in self.parent.raw_metadata.index
+            ) + "]",
+            "Fields: [" + ", ".join(
+                repr(k) for k in self.parent.fields.keys()
             ) + "]",
             "Factors: " + repr(self.parent.factors)
         ])
@@ -86,6 +112,11 @@ class AssayMetadata():
                 return DataFrame()
         else:
             raise IndexError("AssayMetadata: column indexer must be list-like")
+
+    def iterrows(self):
+        """Iterate over metadata slices for each sample"""
+        for sample, raw_row in self.parent.raw_metadata.iterrows():
+            yield sample, MetadataRow(self.parent, sample, raw_row)
 
 
 class Assay():
