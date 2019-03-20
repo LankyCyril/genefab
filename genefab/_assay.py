@@ -147,6 +147,11 @@ class Assay():
         }
 
     @property
+    def samples(self):
+        """Get sample names"""
+        return list(self.raw_metadata.index)
+
+    @property
     def has_arrays(self):
         return "Array Design REF" in self.fields
 
