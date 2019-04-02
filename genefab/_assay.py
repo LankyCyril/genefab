@@ -172,6 +172,16 @@ class Assay():
         # initialize indexing functions:
         self.metadata = AssayMetadata(self)
 
+    def __repr__(self):
+        """Condensed representation"""
+        return "\n".join([
+            "name: " + self.name,
+            "samples: [" + ", ".join(
+                repr(ix) for ix in self.raw_metadata.index
+            ) + "]",
+            "factor values: " + repr(self.factor_values)
+        ])
+
     def _match_field_titles(self, pattern, flags=IGNORECASE, method=search):
         """Find fields matching pattern"""
         if self._indexed_by:

@@ -65,6 +65,8 @@ object and are stored in the `assays` field of the GeneLabDataSet object.
 Data in each assay is indexed by the same field as requested when calling
 the GeneLabDataSet constructor (`index_by`, default "Sample Name").
 
+`Assay.samples`: list of samples in the assay.
+
 `Assay.factors`: a dataframe of factor values associated with each sample.
 
 `Assay.normalized_data`: a dataframe of normalized array data for each sample.
