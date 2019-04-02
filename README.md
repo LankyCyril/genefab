@@ -15,7 +15,6 @@ Under construction...
 Python packages:
 * pandas
 * requests
-* tqdm
 
 It is recommended to use a user installed
 [Conda](https://www.anaconda.com/download/) environment.  

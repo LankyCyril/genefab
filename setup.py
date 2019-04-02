@@ -33,5 +33,5 @@ if __name__ == "__main__":
             "Intended Audience :: Science/Research",
             "Topic :: Scientific/Engineering :: Bio-Informatics"
         ],
-        install_requires = ["numpy", "pandas", "tqdm"]
+        install_requires = ["numpy", "pandas", "requests"]
     )

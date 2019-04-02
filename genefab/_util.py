@@ -6,8 +6,6 @@ from os import makedirs, remove, rename
 from requests import get
 from requests.exceptions import InvalidSchema
 from urllib.error import URLError
-from math import ceil
-from tqdm import tqdm
 from re import sub, search, IGNORECASE
 from zipfile import ZipFile
 from subprocess import call
@@ -49,17 +47,9 @@ def fetch_file(file_name, url, target_directory, update=False, verbose=False, ht
     if stream.status_code != 200:
         raise URLError("{}: status code {}".format(url, stream.status_code))
     total_bytes = int(stream.headers.get("content-length", 0))
-    total_kb = ceil(total_bytes / 1024)
     with open(target_file, "wb") as output_handle:
         written_bytes = 0
-        if verbose:
-            stream_iterator = tqdm(
-                stream.iter_content(1024), desc="Downloading "+file_name,
-                total=total_kb, unit="KB"
-            )
-        else:
-            stream_iterator = stream.iter_content(1024)
-        for block in stream_iterator:
+        for block in stream.iter_content(1024):
             output_handle.write(block)
             written_bytes += len(block)
     if total_bytes != written_bytes:
