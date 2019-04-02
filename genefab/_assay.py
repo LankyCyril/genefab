@@ -28,7 +28,7 @@ class MetadataRow():
         return "\n".join([
             "Sample: " + self.sample,
             "Fields: [" + ", ".join(
-                repr(k) for k in self.parent.fields.keys()
+                repr(k) for k in self.parent._fields.keys()
             ) + "]"
         ])
 
@@ -54,7 +54,7 @@ class AssayMetadataLocator():
                     for t in titles
                 ))
                 fields = set.union(*(
-                    self.parent.parent.fields[title]
+                    self.parent.parent._fields[title]
                     for title in field_titles
                 ))
                 return row_subset[list(fields)]
@@ -81,7 +81,7 @@ class AssayMetadata():
                 repr(ix) for ix in self.parent.raw_metadata.index
             ) + "]",
             "Fields: [" + ", ".join(
-                repr(k) for k in self.parent.fields.keys()
+                repr(k) for k in self.parent._fields.keys()
             ) + "]",
             "Factor values: " + repr(self.parent.factor_values)
         ])
@@ -102,7 +102,7 @@ class AssayMetadata():
             ))
             if titles:
                 return self.parent.raw_metadata[
-                    list(set.union(*(self.parent.fields[t] for t in titles)))
+                    list(set.union(*(self.parent._fields[t] for t in titles)))
                 ]
             else:
                 return DataFrame()
@@ -114,11 +114,16 @@ class AssayMetadata():
         for sample, raw_row in self.parent.raw_metadata.iterrows():
             yield sample, MetadataRow(self.parent, sample, raw_row)
 
+    @property
+    def fields(self):
+        """Alias to self.parent._fields"""
+        return self.parent._fields
+
 
 class Assay():
     """Stores individual assay information and metadata in raw form"""
     name = None
-    fields, raw_metadata, metadata = None, None, None
+    _fields, raw_metadata, metadata = None, None, None
     parent, glds_file_urls = None, None
     storage = None
 
@@ -133,16 +138,16 @@ class Assay():
         self.storage = join(storage_prefix, name)
         self._json = json
         self._raw, self._header = self._json["raw"], self._json["header"]
-        # populate and freeze self.fields (this can be refactored...):
+        # populate and freeze self._fields (this can be refactored...):
         self._field2title = {
             entry["field"]: entry["title"] for entry in self._header
         }
         if len(self._field2title) != len(self._header):
             raise GeneLabJSONException("Conflicting IDs of data fields")
-        self.fields = defaultdict(set)
+        self._fields = defaultdict(set)
         for field, title in self._field2title.items():
-            self.fields[title].add(field)
-        self.fields = dict(self.fields)
+            self._fields[title].add(field)
+        self._fields = dict(self._fields)
         # populate metadata and index with `index_by`:
         self.raw_metadata = concat(map(Series, self._raw), axis=1).T
         self._field_indexed_by = self._get_unique_field_from_title(index_by)
@@ -153,16 +158,16 @@ class Assay():
             )
         self._indexed_by = maybe_indexed_by.pop()
         self.raw_metadata = self.raw_metadata.set_index(self._field_indexed_by)
-        del self.fields[self._indexed_by]
+        del self._fields[self._indexed_by]
         # initialize indexing functions:
         self.metadata = AssayMetadata(self)
 
     def _match_field_titles(self, pattern, flags=IGNORECASE, method=search):
         """Find fields matching pattern"""
         if self._indexed_by:
-            field_pool = set(self.fields) | {self._indexed_by}
+            field_pool = set(self._fields) | {self._indexed_by}
         else:
-            field_pool = self.fields
+            field_pool = self._fields
         return {
             title for title in field_pool
             if method(pattern, title, flags=flags)
@@ -180,7 +185,7 @@ class Assay():
             if matching_title == self._indexed_by:
                 matching_fields = {self._field_indexed_by}
             else:
-                matching_fields = self.fields[matching_title]
+                matching_fields = self._fields[matching_title]
         if len(matching_fields) == 0:
             raise IndexError("Nonexistent '{}'".format(title))
         elif len(matching_fields) > 1:
@@ -201,7 +206,7 @@ class Assay():
         """Get DataFrame of samples and factors in human-readable form"""
         factor_field2title = {}
         for factor in self.factor_values:
-            factor_titles = self.fields[factor]
+            factor_titles = self._fields[factor]
             if len(factor_titles) != 1:
                 raise GeneLabJSONException(
                     "Nonexistent or ambiguous factor fields: '{}'".format(
@@ -227,7 +232,7 @@ class Assay():
 
     @property
     def has_arrays(self):
-        return "Array Design REF" in self.fields
+        return "Array Design REF" in self._fields
 
     @property
     def has_normalized_data(self):
