@@ -2,14 +2,11 @@ from sys import stderr
 from urllib.request import urlopen
 from json import loads
 from os.path import join, isdir, isfile
-from os import makedirs, remove, rename
+from os import makedirs, remove
 from requests import get
 from requests.exceptions import InvalidSchema
 from urllib.error import URLError
-from re import sub, search, IGNORECASE
-from zipfile import ZipFile
-from subprocess import call
-from ._checks import safe_file_name
+from re import sub
 
 GENELAB_ROOT = "https://genelab-data.ndc.nasa.gov"
 API_ROOT = "https://genelab-data.ndc.nasa.gov/genelab"
@@ -56,37 +53,6 @@ def fetch_file(file_name, url, target_directory, update=False, verbose=False, ht
         remove(target_file)
         raise URLError("Failed to download the correct number of bytes")
     return target_file
-
-
-def flat_extract(zip_filename, target_directory):
-    """Extract zip file contents into a flat structure, with safety checks"""
-    with ZipFile(zip_filename) as zf:
-        for fileinfo in zf.filelist:
-            if getattr(fileinfo, "file_size", 0): # is not a directory
-                target_filename = safe_file_name(fileinfo.filename)
-                zf.extract(fileinfo.filename, path=target_directory)
-                rename(
-                    join(target_directory, fileinfo.filename),
-                    join(target_directory, target_filename)
-                )
-
-
-def flat_gunzip(gz_filename, target_directory):
-    """Extract gzipped file contents into a flat structure (in case of TARs), with safety checks"""
-    try:
-        returncode = call(["gunzip", gz_filename], cwd=target_directory)
-        if returncode != 0:
-            raise FileNotFoundError
-    except FileNotFoundError:
-        raise OSError("Could not gunzip file: '{}'".format(gz_filename))
-
-
-def permissive_search_group(expression, string, flags=IGNORECASE):
-    """Like re.search(...).group(), but returns None if re.search() is None"""
-    return getattr(
-        search(expression, string, flags=flags),
-        "group", lambda: None
-    )()
 
 
 FFIELD_VALUES = {
