@@ -1,117 +1,109 @@
 # GeneFab
 
-## Quick start (demo)
+## Installation
+
+GeneFab has been tested under Python 3.5+.  
+It is recommended to use a user installed
+[Conda](https://www.anaconda.com/download/) environment.  
+Currently GeneFab can be installed via **pip** directly from github:  
+`pip install -e git://github.com/LankyCyril/genefab.git#egg=genefab`
+
+For development purposes, it can also be cloned and used like this:
 
 ```
-from genefab import GeneLabDataSet
-
-glds = GeneLabDataSet("GLDS-158")
-assay = glds.assays[0]
-matrix = assay.get_combined_matrix()
-filename = "GLDS-158-" + assay.name + ".tsv"
-matrix.to_csv(filename, sep="\t", index=False)
+$ git clone https://github.com/LankyCyril/genefab
+$ cd genefab
+$ conda env create --name genefab --file environment-linux.yaml
+$ conda activate genefab
+$ python
+>>> from genefab import get_datasets, GLDS
+    ...
 ```
 
-Additionally, see `demo.py`, which also has code for collecting statistics on
-the currently supported and unsupported transcription datasets.
+## Demo
+
+https://github.com/LankyCyril/genefab/blob/development/genefab-demo.ipynb
 
 ## Description
 
-### get_datasets(maxcount=25, storage=".genelab", **search_kwargs, **additional_kwargs)
+The current iteration of GeneFab supports GeneLab datasets processed according
+to API version 2.1. As of April 2, 2019, these are only the datasets
+GLDS-4, GLDS-30, and GLDS-42.
 
-Finds up to `maxcount` datasets and sets up assay data storage under
-`storage`.  
-Returns a list of `GeneLabDataSet` instances.
-
-* `**search_kwargs` can be `ptype, organism, factor, assay` and allow regexes,  
-a simple example being `organism="mus", assay="transcription"`;
-* `**additional_kwargs` are `verbose`, `onerror`, and `assay_strict_indexing`:
-  * `verbose` is self-explanatory
-  * `onerror` controls what happens if an error occurs when accessing a dataset;
-when `onerror="warn"` (default), prints a warning to stderr and continues; if
-it is `"ignore"`, continues silently; otherwise raises the error and fails
-  * `assay_strict_indexing` (default `True`) is inherited by the instances of
-`Assay` inside each `GeneLabDataSet` (see below).
-
-### GeneLabDataSet(accession), and its alias GLDS(accession)
+### GeneLabDataSet(accession, storage_prefix=".genelab", index_by="Sample Name", verbose=False)
 
 Initializes a GeneLabDataSet instance corresponding to `accession`.  
-Additional arguments are `assay_strict_indexing` (see notes for `get_datasets`
-and notes for `Assay`), `verbose`, and `storage_prefix` (for example, if
-`storage_prefix` is `".genelab"` and the accession is `"GLDS-158"`, then the
-data for this GLDS will be stored under `".genelab/GLDS-158"`).
+Each GeneLabDataSet contains references to assays performed in the study; they
+are stored under the field `assays` as a list of `Assay` instances.
 
-After successful initialization, contains field `assays`, which is a list
-of `Assay` instances corresponding to assays that are referenced by this GLDS.  
-Also contains field `factors` that lists experimental factors in the GLDS.
+Argument `storage_prefix` controls where the assay data is stored. For example,
+if `storage_prefix == ".genelab"`, the dataset accession is "GLDS-30", and the
+assay name is "a_GLDS-30_microarray_metadata-txt", the data will be stored under
+".genelab/GLDS-30/a_GLDS-30_microarray_metadata-txt/", relative to the current
+path.  
+This path must be relative to the current working directory and does not use
+shell expansion (e.g., starting the path with "~" will fail).
+
+Argument `index_by` is inherited by the dataset's assays as well and controls
+which field becomes the index for their metadata. Usually, the default setting
+("Sample Name") need not be changed. This field accepts regular expressions and
+treats them as case-insensitive, full-length matchers. In other words,
+".*mple name" would still match "Sample Name" (and maybe something else...), but
+"mple name" wouldn't match it.
+
+`GLDS` is an alias to `GeneLabDataSet`.
+
+```python
+glds = GeneLabDataSet("GLDS-30", storage="data/genelab")
+assay = glds.assays[0]
+```
 
 ### Assay()
 
-Instances of this class are generated and contained by `GeneLabDataSet`.
+Objects of this class are created implicitly after initializing a GeneLabDataSet
+object and are stored in the `assays` field of the GeneLabDataSet object.  
+Data in each assay is indexed by the same field as requested when calling
+the GeneLabDataSet constructor (`index_by`, default "Sample Name").
 
-Stores a dataframe with assay metadata in raw form (`Assay.metadata`), but also
-has property `fields`, which maps human-readable field names to internal field
-names. Using these human-readable field names, metadata can be accessed with
-pandas-like syntax: `assay[["Protocol REF"]]`.  
-Note the double square brackets: because one human-readable field name can map
-to multiple raw fields, this ensures that it will return a DataFrame and not a
-Series (which can be ambiguous). Single-brackets indexing is disallowed.  
-This behavior can be overridden by setting `Assay.strict_indexing` to `False`
-(and, upstream, by calling `get_datasets` and `GeneLabDataSet` with
-`assay_strict_indexing=False`), but may lead to conflicts and errors if you're
-not extra careful.
+`Assay.factors`: a dataframe of factor values associated with each sample.
 
-Instances of `Assay` can also be indexed with `.loc[]` and with boolean queries,
-just like in pandas.
+`Assay.normalized_data`: a dataframe of normalized array data for each sample.
 
-`Assay.has_arrays` is a boolean flag that is set to `True` if metadata suggests
-that the assay has array data (simply, if assay metadata contains fields with
-name "Array Design REF").
+`Assay.processed_data`: a dataframe of processed (normalized and annotated) data
+for each sample.
 
-`Assay.available_protocols` returns a set with all "Protocol REF" values
-referenced by the assay metadata; this is useful for checks like
-`if "nucleic acid hybridization" in assay.available_protocols: ...`.
+`Assay.normalized_annotated_data`: an alias to `Assay.processed_data`.
 
-`Assay.available_file_types` returns a set with all available file types
-referenced by the assay metadata. This is useful, e.g., for checking whether any
-data is available: `if assay.available_file_types: ...`, but also has more uses
-internally.
+`Assay.metadata`: a DataFrame-like object that can be interrogated by
+human-readable field names. It maps these names to internal field names and
+returns DataFrame slices according to requests (see `Assay.metadata.fields` for
+more information).  
+As human-readable names can map to more than one internal field/column, this
+object can only be indexed by double-bracket syntax and can only return
+DataFrames (not Series).  
+Indexing is done by regular expressions that are treated as case-insensitive,
+full-length matchers. For example, `assay.metadata[["extract name"]]` matches
+fields exposed as "Extract Name", while `assay.metadata[[".*extract name"]]` can
+match both "Extract Name" and "Labeled Extract Name".  
+Indexing by sample name is possible: `assay.metadata.loc[sample_name]`  
+Simple logical indexing with `.loc` is also possible:  
+`space_labels = assay.metadata.loc[assay.factors=="Space Flight", ["Labeled Extract Name"]]`
 
-`Assay.available_derived_file_types` returns a set with all available derived
-file types (such as "Processed Array Data File" and so on). This is useful for
-checking whether derived data is available:  
-`if assay.available_derived_file_types: ...`.
-
-`Assay.get_combined_matrix()` attempts to download, parse and combine derived
-data into a single DataFrame.  
-* If derived data is referenced in the metadata individually for each sample,
-returns an instance of `PerSampleMatrix`, which inherits from `pandas.DataFrame`
-and acts like one.  
-`PerSampleMatrix` are long-form (narrow), the index is numeric.
-* If derived data is referenced in one "data matrix" file, assumes a two-line
-header and returns an instance of `DataMatrix` (also just a DataFrame).  
-`DataMatrix` are wide-form, the index is meaningful.
-* If derived data is referenced in combined, complex files, will in the future
-return an instance of `CompoundMatrix`, but currently fails with a
-`NotImplementedError`.
-
-## Requirements
-
-* Python 3.5+
-
-Python packages:
-* pandas
-* requests
-* tqdm
-
-It is recommended to use a user installed
-[Conda](https://www.anaconda.com/download/) environment.  
-Full requirements can be fulfilled by using the \*.yaml files provided in the
-top-level directory of the repo:
-
+`Assay.metadata.fields`: a dictionary mapping human-readable field names to
+internal field names in the API. For example:
 ```
-$ conda env create --name genefab --file environment-linux.yaml
-$ source activate genefab
-$ python
->>> from genefab import get_datasets, GLDS
+>>> assay.metadata.fields["Protocol REF"]
+{'a100017protocolref', 'a100009protocolref'}
+```
+
+`Assay.metadata.index`: sample names in the assay.
+
+`Assay.metadata.columns`: an alias to `list(Assay.metadata.fields.keys())`.
+
+```python
+annotation = assay.factors
+data = assay.processed_data
+
+space_samples = assay.metadata[assay.factors=="Space Flight"].index
+space_data = assay.processed_data[space_samples]
 ```
