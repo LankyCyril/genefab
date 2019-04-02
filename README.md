@@ -22,7 +22,7 @@ $ python
 
 ## Demo
 
-https://github.com/LankyCyril/genefab/blob/development/genefab-demo.ipynb
+https://github.com/LankyCyril/genefab/blob/master/genefab-demo.ipynb
 
 ## Description
 
@@ -30,7 +30,7 @@ The current iteration of GeneFab supports GeneLab datasets processed according
 to API version 2.1. As of April 2, 2019, these are only the datasets
 GLDS-4, GLDS-30, and GLDS-42.
 
-### GeneLabDataSet(accession, storage_prefix=".genelab", index_by="Sample Name", verbose=False)
+#### GeneLabDataSet(accession, storage_prefix=".genelab", index_by="Sample Name", verbose=False)
 
 Initializes a GeneLabDataSet instance corresponding to `accession`.  
 Each GeneLabDataSet contains references to assays performed in the study; they
@@ -58,12 +58,14 @@ glds = GeneLabDataSet("GLDS-30", storage="data/genelab")
 assay = glds.assays[0]
 ```
 
-### Assay()
+#### Assay()
 
 Objects of this class are created implicitly after initializing a GeneLabDataSet
 object and are stored in the `assays` field of the GeneLabDataSet object.  
 Data in each assay is indexed by the same field as requested when calling
 the GeneLabDataSet constructor (`index_by`, default "Sample Name").
+
+`Assay.samples`: list of samples in the assay.
 
 `Assay.factors`: a dataframe of factor values associated with each sample.
 
@@ -96,9 +98,9 @@ internal field names in the API. For example:
 {'a100017protocolref', 'a100009protocolref'}
 ```
 
-`Assay.metadata.index`: sample names in the assay.
-
 `Assay.metadata.columns`: an alias to `list(Assay.metadata.fields.keys())`.
+
+`Assay.metadata.index`: sample names in the assay.
 
 ```python
 annotation = assay.factors
