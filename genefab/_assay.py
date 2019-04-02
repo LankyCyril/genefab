@@ -96,7 +96,7 @@ class AssayMetadata():
             else:
                 raise IndexError("Cannot index by arbitrary DataFrame")
         if isinstance(patterns, (tuple, list, set, Series, Index)):
-            titles = set.union(*(
+            titles = set.union(set(), *(
                 self.parent._match_field_titles(p, method=fullmatch)
                 for p in patterns
             ))
