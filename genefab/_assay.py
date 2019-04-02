@@ -26,8 +26,8 @@ class MetadataRow():
     def __repr__(self):
         """Short description of fields and samples"""
         return "\n".join([
-            "Sample: " + self.sample,
-            "Fields: [" + ", ".join(
+            "index: " + self.sample,
+            "fields: [" + ", ".join(
                 repr(k) for k in self.parent._fields.keys()
             ) + "]"
         ])
@@ -77,13 +77,13 @@ class AssayMetadata():
     def __repr__(self):
         """Short description of fields and samples"""
         return "\n".join([
-            "Samples: [" + ", ".join(
+            "index: [" + ", ".join(
                 repr(ix) for ix in self.parent.raw_metadata.index
             ) + "]",
-            "Fields: [" + ", ".join(
+            "fields: [" + ", ".join(
                 repr(k) for k in self.parent._fields.keys()
             ) + "]",
-            "Factor values: " + repr(self.parent.factor_values)
+            "factor values: " + repr(self.parent.factor_values)
         ])
 
     def __getitem__(self, patterns):
@@ -115,9 +115,19 @@ class AssayMetadata():
             yield sample, MetadataRow(self.parent, sample, raw_row)
 
     @property
+    def index(self):
+        """List of samples"""
+        return self.parent.raw_metadata.index
+
+    @property
     def fields(self):
         """Alias to self.parent._fields"""
         return self.parent._fields
+
+    @property
+    def columns(self):
+        """List of full-length column indexing options"""
+        return list(self.parent._fields.keys())
 
 
 class Assay():
