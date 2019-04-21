@@ -4,7 +4,7 @@ from urllib.parse import quote_plus
 from ._util import get_json
 from ._util import FFIELD_ALIASES, FFIELD_VALUES, API_ROOT, GENELAB_ROOT
 from ._exceptions import GeneLabJSONException
-from ._assay import Assay
+from ._assay import AssayDispatcher
 from os.path import join
 
 
@@ -16,7 +16,7 @@ class GeneLabDataSet():
     verbose = False
     storage = None
 
-    def __init__(self, accession, verbose=False, storage_prefix=".genelab", assay_class=Assay, index_by="Sample Name"):
+    def __init__(self, accession, verbose=False, storage_prefix=".genelab", index_by="Sample Name"):
         """Request JSON representation of ISA metadata and store fields"""
         self.accession = accession
         self.verbose = verbose
@@ -40,18 +40,10 @@ class GeneLabDataSet():
             raise GeneLabJSONException(
                 "Malformed JSON ({})".format(self.accession)
             )
-        try:
-            self.assays = [
-                assay_class(
-                    self, assay_name, assay_json, storage_prefix=self.storage,
-                    glds_file_urls=self._get_file_urls(), index_by=index_by
-                )
-                for assay_name, assay_json in self._info["assays"].items()
-            ]
-        except KeyError:
-            raise GeneLabJSONException(
-                "Malformed assay JSON ({})".format(self.accession)
-            )
+        self.assays = AssayDispatcher(
+            parent=self, json=self._info["assays"], index_by=index_by,
+            storage_prefix=self.storage, glds_file_urls=self._get_file_urls()
+        )
 
     @property
     def factors(self):

@@ -404,3 +404,24 @@ class Assay():
     @property
     def normalized_annotated_data(self):
         return self.processed_data
+
+
+class AssayDispatcher(dict):
+    """Contains Assay objects, indexable by name or by attributes"""
+
+    def __init__(self, parent, json, glds_file_urls, storage_prefix, index_by="Sample Name"):
+        """Populate dictionary of assay_name -> Assay()"""
+        try:
+            for assay_name, assay_json in json.items():
+                super().__setitem__(
+                    assay_name,
+                    Assay(
+                        parent, assay_name, assay_json, index_by=index_by,
+                        storage_prefix=storage_prefix,
+                        glds_file_urls=glds_file_urls,
+                    )
+                )
+        except KeyError:
+            raise GeneLabJSONException(
+                "Malformed assay JSON ({})".format(self.accession)
+            )
