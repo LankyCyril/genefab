@@ -431,7 +431,7 @@ class AssayDispatcher(dict):
     def _as_dataframe(self):
         """List assay names and types"""
         repr_dataframe = DataFrame(
-            index=Index(self.keys(), name="name"),
+            index=Index(self.keys(), name=""),
             columns=[
                 "material_type", "factors", "has_arrays",
                 "has_normalized_data", "has_processed_data"
@@ -457,7 +457,11 @@ class AssayDispatcher(dict):
         return repr_dataframe.copy()
 
     def __repr__(self):
-        return repr(self._as_dataframe.T)
+        return (
+            "Dictionary of {} assays;\n".format(len(self.keys())) +
+            "Subsettable with .choose() by following properties:\n" +
+            repr(self._as_dataframe.T)
+        )
 
     def choose(self, factor=None, material_type=None, has_arrays=None, has_normalized_data=None, has_processed_data=None):
         """Subset AssayDispatcher by properties"""
