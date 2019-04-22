@@ -34,7 +34,9 @@ GLDS-4, GLDS-30, and GLDS-42.
 
 Initializes a GeneLabDataSet instance corresponding to `accession`.  
 Each GeneLabDataSet contains references to assays performed in the study; they
-are stored under the field `assays` as a list of `Assay` instances.
+are stored under the field `assays` as a dictionary of `Assay` instances.  
+The dictionary can be enumerated by keys (assay names) and values
+(Assay objects).
 
 Argument `storage_prefix` controls where the assay data is stored. For example,
 if `storage_prefix == ".genelab"`, the dataset accession is "GLDS-30", and the
