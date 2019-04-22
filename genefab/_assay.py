@@ -463,12 +463,12 @@ class AssayDispatcher(dict):
             repr(self._as_dataframe.T)
         )
 
-    def choose(self, factor=None, material_type=None, has_arrays=None, has_normalized_data=None, has_processed_data=None):
+    def choose(self, factors=None, material_type=None, has_arrays=None, has_normalized_data=None, has_processed_data=None):
         """Subset AssayDispatcher by properties"""
         rd = self._as_dataframe
         subsetter = (rd["has_arrays"]!=2) # always true
-        if factor is not None:
-            subsetter &= (rd["factors"]==factor)
+        if factors is not None:
+            subsetter &= (rd["factors"]==factors)
         if has_arrays is not None:
             subsetter &= (rd["has_arrays"]==has_arrays)
         if has_normalized_data is not None:

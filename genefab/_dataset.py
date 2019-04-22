@@ -57,7 +57,7 @@ class GeneLabDataSet():
         return "\n".join([
             "name: " + self.accession,
             "assays: [" + ", ".join(
-                repr(assay.name) for assay in self.assays
+                repr(assay_name) for assay_name in self.assays.keys()
             ) + "]",
             "factors: [" + ", ".join(
                 repr(factor) for factor in self.factors
