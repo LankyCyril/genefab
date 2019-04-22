@@ -2,9 +2,10 @@ from os.path import join
 from ._exceptions import GeneLabJSONException, GeneLabFileException
 from collections import defaultdict
 from pandas import concat, Series, Index, DataFrame, read_csv
-from re import search, fullmatch, split, IGNORECASE
+from re import search, fullmatch, split, IGNORECASE, sub
 from numpy import nan
 from ._util import fetch_file
+from copy import deepcopy
 
 
 class MetadataRow():
@@ -425,3 +426,54 @@ class AssayDispatcher(dict):
             raise GeneLabJSONException(
                 "Malformed assay JSON ({})".format(self.accession)
             )
+
+    @property
+    def _as_dataframe(self):
+        """List assay names and types"""
+        repr_dataframe = DataFrame(
+            index=Index(self.keys(), name="name"),
+            columns=[
+                "material_type", "factors", "has_arrays",
+                "has_normalized_data", "has_processed_data"
+            ],
+            data=nan
+        )
+        for assay_name, assay in self.items():
+            material_types = set(
+                assay.metadata[["material type"]].values.flatten()
+            )
+            if len(material_types) >= 1:
+                repr_dataframe.loc[assay_name, "material_type"] = ", ".join(
+                    material_types
+                )
+            factors = set(
+                sub('^factor value:  ', "", f, flags=IGNORECASE)
+                for f in assay.factor_values.keys()
+            )
+            repr_dataframe.loc[assay_name, "factors"] = ", ".join(factors)
+            repr_dataframe.loc[assay_name, "has_arrays"] = assay.has_arrays
+            repr_dataframe.loc[assay_name, "has_normalized_data"] = assay.has_normalized_data
+            repr_dataframe.loc[assay_name, "has_processed_data"] = assay.has_processed_data
+        return repr_dataframe.copy()
+
+    def __repr__(self):
+        return repr(self._as_dataframe.T)
+
+    def choose(self, factor=None, material_type=None, has_arrays=None, has_normalized_data=None, has_processed_data=None):
+        """Subset AssayDispatcher by properties"""
+        rd = self._as_dataframe
+        subsetter = (rd["has_arrays"]!=2) # always true
+        if factor is not None:
+            subsetter &= (rd["factors"]==factor)
+        if has_arrays is not None:
+            subsetter &= (rd["has_arrays"]==has_arrays)
+        if has_normalized_data is not None:
+            subsetter &= (rd["has_normalized_data"]==has_normalized_data)
+        if has_processed_data is not None:
+            subsetter &= (rd["has_processed_data"]==has_processed_data)
+        chosen_names = set(rd[subsetter].index)
+        chosen_subset = deepcopy(self)
+        for name in self.keys():
+            if name not in chosen_names:
+                del chosen_subset[name]
+        return chosen_subset
