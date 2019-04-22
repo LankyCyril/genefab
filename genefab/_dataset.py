@@ -128,11 +128,12 @@ def get_datasets(maxcount="25", storage=".genelab", verbose=False, onerror="warn
                     hit["_id"], storage_prefix=storage, verbose=verbose
                 )
             )
-        except GeneLabJSONException as e:
+        except Exception as e:
             if onerror == "ignore":
                 pass
             elif onerror == "warn":
-                print("Warning:", e, file=stderr)
+                msgmask = "Warning: Could not process {} due to error:"
+                print(msgmask.format(hit["_id"]), e, file=stderr)
             else:
                 raise
     return datasets
