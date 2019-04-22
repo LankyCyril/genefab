@@ -2,9 +2,10 @@ from os.path import join
 from ._exceptions import GeneLabJSONException, GeneLabFileException
 from collections import defaultdict
 from pandas import concat, Series, Index, DataFrame, read_csv
-from re import search, fullmatch, split, IGNORECASE
+from re import search, fullmatch, split, IGNORECASE, sub
 from numpy import nan
 from ._util import fetch_file
+from copy import deepcopy
 
 
 class MetadataRow():
@@ -26,9 +27,9 @@ class MetadataRow():
     def __repr__(self):
         """Short description of fields and samples"""
         return "\n".join([
-            "Sample: " + self.sample,
-            "Fields: [" + ", ".join(
-                repr(k) for k in self.parent.fields.keys()
+            "index: " + self.sample,
+            "fields: [" + ", ".join(
+                repr(k) for k in self.parent._fields.keys()
             ) + "]"
         ])
 
@@ -54,7 +55,7 @@ class AssayMetadataLocator():
                     for t in titles
                 ))
                 fields = set.union(*(
-                    self.parent.parent.fields[title]
+                    self.parent.parent._fields[title]
                     for title in field_titles
                 ))
                 return row_subset[list(fields)]
@@ -77,13 +78,13 @@ class AssayMetadata():
     def __repr__(self):
         """Short description of fields and samples"""
         return "\n".join([
-            "Samples: [" + ", ".join(
+            "index: [" + ", ".join(
                 repr(ix) for ix in self.parent.raw_metadata.index
             ) + "]",
-            "Fields: [" + ", ".join(
-                repr(k) for k in self.parent.fields.keys()
+            "fields: [" + ", ".join(
+                repr(k) for k in self.parent._fields.keys()
             ) + "]",
-            "Factor values: " + repr(self.parent.factor_values)
+            "factor values: " + repr(self.parent.factor_values)
         ])
 
     def __getitem__(self, patterns):
@@ -96,13 +97,13 @@ class AssayMetadata():
             else:
                 raise IndexError("Cannot index by arbitrary DataFrame")
         if isinstance(patterns, (tuple, list, set, Series, Index)):
-            titles = set.union(*(
+            titles = set.union(set(), *(
                 self.parent._match_field_titles(p, method=fullmatch)
                 for p in patterns
             ))
             if titles:
                 return self.parent.raw_metadata[
-                    list(set.union(*(self.parent.fields[t] for t in titles)))
+                    list(set.union(*(self.parent._fields[t] for t in titles)))
                 ]
             else:
                 return DataFrame()
@@ -114,11 +115,26 @@ class AssayMetadata():
         for sample, raw_row in self.parent.raw_metadata.iterrows():
             yield sample, MetadataRow(self.parent, sample, raw_row)
 
+    @property
+    def index(self):
+        """List of samples"""
+        return self.parent.raw_metadata.index
+
+    @property
+    def fields(self):
+        """Alias to self.parent._fields"""
+        return self.parent._fields
+
+    @property
+    def columns(self):
+        """List of full-length column indexing options"""
+        return list(self.parent._fields.keys())
+
 
 class Assay():
     """Stores individual assay information and metadata in raw form"""
     name = None
-    fields, raw_metadata, metadata = None, None, None
+    _fields, raw_metadata, metadata = None, None, None
     parent, glds_file_urls = None, None
     storage = None
 
@@ -133,16 +149,16 @@ class Assay():
         self.storage = join(storage_prefix, name)
         self._json = json
         self._raw, self._header = self._json["raw"], self._json["header"]
-        # populate and freeze self.fields (this can be refactored...):
+        # populate and freeze self._fields (this can be refactored...):
         self._field2title = {
             entry["field"]: entry["title"] for entry in self._header
         }
         if len(self._field2title) != len(self._header):
             raise GeneLabJSONException("Conflicting IDs of data fields")
-        self.fields = defaultdict(set)
+        self._fields = defaultdict(set)
         for field, title in self._field2title.items():
-            self.fields[title].add(field)
-        self.fields = dict(self.fields)
+            self._fields[title].add(field)
+        self._fields = dict(self._fields)
         # populate metadata and index with `index_by`:
         self.raw_metadata = concat(map(Series, self._raw), axis=1).T
         self._field_indexed_by = self._get_unique_field_from_title(index_by)
@@ -153,16 +169,26 @@ class Assay():
             )
         self._indexed_by = maybe_indexed_by.pop()
         self.raw_metadata = self.raw_metadata.set_index(self._field_indexed_by)
-        del self.fields[self._indexed_by]
+        del self._fields[self._indexed_by]
         # initialize indexing functions:
         self.metadata = AssayMetadata(self)
+
+    def __repr__(self):
+        """Condensed representation"""
+        return "\n".join([
+            "name: " + self.name,
+            "samples: [" + ", ".join(
+                repr(ix) for ix in self.raw_metadata.index
+            ) + "]",
+            "factor values: " + repr(self.factor_values)
+        ])
 
     def _match_field_titles(self, pattern, flags=IGNORECASE, method=search):
         """Find fields matching pattern"""
         if self._indexed_by:
-            field_pool = set(self.fields) | {self._indexed_by}
+            field_pool = set(self._fields) | {self._indexed_by}
         else:
-            field_pool = self.fields
+            field_pool = self._fields
         return {
             title for title in field_pool
             if method(pattern, title, flags=flags)
@@ -180,7 +206,7 @@ class Assay():
             if matching_title == self._indexed_by:
                 matching_fields = {self._field_indexed_by}
             else:
-                matching_fields = self.fields[matching_title]
+                matching_fields = self._fields[matching_title]
         if len(matching_fields) == 0:
             raise IndexError("Nonexistent '{}'".format(title))
         elif len(matching_fields) > 1:
@@ -201,7 +227,7 @@ class Assay():
         """Get DataFrame of samples and factors in human-readable form"""
         factor_field2title = {}
         for factor in self.factor_values:
-            factor_titles = self.fields[factor]
+            factor_titles = self._fields[factor]
             if len(factor_titles) != 1:
                 raise GeneLabJSONException(
                     "Nonexistent or ambiguous factor fields: '{}'".format(
@@ -227,7 +253,7 @@ class Assay():
 
     @property
     def has_arrays(self):
-        return "Array Design REF" in self.fields
+        return "Array Design REF" in self._fields
 
     @property
     def has_normalized_data(self):
@@ -379,3 +405,79 @@ class Assay():
     @property
     def normalized_annotated_data(self):
         return self.processed_data
+
+
+class AssayDispatcher(dict):
+    """Contains Assay objects, indexable by name or by attributes"""
+
+    def __init__(self, parent, json, glds_file_urls, storage_prefix, index_by="Sample Name"):
+        """Populate dictionary of assay_name -> Assay()"""
+        try:
+            for assay_name, assay_json in json.items():
+                super().__setitem__(
+                    assay_name,
+                    Assay(
+                        parent, assay_name, assay_json, index_by=index_by,
+                        storage_prefix=storage_prefix,
+                        glds_file_urls=glds_file_urls,
+                    )
+                )
+        except KeyError:
+            raise GeneLabJSONException(
+                "Malformed assay JSON ({})".format(self.accession)
+            )
+
+    @property
+    def _as_dataframe(self):
+        """List assay names and types"""
+        repr_dataframe = DataFrame(
+            index=Index(self.keys(), name=""),
+            columns=[
+                "material_type", "factors", "has_arrays",
+                "has_normalized_data", "has_processed_data"
+            ],
+            data=nan
+        )
+        for assay_name, assay in self.items():
+            material_types = set(
+                assay.metadata[["material type"]].values.flatten()
+            )
+            if len(material_types) >= 1:
+                repr_dataframe.loc[assay_name, "material_type"] = ", ".join(
+                    material_types
+                )
+            factors = set(
+                sub('^factor value:  ', "", f, flags=IGNORECASE)
+                for f in assay.factor_values.keys()
+            )
+            repr_dataframe.loc[assay_name, "factors"] = ", ".join(factors)
+            repr_dataframe.loc[assay_name, "has_arrays"] = assay.has_arrays
+            repr_dataframe.loc[assay_name, "has_normalized_data"] = assay.has_normalized_data
+            repr_dataframe.loc[assay_name, "has_processed_data"] = assay.has_processed_data
+        return repr_dataframe.copy()
+
+    def __repr__(self):
+        return (
+            "Dictionary of {} assays;\n".format(len(self.keys())) +
+            "Subsettable with .choose() by following properties:\n" +
+            repr(self._as_dataframe.T)
+        )
+
+    def choose(self, factors=None, material_type=None, has_arrays=None, has_normalized_data=None, has_processed_data=None):
+        """Subset AssayDispatcher by properties"""
+        rd = self._as_dataframe
+        subsetter = (rd["has_arrays"]!=2) # always true
+        if factors is not None:
+            subsetter &= (rd["factors"]==factors)
+        if has_arrays is not None:
+            subsetter &= (rd["has_arrays"]==has_arrays)
+        if has_normalized_data is not None:
+            subsetter &= (rd["has_normalized_data"]==has_normalized_data)
+        if has_processed_data is not None:
+            subsetter &= (rd["has_processed_data"]==has_processed_data)
+        chosen_names = set(rd[subsetter].index)
+        chosen_subset = deepcopy(self)
+        for name in self.keys():
+            if name not in chosen_names:
+                del chosen_subset[name]
+        return chosen_subset
