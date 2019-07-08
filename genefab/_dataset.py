@@ -24,8 +24,10 @@ class GeneLabDataSet():
         data_json = get_json(
             "{}/data/study/data/{}/".format(API_ROOT, accession), self.verbose
         )
+        if len(data_json) == 0:
+            raise GeneLabJSONException("Invalid JSON (GLDS does not exist?)")
         if len(data_json) > 1:
-            raise GeneLabJSONException("Too many results returned")
+            raise GeneLabJSONException("Invalid JSON, too many sections")
         self._json = data_json[0]
         try:
             self.internal_id = self._json["_id"]

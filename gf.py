@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 from flask import Flask, Response
-from genefab import GLDS
+from genefab import GLDS, GeneLabJSONException
 from pandas import DataFrame, concat
 from json import dumps
 
@@ -14,7 +14,10 @@ def hello_space():
 @app.route("/<accession>.<rettype>")
 def glds_summary(accession, rettype):
     """Report factors, assays, and/or raw JSON"""
-    glds = GLDS(accession)
+    try:
+        glds = GLDS(accession)
+    except GeneLabJSONException as e:
+        return "404; not found: {}".format(e), 404
     if rettype == "json":
         return Response(dumps([glds._json]), mimetype="text/json")
     assays_df = glds.assays._as_dataframe.copy()
@@ -33,4 +36,4 @@ def glds_summary(accession, rettype):
     elif rettype == "html":
         return repr_df.to_html(index=False, na_rep="")
     else:
-        return "400 bad request (wrong extension/type?)", 400
+        return "400; bad request (wrong extension/type?)", 400
