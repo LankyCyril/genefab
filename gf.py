@@ -54,8 +54,8 @@ def glds_summary(accession, rettype):
     return display_dataframe(repr_df, rettype)
 
 
-@app.route("/<accession>/<assay_name>.<rettype>")
-def assay_summary(accession, assay_name, rettype):
+@app.route("/<accession>/<assay_name>/metadata.<selection>")
+def assay_summary(accession, assay_name, selection):
     """Provide overview of samples, fields, factors in metadata"""
     try:
         glds = GLDS(accession)
@@ -66,16 +66,16 @@ def assay_summary(accession, assay_name, rettype):
     else:
         mask = "404; not found: assay {} does not exist under {}"
         return mask.format(assay_name, accession), 404
-    if rettype == "fields":
+    if selection == "fields":
         return Response(dumps(assay._fields, cls=SetEnc), mimetype="text/json")
-    if rettype == "index":
+    elif selection == "index":
         return Response(
             dumps(list(assay.raw_metadata.index)), mimetype="text/json"
         )
-    repr_list = (
-        [["index", assay._indexed_by, ix] for ix in assay.raw_metadata.index] +
-        [["field", nan, f] for f in assay._fields.keys()] +
-        [["factor", k, v] for k, vs in assay.factor_values.items() for v in vs]
-    )
-    repr_df = DataFrame(data=repr_list, columns=["type", "name", "value"])
-    return display_dataframe(repr_df, rettype)
+    elif selection == "factors":
+        return Response(
+            dumps(assay.factor_values, cls=SetEnc), mimetype="text/json"
+        )
+    else:
+        mask = "400; bad request: {} is not a valid selection"
+        return mask.format(selection), 400
