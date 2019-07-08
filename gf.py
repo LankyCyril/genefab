@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 from flask import Flask
-app = Flask("genefab")
 
-@app.route("/")
-def hello_world():
+def hello_space():
     return "Hello, space!"
+
+app = Flask("genefab")
+app.route("/")(hello_space)
