@@ -2,7 +2,7 @@
 from flask import Flask, Response
 from genefab import GLDS, GeneLabJSONException
 from pandas import DataFrame, concat
-from json import dumps
+from json import dumps, JSONEncoder
 from numpy import nan
 
 app = Flask("genefab")
@@ -23,6 +23,15 @@ def display_dataframe(df, rettype):
         return df.to_html(index=False, na_rep="")
     else:
         return "400; bad request (wrong extension/type?)", 400
+
+
+class SetEnc(JSONEncoder):
+    """Allow dumps to convert sets to serializable lists"""
+    def default(self, entry):
+        if isinstance(entry, set):
+            return list(entry)
+        else:
+            return JSONEncoder.default(self, entry)
 
 
 @app.route("/<accession>.<rettype>")
@@ -47,6 +56,7 @@ def glds_summary(accession, rettype):
 
 @app.route("/<accession>/<assay_name>.<rettype>")
 def assay_summary(accession, assay_name, rettype):
+    """Provide overview of samples, fields, factors in metadata"""
     try:
         glds = GLDS(accession)
     except GeneLabJSONException as e:
@@ -56,6 +66,12 @@ def assay_summary(accession, assay_name, rettype):
     else:
         mask = "404; not found: assay {} does not exist under {}"
         return mask.format(assay_name, accession), 404
+    if rettype == "fields":
+        return Response(dumps(assay._fields, cls=SetEnc), mimetype="text/json")
+    if rettype == "index":
+        return Response(
+            dumps(list(assay.raw_metadata.index)), mimetype="text/json"
+        )
     repr_list = (
         [["index", assay._indexed_by, ix] for ix in assay.raw_metadata.index] +
         [["field", nan, f] for f in assay._fields.keys()] +
