@@ -1,23 +1,36 @@
 #!/usr/bin/env python
 from flask import Flask, Response
 from genefab import GLDS
+from pandas import DataFrame, concat
 from json import dumps
 
 app = Flask("genefab")
 
 @app.route("/")
 def hello_space():
-    return "Hello, space!"
+    """Hello, Space!"""
+    return "Hello, Space!"
 
-@app.route("/<accession>.json")
-def glds_json(accession):
+@app.route("/<accession>.<rettype>")
+def glds_summary(accession, rettype):
+    """Report factors, assays, and/or raw JSON"""
     glds = GLDS(accession)
-    return Response(dumps([glds._json]), mimetype="text/json")
-
-@app.route("/<accession>.tsv")
-def glds_tsv(accession):
-    glds = GLDS(accession)
-    return Response(
-        glds.assays._as_dataframe.to_csv(sep="\t"),
-        mimetype="text/plain"
+    if rettype == "json":
+        return Response(dumps([glds._json]), mimetype="text/json")
+    assays_df = glds.assays._as_dataframe.copy()
+    assays_df.index.name = "name"
+    assays_df["type"] = "assay"
+    factors_df = DataFrame(
+        columns=["type", "name", "factors"],
+        data=[["dataset", accession, factor] for factor in glds.factors]
     )
+    repr_df = concat([factors_df, assays_df.reset_index()], axis=0, sort=False)
+    if rettype == "tsv":
+        return Response(
+            repr_df.to_csv(sep="\t", index=False, na_rep=""),
+            mimetype="text/plain"
+        )
+    elif rettype == "html":
+        return repr_df.to_html(index=False, na_rep="")
+    else:
+        return "400 bad request (wrong extension/type?)", 400
