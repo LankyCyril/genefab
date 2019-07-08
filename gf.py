@@ -4,4 +4,4 @@ app = Flask("genefab")
 
 @app.route("/")
 def hello_world():
-    return "Hello, world!"
+    return "Hello, space!"
