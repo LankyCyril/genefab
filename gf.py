@@ -34,6 +34,17 @@ class SetEnc(JSONEncoder):
             return JSONEncoder.default(self, entry)
 
 
+def get_assay(accession, assay_name):
+    try:
+        glds = GLDS(accession)
+    except GeneLabJSONException as e:
+        return None, "404; not found: {}".format(e), 404
+    if assay_name in glds.assays:
+        return glds.assays[assay_name], None, 200
+    else:
+        mask = "404; not found: assay {} does not exist under {}"
+        return None, mask.format(assay_name, accession), 404
+
 @app.route("/<accession>.<rettype>")
 def glds_summary(accession, rettype):
     """Report factors, assays, and/or raw JSON"""
@@ -54,7 +65,7 @@ def glds_summary(accession, rettype):
     return display_dataframe(repr_df, rettype)
 
 
-@app.route("/<accession>/<assay_name>/metadata.<selection>")
+@app.route("/<accession>/<assay_name>/<selection>")
 def assay_summary(accession, assay_name, selection):
     """Provide overview of samples, fields, factors in metadata"""
     try:
@@ -76,6 +87,22 @@ def assay_summary(accession, assay_name, selection):
         return Response(
             dumps(assay.factor_values, cls=SetEnc), mimetype="text/json"
         )
+    else:
+        mask = "400; bad request: {} is not a valid selection"
+        return mask.format(selection), 400
+
+
+@app.route("/<accession>/<assay_name>/metadata.<selection>")
+def assay_metadata(accession, assay_name, selection):
+    assay, message, status = get_assay(accession, assay_name)
+    if assay is None:
+        return message, status
+    if selection == "raw":
+        return Response(
+            assay.raw_metadata.to_csv(sep="\t"), mimetype="text/plain"
+        )
+    elif selection == "pkl":
+        return "501; not implemented: Pickles coming soon", 501
     else:
         mask = "400; bad request: {} is not a valid selection"
         return mask.format(selection), 400
