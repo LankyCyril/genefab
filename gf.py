@@ -3,7 +3,7 @@ from flask import Flask, Response, request
 from genefab import GLDS, GeneLabJSONException
 from pandas import DataFrame, concat, option_context
 from json import dumps, JSONEncoder
-from html import escape
+from html import escape, unescape
 
 app = Flask("genefab")
 
@@ -100,17 +100,25 @@ def glds_summary(accession, rettype):
         return display_object(repr_df, rettype)
 
 
-@app.route("/<accession>/<assay_name>/metadata.<rettype>")
+@app.route("/<accession>/<assay_name>/metadata.<rettype>", methods=["GET", "POST"])
 def assay_metadata(accession, assay_name, rettype):
     assay, message, status = get_assay(accession, assay_name)
     if assay is None:
         return message, status
-    if rettype == "raw":
-        return display_object(assay.raw_metadata, "tsv", index=True)
-    elif rettype == "pkl":
-        return "501; not implemented: pickles coming soon", 501
+    elif request.args:
+        fields = set(unescape(request.args.get("fields", "")).split()) - {""}
+        index = set(unescape(request.args.get("index", "")).split()) - {""}
+        if len(index) and len(fields):
+            repr_df = assay.metadata.loc[list(index), list(fields)]
+        elif index:
+            repr_df = assay.metadata.loc[list(index)]
+        elif fields:
+            repr_df = assay.metadata[list(fields)]
+        else:
+            return "400; bad request (please use 'fields', 'index')", 400
     else:
-        return display_object(assay.metadata.to_frame(), rettype, index=True)
+        repr_df = assay.metadata.to_frame()
+    return display_object(repr_df, rettype, index=True)
 
 
 @app.route("/<accession>/<assay_name>/metadata/<prop>.<rettype>")
