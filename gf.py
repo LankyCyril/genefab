@@ -28,9 +28,12 @@ def display_object(obj, rettype, index=False):
         if rettype == "json":
             return Response(dumps(obj, cls=SetEnc), mimetype="text/json")
         else:
-            mask = "501; not implemented: {} cannot be returned as {}"
-            return mask.format(escape(str(type(obj))), rettype), 501
-    elif isinstance(obj, DataFrame):
+            obj = DataFrame(
+                columns=["key", "value"],
+                data=[[k, v] for k, vv in obj.items() for v in vv]
+            )
+            index = False
+    if isinstance(obj, DataFrame):
         if rettype == "tsv":
             return Response(
                 obj.to_csv(sep="\t", index=index, na_rep=""),
