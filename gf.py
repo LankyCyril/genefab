@@ -68,18 +68,35 @@ def glds_summary(accession, rettype):
         return "404; not found: {}".format(e), 404
     if rettype == "json":
         return display_object([glds._json], rettype)
-    assays_df = glds.assays._as_dataframe.copy()
-    assays_df.index.name = "name"
-    assays_df["type"] = "assay"
-    factors_df = DataFrame(
-        columns=["type", "name", "factors"],
-        data=[["dataset", accession, factor] for factor in glds.factors]
-    )
-    repr_df = concat([factors_df, assays_df.reset_index()], axis=0, sort=False)
-    return display_object(repr_df, rettype)
+    else:
+        assays_df = glds.assays._as_dataframe.copy()
+        assays_df.index.name = "name"
+        assays_df["type"] = "assay"
+        factors_df = DataFrame(
+            columns=["type", "name", "factors"],
+            data=[["dataset", accession, factor] for factor in glds.factors]
+        )
+        repr_df = concat(
+            [factors_df, assays_df.reset_index()],
+            axis=0, sort=False
+        )
+        return display_object(repr_df, rettype)
 
 
-@app.route("/<accession>/<assay_name>/<prop>.<rettype>")
+@app.route("/<accession>/<assay_name>/metadata.<rettype>")
+def assay_metadata(accession, assay_name, rettype):
+    assay, message, status = get_assay(accession, assay_name)
+    if assay is None:
+        return message, status
+    if rettype == "raw":
+        return display_object(assay.raw_metadata, "tsv", index=True)
+    elif rettype == "pkl":
+        return "501; not implemented: pickles coming soon", 501
+    else:
+        return display_object(assay.extended_raw_metadata, rettype, index=True)
+
+
+@app.route("/<accession>/<assay_name>/metadata/<prop>.<rettype>")
 def assay_summary(accession, assay_name, prop, rettype):
     """Provide overview of samples, fields, factors in metadata"""
     assay, message, status = get_assay(accession, assay_name)
@@ -94,19 +111,3 @@ def assay_summary(accession, assay_name, prop, rettype):
     else:
         mask = "400; bad request: {} is not a valid property"
         return mask.format(prop), 400
-
-
-@app.route("/<accession>/<assay_name>/metadata.<rettype>")
-def assay_metadata(accession, assay_name, rettype):
-    assay, message, status = get_assay(accession, assay_name)
-    if assay is None:
-        return message, status
-    if rettype == "raw":
-        return display_object(assay.raw_metadata, "tsv", index=True)
-    elif rettype in ("tsv", "html"):
-        return display_object(assay.extended_raw_metadata, rettype, index=True)
-    elif rettype == "pkl":
-        return "501; not implemented: pickles coming soon", 501
-    else:
-        mask = "400; bad request: {} is not a valid return type"
-        return mask.format(rettype), 400
