@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 from flask import Flask, Response
 from genefab import GLDS, GeneLabJSONException
-from pandas import DataFrame, concat
+from pandas import DataFrame, concat, option_context
 from json import dumps, JSONEncoder
 from html import escape
 
@@ -37,7 +37,8 @@ def display_object(obj, rettype, index=False):
                 mimetype="text/plain"
             )
         elif rettype == "html":
-            return obj.to_html(index=index, na_rep="")
+            with option_context("display.max_colwidth", -1):
+                return obj.to_html(index=index, na_rep="", justify="left")
         else:
             return "400; bad request (wrong extension/type?)", 400
     else:
@@ -102,8 +103,8 @@ def assay_metadata(accession, assay_name, rettype):
         return message, status
     if rettype == "raw":
         return display_object(assay.raw_metadata, "tsv", index=True)
-    elif rettype == "tsv":
-        return display_object(assay.extended_raw_metadata, "tsv", index=True)
+    elif rettype in ("tsv", "html"):
+        return display_object(assay.extended_raw_metadata, rettype, index=True)
     elif rettype == "pkl":
         return "501; not implemented: pickles coming soon", 501
     else:
