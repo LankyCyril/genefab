@@ -106,8 +106,19 @@ def glds_summary(accession, rettype):
         return display_object(repr_df, rettype)
 
 
+@app.route("/<accession>/<assay_name>/factors.<rettype>")
+def assay_factors(accession, assay_name, rettype):
+    """DataFrame of samples and factors in human-readable form"""
+    assay, message, status = get_assay(accession, assay_name)
+    if assay is None:
+        return message, status
+    else:
+        return display_object(assay.factors, rettype, index=True)
+
+
 @app.route("/<accession>/<assay_name>/metadata.<rettype>", methods=["GET", "POST"])
 def assay_metadata(accession, assay_name, rettype):
+    """DataFrame view of metadata, optionally queried"""
     assay, message, status = get_assay(accession, assay_name)
     if assay is None:
         return message, status
