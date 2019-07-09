@@ -28,10 +28,13 @@ def display_object(obj, rettype, index=False):
         if rettype == "json":
             return Response(dumps(obj, cls=SetEnc), mimetype="text/json")
         else:
-            obj = DataFrame(
-                columns=["key", "value"],
-                data=[[k, v] for k, vv in obj.items() for v in vv]
-            )
+            if isinstance(obj, dict):
+                obj = DataFrame(
+                    columns=["key", "value"],
+                    data=[[k, v] for k, vv in obj.items() for v in vv]
+                )
+            else:
+                obj = DataFrame(columns=["value"], data=obj)
             index = False
     if isinstance(obj, DataFrame):
         if rettype == "tsv":
