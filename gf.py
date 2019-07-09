@@ -110,7 +110,7 @@ def assay_metadata(accession, assay_name, rettype):
     elif rettype == "pkl":
         return "501; not implemented: pickles coming soon", 501
     else:
-        return display_object(assay.extended_raw_metadata, rettype, index=True)
+        return display_object(assay.metadata.to_frame(), rettype, index=True)
 
 
 @app.route("/<accession>/<assay_name>/metadata/<prop>.<rettype>")
