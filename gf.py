@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from flask import Flask, Response
+from flask import Flask, Response, request
 from genefab import GLDS, GeneLabJSONException
 from pandas import DataFrame, concat, option_context
 from json import dumps, JSONEncoder
@@ -7,10 +7,10 @@ from html import escape
 
 app = Flask("genefab")
 
-@app.route("/")
+@app.route("/", methods=["GET"])
 def hello_space():
     """Hello, Space!"""
-    return "Hello, Space!"
+    return "Hello, {}!".format(request.args.get("name", "Space"))
 
 
 class SetEnc(JSONEncoder):
