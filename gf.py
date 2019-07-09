@@ -172,3 +172,18 @@ def locate_file(accession, assay_name, filemask):
         local_filepath = fetch_file(filemask, url, assay.storage)
         with open(local_filepath, mode="rb") as handle:
             return Response(handle.read(), mimetype="application/octet-stream")
+
+
+@app.route("/<accession>/<assay_name>/<kind>_data.<rettype>")
+def get_data(accession, assay_name, kind, rettype):
+    """Serve up normalized/processed data"""
+    assay, message, status = get_assay(accession, assay_name)
+    if assay is None:
+        return message, status
+    if kind == "normalized":
+        repr_df = assay.normalized_data
+    elif kind in {"processed", "normalized_annotated"}:
+        repr_df = assay.processed_data
+    else:
+        return "400; bad request: unknown data request", 400
+    return display_object(repr_df, rettype, index=True)
