@@ -40,12 +40,10 @@ def display_object(obj, rettype, index=False):
             with option_context("display.max_colwidth", -1):
                 return obj.to_html(index=index, na_rep="", justify="left")
         elif rettype == "json":
-            if index:
-                return Response(obj.to_json(index=index), mimetype="text/json")
-            else:
-                return Response(
-                    obj.to_json(orient="records"), mimetype="text/json"
-                )
+            return Response(
+                obj.to_json(index=True, orient="records"),
+                mimetype="text/json"
+            )
         else:
             return "400; bad request (wrong extension/type?)", 400
     else:
