@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from flask import Flask, Response, request
+from flask import Flask, Response, request, redirect
 from genefab import GLDS, GeneLabJSONException
 from pandas import DataFrame, concat, option_context
 from json import dumps, JSONEncoder
@@ -153,3 +153,21 @@ def assay_summary(accession, assay_name, prop, rettype):
     else:
         mask = "400; bad request: {} is not a valid property"
         return mask.format(prop), 400
+
+
+@app.route("/<accession>/<assay_name>/file/<filemask>", methods=["GET"])
+def locate_file(accession, assay_name, filemask):
+    """Find file URL that matches filemask, optionally redirect there"""
+    assay, message, status = get_assay(accession, assay_name)
+    if assay is None:
+        return message, status
+    try:
+        url = assay._get_file_url(filemask)
+    except GeneLabJSONException:
+        return "400; bad request: multiple files match mask", 400
+    if url is None:
+        return "400; bad request: no files match mask", 400
+    elif "noredirect" in request.args:
+        return url
+    else:
+        return redirect(url)
