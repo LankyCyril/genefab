@@ -39,6 +39,13 @@ def display_object(obj, rettype, index=False):
         elif rettype == "html":
             with option_context("display.max_colwidth", -1):
                 return obj.to_html(index=index, na_rep="", justify="left")
+        elif rettype == "json":
+            if index:
+                return Response(obj.to_json(index=index), mimetype="text/json")
+            else:
+                return Response(
+                    obj.to_json(orient="records"), mimetype="text/json"
+                )
         else:
             return "400; bad request (wrong extension/type?)", 400
     else:
@@ -66,8 +73,8 @@ def glds_summary(accession, rettype):
         glds = GLDS(accession)
     except GeneLabJSONException as e:
         return "404; not found: {}".format(e), 404
-    if rettype == "json":
-        return display_object([glds._json], rettype)
+    if rettype == "rawjson":
+        return display_object([glds._json], "json")
     else:
         assays_df = glds.assays._as_dataframe.copy()
         assays_df.index.name = "name"
