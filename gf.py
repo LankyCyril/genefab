@@ -52,10 +52,16 @@ def display_object(obj, rettype, index="auto"):
         elif rettype == "json":
             if index == "auto":
                 index = True
-            return Response(
-                obj.to_json(index=index, orient="records"),
-                mimetype="text/json"
-            )
+            try:
+                return Response(
+                    obj.to_json(index=index, orient="index"),
+                    mimetype="text/json"
+                )
+            except ValueError:
+                return Response(
+                    obj.to_json(index=index, orient="records"),
+                    mimetype="text/json"
+                )
         else:
             return "400; bad request (wrong extension/type?)", 400
     else:
