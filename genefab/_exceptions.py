@@ -3,3 +3,6 @@ class GeneLabJSONException(Exception):
 
 class GeneLabFileException(Exception):
     pass
+
+class GeneLabException(Exception):
+    pass

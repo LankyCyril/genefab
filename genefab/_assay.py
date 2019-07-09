@@ -1,7 +1,8 @@
 from os.path import join
 from ._exceptions import GeneLabJSONException, GeneLabFileException
+from ._exceptions import GeneLabException
 from collections import defaultdict
-from pandas import concat, Series, Index, DataFrame, read_csv
+from pandas import concat, Series, Index, DataFrame, read_csv, merge
 from re import search, fullmatch, split, IGNORECASE, sub
 from numpy import nan
 from ._util import fetch_file
@@ -172,6 +173,27 @@ class Assay():
         del self._fields[self._indexed_by]
         # initialize indexing functions:
         self.metadata = AssayMetadata(self)
+
+    @property
+    def extended_raw_metadata(self):
+        """Raw metadata with multiindex columns (human-readable -> internal)"""
+        multicols = ["external_field", "internal_field"]
+        fields_df = DataFrame(
+            data=[[k, v] for k, vv in self._fields.items() for v in vv],
+            columns=multicols
+        )
+        columns_df = DataFrame(
+            data=self.raw_metadata.columns, columns=["internal_field"]
+        )
+        multiindex_df = merge(columns_df, fields_df, sort=False, how="outer") \
+            .fillna("Unknown")
+        mdv = multiindex_df["internal_field"].values
+        rmv = self.raw_metadata.columns.values
+        if (mdv != rmv).any():
+            raise GeneLabException("Could not generate extended raw metadata")
+        erm = self.raw_metadata.copy()
+        erm.columns = multiindex_df.set_index(multicols).index
+        return erm.sort_index(by="external_field", axis="columns")
 
     def __repr__(self):
         """Condensed representation"""
