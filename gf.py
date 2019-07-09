@@ -22,7 +22,7 @@ class SetEnc(JSONEncoder):
             return JSONEncoder.default(self, entry)
 
 
-def display_object(obj, rettype, index=False):
+def display_object(obj, rettype, index="auto"):
     """Select appropriate converter and mimetype for rettype"""
     if isinstance(obj, (dict, tuple, list)):
         if rettype == "json":
@@ -38,16 +38,22 @@ def display_object(obj, rettype, index=False):
             index = False
     if isinstance(obj, DataFrame):
         if rettype == "tsv":
+            if index == "auto":
+                index = False
             return Response(
                 obj.to_csv(sep="\t", index=index, na_rep=""),
                 mimetype="text/plain"
             )
         elif rettype == "html":
+            if index == "auto":
+                index = False
             with option_context("display.max_colwidth", -1):
                 return obj.to_html(index=index, na_rep="", justify="left")
         elif rettype == "json":
+            if index == "auto":
+                index = True
             return Response(
-                obj.to_json(index=True, orient="records"),
+                obj.to_json(index=index, orient="records"),
                 mimetype="text/json"
             )
         else:
