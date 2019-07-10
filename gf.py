@@ -23,36 +23,36 @@ class SetEnc(JSONEncoder):
             return JSONEncoder.default(self, entry)
 
 
+def to_dataframe(obj):
+    """Convert simple structured objects (dicts, list, tuples) to a DataFrame representation"""
+    if isinstance(obj, dict):
+        return DataFrame(
+            columns=["key", "value"],
+            data=[[k, v] for k, vv in obj.items() for v in vv]
+        )
+    else:
+        return DataFrame(columns=["value"], data=obj)
+
+
 def display_object(obj, rettype, index="auto"):
     """Select appropriate converter and mimetype for rettype"""
     if isinstance(obj, (dict, tuple, list)):
         if rettype == "json":
             return Response(dumps(obj, cls=SetEnc), mimetype="text/json")
         else:
-            if isinstance(obj, dict):
-                obj = DataFrame(
-                    columns=["key", "value"],
-                    data=[[k, v] for k, vv in obj.items() for v in vv]
-                )
-            else:
-                obj = DataFrame(columns=["value"], data=obj)
-            index = False
+            obj, index = to_dataframe(obj), False
+    if index == "auto":
+        index = (rettype == "json")
     if isinstance(obj, DataFrame):
         if rettype == "tsv":
-            if index == "auto":
-                index = False
             return Response(
                 obj.to_csv(sep="\t", index=index, na_rep=""),
                 mimetype="text/plain"
             )
         elif rettype == "html":
-            if index == "auto":
-                index = False
             with option_context("display.max_colwidth", -1):
                 return obj.to_html(index=index, na_rep="", justify="left")
         elif rettype == "json":
-            if index == "auto":
-                index = True
             try:
                 return Response(
                     obj.to_json(index=index, orient="index"),
