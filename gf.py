@@ -118,7 +118,7 @@ def assay_factors(accession, assay_name, rettype):
         return display_object(assay.factors, rettype, index=True)
 
 
-@app.route("/<accession>/<assay_name>/metadata.<rettype>", methods=["GET", "POST"])
+@app.route("/<accession>/<assay_name>.<rettype>", methods=["GET", "POST"])
 def assay_metadata(accession, assay_name, rettype):
     """DataFrame view of metadata, optionally queried"""
     assay, message, status = get_assay(accession, assay_name)
@@ -140,7 +140,7 @@ def assay_metadata(accession, assay_name, rettype):
     return display_object(repr_df, rettype, index=True)
 
 
-@app.route("/<accession>/<assay_name>/metadata/<prop>.<rettype>")
+@app.route("/<accession>/<assay_name>/<prop>.<rettype>")
 def assay_summary(accession, assay_name, prop, rettype):
     """Provide overview of samples, fields, factors in metadata"""
     assay, message, status = get_assay(accession, assay_name)
