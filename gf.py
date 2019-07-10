@@ -168,7 +168,7 @@ def locate_file(accession, assay_name, filemask):
     except GeneLabJSONException:
         return "400; bad request: multiple files match mask", 400
     if url is None:
-        return "400; bad request: no files match mask", 400
+        return "404; not found: file not found", 404
     else:
         local_filepath = fetch_file(filemask, url, assay.storage)
         with open(local_filepath, mode="rb") as handle:
