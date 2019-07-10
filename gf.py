@@ -5,6 +5,7 @@ from genefab._util import fetch_file
 from pandas import DataFrame, concat, option_context
 from json import dumps, JSONEncoder
 from html import escape, unescape
+from re import sub
 
 app = Flask("genefab")
 
@@ -44,25 +45,25 @@ def display_object(obj, rettype, index="auto"):
     if index == "auto":
         index = (rettype == "json")
     if isinstance(obj, DataFrame):
-        if rettype == "tsv":
-            return Response(
-                obj.to_csv(sep="\t", index=index, na_rep=""),
-                mimetype="text/plain"
-            )
+        if rettype == "list":
+            if obj.shape == (1, 1):
+                obj_repr = sub(r'\s*,\s*', "\n", str(obj.iloc[0, 0]))
+                return Response(obj_repr, mimetype="text/plain")
+            else:
+                return "400; bad request (multiple cells selected)", 400
+        elif rettype == "tsv":
+            obj_repr = obj.to_csv(sep="\t", index=index, na_rep="")
+            return Response(obj_repr, mimetype="text/plain")
         elif rettype == "html":
             with option_context("display.max_colwidth", -1):
                 return obj.to_html(index=index, na_rep="", justify="left")
         elif rettype == "json":
             try:
-                return Response(
-                    obj.to_json(index=index, orient="index"),
-                    mimetype="text/json"
-                )
+                obj_repr = obj.to_json(index=index, orient="index")
+                return Response(obj_repr, mimetype="text/json")
             except ValueError:
-                return Response(
-                    obj.to_json(index=index, orient="records"),
-                    mimetype="text/json"
-                )
+                obj_repr = obj.to_json(index=index, orient="records")
+                return Response(obj_repr, mimetype="text/json")
         else:
             return "400; bad request (wrong extension/type?)", 400
     else:
