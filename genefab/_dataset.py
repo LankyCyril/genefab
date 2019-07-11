@@ -16,7 +16,7 @@ class GeneLabDataSet():
     verbose = False
     storage = None
 
-    def __init__(self, accession, verbose=False, storage_prefix=".genelab", index_by="Sample Name"):
+    def __init__(self, accession, verbose=False, storage_prefix=".genelab", index_by="Sample Name", spaces_in_sample_names=True):
         """Request JSON representation of ISA metadata and store fields"""
         self.accession = accession
         self.verbose = verbose
@@ -43,8 +43,9 @@ class GeneLabDataSet():
                 "Malformed JSON ({})".format(self.accession)
             )
         self.assays = AssayDispatcher(
-            parent=self, json=self._info["assays"], index_by=index_by,
-            storage_prefix=self.storage, glds_file_urls=self._get_file_urls()
+            parent=self, json=self._info["assays"], storage_prefix=self.storage,
+            spaces_in_sample_names=spaces_in_sample_names, index_by=index_by,
+            glds_file_urls=self._get_file_urls()
         )
 
     @property

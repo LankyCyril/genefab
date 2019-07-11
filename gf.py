@@ -71,10 +71,17 @@ def display_object(obj, rettype, index="auto"):
         return mask.format(escape(str(type(obj)))), 501
 
 
-def get_assay(accession, assay_name):
+def get_bool(rargs, key, default_value):
+    """Get boolean value from GET request args"""
+    raw_value = rargs.get(key, default_value)
+    return (raw_value not in {"False", "0"}) and bool(raw_value)
+
+
+def get_assay(accession, assay_name, rargs):
     """Get assay object via GLDS accession and assay name"""
+    spaces_in_sample_names = get_bool(rargs, "spaces_in_sample_names", True)
     try:
-        glds = GLDS(accession)
+        glds = GLDS(accession, spaces_in_sample_names=spaces_in_sample_names)
     except GeneLabJSONException as e:
         return None, "404; not found: {}".format(e), 404
     if assay_name in glds.assays:
@@ -108,10 +115,10 @@ def glds_summary(accession, rettype):
         return display_object(repr_df, rettype)
 
 
-@app.route("/<accession>/<assay_name>/factors.<rettype>")
+@app.route("/<accession>/<assay_name>/factors.<rettype>", methods=["GET"])
 def assay_factors(accession, assay_name, rettype):
     """DataFrame of samples and factors in human-readable form"""
-    assay, message, status = get_assay(accession, assay_name)
+    assay, message, status = get_assay(accession, assay_name, request.args)
     if assay is None:
         return message, status
     else:
@@ -121,7 +128,7 @@ def assay_factors(accession, assay_name, rettype):
 @app.route("/<accession>/<assay_name>.<rettype>", methods=["GET", "POST"])
 def assay_metadata(accession, assay_name, rettype):
     """DataFrame view of metadata, optionally queried"""
-    assay, message, status = get_assay(accession, assay_name)
+    assay, message, status = get_assay(accession, assay_name, request.args)
     if assay is None:
         return message, status
     elif request.args:
@@ -134,16 +141,16 @@ def assay_metadata(accession, assay_name, rettype):
         elif fields:
             repr_df = assay.metadata[list(fields)]
         else:
-            return "400; bad request (please use 'fields', 'index')", 400
+            repr_df = assay.metadata.to_frame()
     else:
         repr_df = assay.metadata.to_frame()
     return display_object(repr_df, rettype, index=True)
 
 
-@app.route("/<accession>/<assay_name>/<prop>.<rettype>")
+@app.route("/<accession>/<assay_name>/<prop>.<rettype>", methods=["GET"])
 def assay_summary(accession, assay_name, prop, rettype):
     """Provide overview of samples, fields, factors in metadata"""
-    assay, message, status = get_assay(accession, assay_name)
+    assay, message, status = get_assay(accession, assay_name, request.args)
     if assay is None:
         return message, status
     if prop == "fields":
@@ -157,10 +164,10 @@ def assay_summary(accession, assay_name, prop, rettype):
         return mask.format(prop), 400
 
 
-@app.route("/<accession>/<assay_name>/file/<filemask>")
+@app.route("/<accession>/<assay_name>/file/<filemask>", methods=["GET"])
 def locate_file(accession, assay_name, filemask):
     """Find file URL that matches filemask, redirect to download"""
-    assay, message, status = get_assay(accession, assay_name)
+    assay, message, status = get_assay(accession, assay_name, request.args)
     if assay is None:
         return message, status
     try:
@@ -175,26 +182,22 @@ def locate_file(accession, assay_name, filemask):
             return Response(handle.read(), mimetype="application/octet-stream")
 
 
-def get_bool(rargs, key):
-    """Get boolean value from GET request args"""
-    raw_value = rargs.get(key, False)
-    return (raw_value != False) and bool(raw_value)
-
-
 @app.route("/<accession>/<assay_name>/<kind>_data.<rettype>", methods=["GET"])
 def get_data(accession, assay_name, kind, rettype):
     """Serve up normalized/processed data"""
-    assay, message, status = get_assay(accession, assay_name)
+    assay, message, status = get_assay(accession, assay_name, request.args)
     if assay is None:
         return message, status
-    translate_sample_names, data_columns = (
-        get_bool(request.args, "translate_sample_names"),
+    translate_sample_names, spaces_in_sample_names, data_columns = (
+        get_bool(request.args, "translate_sample_names", False),
+        get_bool(request.args, "spaces_in_sample_names", True),
         request.args.get("data_columns", None)
     )
     if kind == "normalized":
         if translate_sample_names or data_columns:
             repr_df = assay.get_normalized_data(
                 translate_sample_names=translate_sample_names,
+                spaces_in_sample_names=spaces_in_sample_names,
                 data_columns=data_columns
             )
         else:
@@ -203,6 +206,7 @@ def get_data(accession, assay_name, kind, rettype):
         if translate_sample_names or data_columns:
             repr_df = assay.get_processed_data(
                 translate_sample_names=translate_sample_names,
+                spaces_in_sample_names=spaces_in_sample_names,
                 data_columns=data_columns
             )
         else:
