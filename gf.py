@@ -101,18 +101,7 @@ def glds_summary(accession, rettype):
     if rettype == "rawjson":
         return display_object([glds._json], "json")
     else:
-        assays_df = glds.assays._as_dataframe.copy()
-        assays_df.index.name = "name"
-        assays_df["type"] = "assay"
-        factors_df = DataFrame(
-            columns=["type", "name", "factors"],
-            data=[["dataset", accession, factor] for factor in glds.factors]
-        )
-        repr_df = concat(
-            [factors_df, assays_df.reset_index()],
-            axis=0, sort=False
-        )
-        return display_object(repr_df, rettype)
+        return display_object(glds._summary_dataframe, rettype)
 
 
 @app.route("/<accession>/<assay_name>/factors.<rettype>", methods=["GET"])

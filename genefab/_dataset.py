@@ -5,6 +5,7 @@ from ._util import get_json
 from ._util import FFIELD_ALIASES, FFIELD_VALUES, API_ROOT, GENELAB_ROOT
 from ._exceptions import GeneLabJSONException
 from ._assay import AssayDispatcher
+from pandas import DataFrame, concat
 from os.path import join
 
 
@@ -54,18 +55,22 @@ class GeneLabDataSet():
         return [
             factor_info["factor"] for factor_info in self.description["factors"]
         ]
+
+    @property
+    def _summary_dataframe(self):
+        """List factors, assay names and types"""
+        assays_df = self.assays._summary_dataframe.copy()
+        assays_df.index.name = "name"
+        assays_df["type"] = "assay"
+        factors_df = DataFrame(
+            columns=["type", "name", "factors"],
+            data=[["dataset", self.accession, factor] for factor in self.factors]
+        )
+        return concat([factors_df, assays_df.reset_index()], axis=0, sort=False)
  
     def __repr__(self):
-        """Simple description, for now"""
-        return "\n".join([
-            "name: " + self.accession,
-            "assays: [" + ", ".join(
-                repr(assay_name) for assay_name in self.assays.keys()
-            ) + "]",
-            "factors: [" + ", ".join(
-                repr(factor) for factor in self.factors
-            ) + "]"
-        ])
+        """Use summary dataframe"""
+        return repr(self._summary_dataframe)
  
     def _get_file_urls(self, force_reload=False):
         """Get filenames and associated URLs"""
