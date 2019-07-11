@@ -175,16 +175,38 @@ def locate_file(accession, assay_name, filemask):
             return Response(handle.read(), mimetype="application/octet-stream")
 
 
-@app.route("/<accession>/<assay_name>/<kind>_data.<rettype>")
+def get_bool(rargs, key):
+    """Get boolean value from GET request args"""
+    raw_value = rargs.get(key, False)
+    return (raw_value != False) and bool(raw_value)
+
+
+@app.route("/<accession>/<assay_name>/<kind>_data.<rettype>", methods=["GET"])
 def get_data(accession, assay_name, kind, rettype):
     """Serve up normalized/processed data"""
     assay, message, status = get_assay(accession, assay_name)
     if assay is None:
         return message, status
+    translate_sample_names, data_columns = (
+        get_bool(request.args, "translate_sample_names"),
+        request.args.get("data_columns", None)
+    )
     if kind == "normalized":
-        repr_df = assay.normalized_data
+        if translate_sample_names or data_columns:
+            repr_df = assay.get_normalized_data(
+                translate_sample_names=translate_sample_names,
+                data_columns=data_columns
+            )
+        else:
+            repr_df = assay.normalized_data
     elif kind in {"processed", "normalized_annotated"}:
-        repr_df = assay.processed_data
+        if translate_sample_names or data_columns:
+            repr_df = assay.get_processed_data(
+                translate_sample_names=translate_sample_names,
+                data_columns=data_columns
+            )
+        else:
+            repr_df = assay.processed_data
     else:
         return "400; bad request: unknown data request", 400
     return display_object(repr_df, rettype, index=True)

@@ -307,7 +307,7 @@ class Assay():
         else:
             return self.glds_file_urls[matching_names.pop()]
 
-    def _translate_data_sample_names(self, data, data_columns="hybridization assay name"):
+    def _translate_data_sample_names(self, data, data_columns):
         """Convert data header to match metadata index"""
         field_from = self._get_unique_field_from_title(data_columns)
         field_to = self._field_indexed_by
@@ -374,7 +374,7 @@ class Assay():
         else:
             return None
 
-    def get_normalized_data(self, force_redownload=False, translate_sample_names=True, data_columns="hybridization assay name"):
+    def get_normalized_data(self, force_redownload=False, translate_sample_names=False, data_columns="sample name"):
         """Get normalized data from file(s) listed under 'normalized data files'"""
         self._normalized_data = self._read_data_from(
             ".*normalized data files.*",
@@ -392,7 +392,7 @@ class Assay():
         else:
             return self._normalized_data
 
-    def get_processed_data(self, force_redownload=False, translate_sample_names=True, data_columns="hybridization assay name"):
+    def get_processed_data(self, force_redownload=False, translate_sample_names=False, data_columns="sample name"):
         """Get processed data from file(s) listed under 'normalized annotated data files'"""
         self._processed_data = self._read_data_from(
             ".*normalized annotated data files.*",
