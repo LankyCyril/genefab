@@ -207,4 +207,10 @@ def get_data(accession, assay_name, kind, rettype):
             repr_df = assay.processed_data
     else:
         return "400; bad request: unknown data request", 400
+    nrows = request.args.get("head", None)
+    if nrows:
+        if nrows.isdigit():
+            repr_df = repr_df[:int(nrows)]
+        else:
+            return "400; bad request: 'head' must be positive integer", 400
     return display_object(repr_df, rettype, index=True)
