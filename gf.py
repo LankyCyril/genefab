@@ -205,6 +205,8 @@ def get_data(accession, assay_name, kind, rettype):
         )
     else:
         repr_df = getattr(assay, getter_attr)
+    if repr_df is None:
+        return ResponseError("data not available", 404)
     nrows = request.args.get("head", None)
     if nrows:
         if nrows.isdigit():
