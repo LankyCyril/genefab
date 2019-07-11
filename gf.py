@@ -164,8 +164,8 @@ def assay_summary(accession, assay_name, prop, rettype):
         return ResponseError("{} is not a valid property", 400, prop)
 
 
-@app.route("/<accession>/<assay_name>/file/<filemask>", methods=["GET"])
-def locate_file(accession, assay_name, filemask):
+@app.route("/<accession>/<assay_name>/file/<filemask>")
+def expose_file(accession, assay_name, filemask):
     """Find file URL that matches filemask, redirect to download"""
     assay, message, status = get_assay(accession, assay_name, request.args)
     if assay is None:
@@ -179,7 +179,7 @@ def locate_file(accession, assay_name, filemask):
     else:
         local_filepath = fetch_file(filemask, url, assay.storage)
         with open(local_filepath, mode="rb") as handle:
-            return Response(handle.read(), mimetype="application/octet-stream")
+            return Response(handle.read(), mimetype="application")
 
 
 @app.route("/<accession>/<assay_name>/<kind>_data.<rettype>", methods=["GET"])
