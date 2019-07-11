@@ -152,7 +152,7 @@ class Assay():
     storage = None
 
     _normalized_data, _processed_data = None, None
-    _indexed_by, _field_indexed_by = None, None
+    _indexed_by, _spaces_in_sample_names, _field_indexed_by = None, True, None
 
     def __init__(self, parent, name, json, glds_file_urls, storage_prefix, index_by="Sample Name", spaces_in_sample_names=True):
         """Parse JSON into assay metadata"""
@@ -182,6 +182,7 @@ class Assay():
             )
         self._indexed_by = maybe_indexed_by.pop()
         self.raw_metadata = self.raw_metadata.set_index(self._field_indexed_by)
+        self._spaces_in_sample_names = spaces_in_sample_names
         if spaces_in_sample_names:
             self.raw_metadata.index = self.raw_metadata.index.map(
                 lambda f: sub(r'[._-]', " ", f)
@@ -344,7 +345,7 @@ class Assay():
         )
         return translated_data
 
-    def _read_data_from(self, field_title, blacklist_regex, force_redownload, translate_sample_names, spaces_in_sample_names, data_columns, sep="\t"):
+    def _read_data_from(self, field_title, blacklist_regex, force_redownload, translate_sample_names, data_columns, sep="\t"):
         """Download (if necessary) and parse data contained in a single target file linked to by target field"""
         meta_files = self.metadata[[field_title]]
         if len(meta_files):
@@ -371,7 +372,7 @@ class Assay():
                 data.columns.name = self._indexed_by
                 if translate_sample_names:
                     data = self._translate_data_sample_names(data, data_columns)
-                if spaces_in_sample_names:
+                if self._spaces_in_sample_names:
                     data.columns = data.columns.map(
                         lambda f: sub(r'[._-]', " ", f)
                     )
@@ -379,14 +380,13 @@ class Assay():
         else:
             return None
 
-    def get_normalized_data(self, force_redownload=False, translate_sample_names=False, spaces_in_sample_names=True, data_columns="sample name"):
+    def get_normalized_data(self, force_redownload=False, translate_sample_names=False, data_columns="sample name"):
         """Get normalized data from file(s) listed under 'normalized data files'"""
         self._normalized_data = self._read_data_from(
             ".*normalized data files.*",
             blacklist_regex=r'\.rda(ta)?(\.gz)?$',
             force_redownload=force_redownload,
             translate_sample_names=translate_sample_names,
-            spaces_in_sample_names=spaces_in_sample_names,
             data_columns=data_columns
         )
         return self._normalized_data
@@ -398,14 +398,13 @@ class Assay():
         else:
             return self._normalized_data
 
-    def get_processed_data(self, force_redownload=False, translate_sample_names=False, spaces_in_sample_names=True, data_columns="sample name"):
+    def get_processed_data(self, force_redownload=False, translate_sample_names=False, data_columns="sample name"):
         """Get processed data from file(s) listed under 'normalized annotated data files'"""
         self._processed_data = self._read_data_from(
             ".*normalized annotated data files.*",
             blacklist_regex=r'\.rda(ta)?(\.gz)?$',
             force_redownload=force_redownload,
             translate_sample_names=translate_sample_names,
-            spaces_in_sample_names=spaces_in_sample_names,
             data_columns=data_columns
         )
         return self._processed_data

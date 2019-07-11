@@ -188,16 +188,14 @@ def get_data(accession, assay_name, kind, rettype):
     assay, message, status = get_assay(accession, assay_name, request.args)
     if assay is None:
         return message, status
-    translate_sample_names, spaces_in_sample_names, data_columns = (
+    translate_sample_names, data_columns = (
         get_bool(request.args, "translate_sample_names", False),
-        get_bool(request.args, "spaces_in_sample_names", True),
         request.args.get("data_columns", None)
     )
     if kind == "normalized":
         if translate_sample_names or data_columns:
             repr_df = assay.get_normalized_data(
                 translate_sample_names=translate_sample_names,
-                spaces_in_sample_names=spaces_in_sample_names,
                 data_columns=data_columns
             )
         else:
@@ -206,7 +204,6 @@ def get_data(accession, assay_name, kind, rettype):
         if translate_sample_names or data_columns:
             repr_df = assay.get_processed_data(
                 translate_sample_names=translate_sample_names,
-                spaces_in_sample_names=spaces_in_sample_names,
                 data_columns=data_columns
             )
         else:
