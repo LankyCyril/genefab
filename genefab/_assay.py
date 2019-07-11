@@ -150,22 +150,17 @@ class Assay():
     _fields, raw_metadata, metadata = None, None, None
     parent, glds_file_urls = None, None
     storage = None
-
     _normalized_data, _processed_data = None, None
     _indexed_by, _spaces_in_sample_names, _field_indexed_by = None, True, None
 
     def __init__(self, parent, name, json, glds_file_urls, storage_prefix, index_by="Sample Name", spaces_in_sample_names=True):
         """Parse JSON into assay metadata"""
-        self.parent = parent
-        self.name = name
+        self.parent, self.name, self._json = parent, name, json
         self.glds_file_urls = glds_file_urls
         self.storage = join(storage_prefix, name)
-        self._json = json
         self._raw, self._header = self._json["raw"], self._json["header"]
         # populate and freeze self._fields (this can be refactored...):
-        self._field2title = {
-            entry["field"]: entry["title"] for entry in self._header
-        }
+        self._field2title = {e["field"]: e["title"] for e in self._header}
         if len(self._field2title) != len(self._header):
             raise GeneLabJSONException("Conflicting IDs of data fields")
         self._fields = defaultdict(set)
