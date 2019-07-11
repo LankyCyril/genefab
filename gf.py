@@ -131,17 +131,14 @@ def assay_metadata(accession, assay_name, rettype):
     assay, message, status = get_assay(accession, assay_name, request.args)
     if assay is None:
         return message, status
-    elif request.args:
-        fields = set(unescape(request.args.get("fields", "")).split()) - {""}
-        index = set(unescape(request.args.get("index", "")).split()) - {""}
-        if len(index) and len(fields):
-            repr_df = assay.metadata.loc[list(index), list(fields)]
-        elif index:
-            repr_df = assay.metadata.loc[list(index)]
-        elif fields:
-            repr_df = assay.metadata[list(fields)]
-        else:
-            repr_df = assay.metadata.to_frame()
+    fields = set(unescape(request.args.get("fields", "")).split()) - {""}
+    index = set(unescape(request.args.get("index", "")).split()) - {""}
+    if len(index) and len(fields):
+        repr_df = assay.metadata.loc[list(index), list(fields)]
+    elif index:
+        repr_df = assay.metadata.loc[list(index)]
+    elif fields:
+        repr_df = assay.metadata[list(fields)]
     else:
         repr_df = assay.metadata.to_frame()
     return display_object(repr_df, rettype, index=True)
