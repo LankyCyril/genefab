@@ -2,7 +2,7 @@
 from flask import Flask, Response, request
 from genefab import GLDS, GeneLabJSONException
 from genefab._util import fetch_file
-from pandas import DataFrame, concat, option_context
+from pandas import DataFrame, option_context
 from json import dumps, JSONEncoder
 from html import escape, unescape
 from re import sub
@@ -13,6 +13,22 @@ app = Flask("genefab")
 def hello_space():
     """Hello, Space!"""
     return "Hello, {}!".format(request.args.get("name", "Space"))
+
+
+def ResponseError(mask, code, *args):
+    """Generate HTTP error code and message"""
+    if code == 400: explanation = "; bad request"
+    elif code == 404: explanation = "; not found"
+    elif code == 501: explanation = "; not implemented"
+    else: explanation = ""
+    if args:
+        converted_args = [
+            escape(str(arg)) if type(arg) == type(type) else arg for arg in args
+        ]
+        message = str(code) + explanation + ": " + mask.format(*converted_args)
+    else:
+        message = str(code) + explanation + ": " + mask
+    return message, code
 
 
 class SetEnc(JSONEncoder):
@@ -50,7 +66,7 @@ def display_object(obj, rettype, index="auto"):
                 obj_repr = sub(r'\s*,\s*', "\n", str(obj.iloc[0, 0]))
                 return Response(obj_repr, mimetype="text/plain")
             else:
-                return "400; bad request (multiple cells selected)", 400
+                return ResponseError("multiple cells selected", 400)
         elif rettype == "tsv":
             obj_repr = obj.to_csv(sep="\t", index=index, na_rep="")
             return Response(obj_repr, mimetype="text/plain")
@@ -65,10 +81,9 @@ def display_object(obj, rettype, index="auto"):
                 obj_repr = obj.to_json(index=index, orient="records")
                 return Response(obj_repr, mimetype="text/json")
         else:
-            return "400; bad request (wrong extension/type?)", 400
+            return ResponseError("wrong extension or type?", 400)
     else:
-        mask = "501; not implemented: {} cannot be displayed"
-        return mask.format(escape(str(type(obj)))), 501
+        return ResponseError("{} cannot be displayed", 501, type(obj))
 
 
 def get_bool(rargs, key, default_value):
@@ -97,7 +112,7 @@ def glds_summary(accession, rettype):
     try:
         glds = GLDS(accession)
     except GeneLabJSONException as e:
-        return "404; not found: {}".format(e), 404
+        return ResponseError("{}", 404, format(e))
     if rettype == "rawjson":
         return display_object([glds._json], "json")
     else:
@@ -146,8 +161,7 @@ def assay_summary(accession, assay_name, prop, rettype):
     elif prop == "factors":
         return display_object(assay.factor_values, rettype)
     else:
-        mask = "400; bad request: {} is not a valid property"
-        return mask.format(prop), 400
+        return ResponseError("{} is not a valid property", 400, prop)
 
 
 @app.route("/<accession>/<assay_name>/file/<filemask>", methods=["GET"])
@@ -159,9 +173,9 @@ def locate_file(accession, assay_name, filemask):
     try:
         url = assay._get_file_url(filemask)
     except GeneLabJSONException:
-        return "400; bad request: multiple files match mask", 400
+        return ResponseError("multiple files match mask", 400)
     if url is None:
-        return "404; not found: file not found", 404
+        return ResponseError("file not found", 404)
     else:
         local_filepath = fetch_file(filemask, url, assay.storage)
         with open(local_filepath, mode="rb") as handle:
@@ -195,11 +209,11 @@ def get_data(accession, assay_name, kind, rettype):
         else:
             repr_df = assay.processed_data
     else:
-        return "400; bad request: unknown data request", 400
+        return ResponseError("unknown data request", 400)
     nrows = request.args.get("head", None)
     if nrows:
         if nrows.isdigit():
             repr_df = repr_df[:int(nrows)]
         else:
-            return "400; bad request: 'head' must be positive integer", 400
+            return ResponseError("'head' must be positive integer", 400)
     return display_object(repr_df, rettype, index=True)
