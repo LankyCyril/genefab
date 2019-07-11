@@ -193,23 +193,18 @@ def get_data(accession, assay_name, kind, rettype):
         request.args.get("data_columns", None)
     )
     if kind == "normalized":
-        if translate_sample_names or data_columns:
-            repr_df = assay.get_normalized_data(
-                translate_sample_names=translate_sample_names,
-                data_columns=data_columns
-            )
-        else:
-            repr_df = assay.normalized_data
+        getter_func, getter_attr = assay.get_normalized_data, "normalized_data"
     elif kind in {"processed", "normalized_annotated"}:
-        if translate_sample_names or data_columns:
-            repr_df = assay.get_processed_data(
-                translate_sample_names=translate_sample_names,
-                data_columns=data_columns
-            )
-        else:
-            repr_df = assay.processed_data
+        getter_func, getter_attr = assay.get_processed_data, "processed_data"
     else:
         return ResponseError("unknown data request", 400)
+    if translate_sample_names or data_columns:
+        repr_df = getter_func(
+            translate_sample_names=translate_sample_names,
+            data_columns=data_columns
+        )
+    else:
+        repr_df = getattr(assay, getter_attr)
     nrows = request.args.get("head", None)
     if nrows:
         if nrows.isdigit():
