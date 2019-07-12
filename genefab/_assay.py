@@ -78,7 +78,7 @@ class AssayMetadata():
 
     def to_frame(self):
         """Raw metadata with multiindex columns (human-readable -> internal)"""
-        multicols = ["external_field", "internal_field"]
+        multicols = ["field", "internal_field"]
         fields_df = DataFrame(
             data=[[k, v] for k, vv in self.parent._fields.items() for v in vv],
             columns=multicols
@@ -94,7 +94,7 @@ class AssayMetadata():
             raise GeneLabException("Could not generate extended raw metadata")
         as_frame = self.parent.raw_metadata.copy()
         as_frame.columns = multiindex_df.set_index(multicols).index
-        return as_frame.sort_index(by="external_field", axis="columns")
+        return as_frame.sort_index(by="field", axis="columns")
 
     def __repr__(self):
         """Use the repr of the dataframe form"""
