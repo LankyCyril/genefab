@@ -4,7 +4,7 @@ from genefab import GLDS, GeneLabJSONException
 from genefab._util import fetch_file
 from pandas import DataFrame, option_context
 from json import dumps, JSONEncoder
-from html import escape, unescape
+from html import escape
 from re import sub
 
 app = Flask("genefab")
@@ -92,11 +92,6 @@ def argget_bool(rargs, key, default_value):
     return (raw_value not in {"False", "0"}) and bool(raw_value)
 
 
-def argget_set(rargs, key, default_value, sep=None):
-    """Get 'set' value from GET request args"""
-    return set(unescape(rargs.get(key, default_value)).split(sep)) - {""}
-
-
 def get_assay(accession, assay_name, rargs):
     """Get assay object via GLDS accession and assay name"""
     spaces_in_sample_names = argget_bool(rargs, "spaces_in_sample_names", True)
@@ -148,31 +143,29 @@ def assay_metadata(accession, assay_name, rettype):
     if assay is None:
         return message, status
     fields, internal_fields, index = (
-        argget_set(request.args, "fields", ""),
-        argget_set(request.args, "internal_fields", ""),
-        argget_set(request.args, "index", "")
+        request.args.get("fields", None),
+        request.args.get("internal_fields", None),
+        request.args.get("index", None)
     )
-    if len(fields) and len(internal_fields):
+    if fields and internal_fields:
         return ResponseError(
             "cannot use 'fields' and 'internal_fields' together", 400
         )
     if fields:
         if index:
-            repr_df = assay.metadata.loc[list(index), list(fields)]
+            repr_df = assay.metadata.loc[[index], [fields]]
         else:
-            repr_df = assay.metadata[list(fields)]
+            repr_df = assay.metadata[[fields]]
     elif internal_fields:
         try:
             if index:
-                repr_df = assay.raw_metadata.loc[
-                    list(index), list(internal_fields)
-                ]
+                repr_df = assay.raw_metadata.loc[[index], [internal_fields]]
             else:
-                repr_df = assay.raw_metadata[list(internal_fields)]
+                repr_df = assay.raw_metadata[[internal_fields]]
         except KeyError:
             repr_df = DataFrame()
     elif index:
-        repr_df = assay.metadata.loc[list(index)]
+        repr_df = assay.metadata.loc[[index]]
     else:
         repr_df = assay.metadata.to_frame()
     return display_object(repr_df, rettype, index=True)
