@@ -86,15 +86,20 @@ def display_object(obj, rettype, index="auto"):
         return ResponseError("{} cannot be displayed", 501, type(obj))
 
 
-def get_bool(rargs, key, default_value):
+def argget_bool(rargs, key, default_value):
     """Get boolean value from GET request args"""
     raw_value = rargs.get(key, default_value)
     return (raw_value not in {"False", "0"}) and bool(raw_value)
 
 
+def argget_set(rargs, key, default_value, sep=None):
+    """Get 'set' value from GET request args"""
+    return set(unescape(rargs.get(key, default_value)).split(sep)) - {""}
+
+
 def get_assay(accession, assay_name, rargs):
     """Get assay object via GLDS accession and assay name"""
-    spaces_in_sample_names = get_bool(rargs, "spaces_in_sample_names", True)
+    spaces_in_sample_names = argget_bool(rargs, "spaces_in_sample_names", True)
     try:
         glds = GLDS(accession, spaces_in_sample_names=spaces_in_sample_names)
     except GeneLabJSONException as e:
@@ -136,11 +141,6 @@ def assay_factors(accession, assay_name, rettype):
         return display_object(assay.factors, rettype, index=True)
 
 
-def get_set(rargs, key, default_value, sep=None):
-    """Get 'set' value from GET request args"""
-    return set(unescape(rargs.get(key, default_value)).split(sep)) - {""}
-
-
 @app.route("/<accession>/<assay_name>.<rettype>", methods=["GET", "POST"])
 def assay_metadata(accession, assay_name, rettype):
     """DataFrame view of metadata, optionally queried"""
@@ -148,9 +148,9 @@ def assay_metadata(accession, assay_name, rettype):
     if assay is None:
         return message, status
     fields, internal_fields, index = (
-        get_set(request.args, "fields", ""),
-        get_set(request.args, "internal_fields", ""),
-        get_set(request.args, "index", "")
+        argget_set(request.args, "fields", ""),
+        argget_set(request.args, "internal_fields", ""),
+        argget_set(request.args, "index", "")
     )
     if len(fields) and len(internal_fields):
         return ResponseError(
@@ -219,7 +219,7 @@ def get_data(accession, assay_name, kind, rettype):
     if assay is None:
         return message, status
     translate_sample_names, data_columns = (
-        get_bool(request.args, "translate_sample_names", False),
+        argget_bool(request.args, "translate_sample_names", False),
         request.args.get("data_columns", None)
     )
     if kind == "normalized":
