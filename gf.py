@@ -99,7 +99,14 @@ def get_assay(accession, assay_name, rargs):
         glds = GLDS(accession, spaces_in_sample_names=spaces_in_sample_names)
     except GeneLabJSONException as e:
         return None, "404; not found: {}".format(e), 404
-    if assay_name in glds.assays:
+    if assay_name == "assay":
+        if len(glds.assays) == 1:
+            assay_name = list(glds.assays.keys())[0]
+            return glds.assays[assay_name], None, 200
+        else:
+            mask = "400; bad request: ambiguous assay name {} for {}"
+            return None, mask.format(assay_name, accession), 400
+    elif assay_name in glds.assays:
         return glds.assays[assay_name], None, 200
     else:
         mask = "404; not found: assay {} does not exist under {}"
