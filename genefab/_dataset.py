@@ -11,11 +11,8 @@ from os.path import join
 
 class GeneLabDataSet():
     """Stores GLDS metadata associated with an accession number"""
-    accession = None
-    assays = None
-    file_urls = None
+    accession, assays, file_urls, storage = None, None, None, None
     verbose = False
-    storage = None
 
     def __init__(self, accession, verbose=False, storage_prefix=".genelab", index_by="Sample Name", spaces_in_sample_names=True):
         """Request JSON representation of ISA metadata and store fields"""
@@ -52,9 +49,7 @@ class GeneLabDataSet():
     @property
     def factors(self):
         """List factors"""
-        return [
-            factor_info["factor"] for factor_info in self.description["factors"]
-        ]
+        return [fi["factor"] for fi in self.description["factors"]]
 
     @property
     def _summary_dataframe(self):
@@ -67,11 +62,11 @@ class GeneLabDataSet():
             data=[["dataset", self.accession, factor] for factor in self.factors]
         )
         return concat([factors_df, assays_df.reset_index()], axis=0, sort=False)
- 
+
     def __repr__(self):
         """Use summary dataframe"""
         return repr(self._summary_dataframe)
- 
+
     def _get_file_urls(self, force_reload=False):
         """Get filenames and associated URLs"""
         if self.accession is None:
