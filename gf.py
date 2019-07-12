@@ -142,28 +142,14 @@ def assay_metadata(accession, assay_name, rettype):
     assay, message, status = get_assay(accession, assay_name, request.args)
     if assay is None:
         return message, status
-    fields, internal_fields, index = (
+    fields, index = (
         request.args.get("fields", None),
-        request.args.get("internal_fields", None),
         request.args.get("index", None)
     )
-    if fields and internal_fields:
-        return ResponseError(
-            "cannot use 'fields' and 'internal_fields' together", 400
-        )
-    if fields:
-        if index:
-            repr_df = assay.metadata.loc[[index], [fields]]
-        else:
-            repr_df = assay.metadata[[fields]]
-    elif internal_fields:
-        try:
-            if index:
-                repr_df = assay.raw_metadata.loc[[index], [internal_fields]]
-            else:
-                repr_df = assay.raw_metadata[[internal_fields]]
-        except KeyError:
-            repr_df = DataFrame()
+    if fields and index:
+        repr_df = assay.metadata.loc[[index], [fields]]
+    elif fields:
+        repr_df = assay.metadata[[fields]]
     elif index:
         repr_df = assay.metadata.loc[[index]]
     else:
