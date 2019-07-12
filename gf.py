@@ -136,20 +136,43 @@ def assay_factors(accession, assay_name, rettype):
         return display_object(assay.factors, rettype, index=True)
 
 
+def get_set(rargs, key, default_value, sep=None):
+    """Get 'set' value from GET request args"""
+    return set(unescape(rargs.get(key, default_value)).split(sep)) - {""}
+
+
 @app.route("/<accession>/<assay_name>.<rettype>", methods=["GET", "POST"])
 def assay_metadata(accession, assay_name, rettype):
     """DataFrame view of metadata, optionally queried"""
     assay, message, status = get_assay(accession, assay_name, request.args)
     if assay is None:
         return message, status
-    fields = set(unescape(request.args.get("fields", "")).split()) - {""}
-    index = set(unescape(request.args.get("index", "")).split()) - {""}
-    if len(index) and len(fields):
-        repr_df = assay.metadata.loc[list(index), list(fields)]
+    fields, internal_fields, index = (
+        get_set(request.args, "fields", ""),
+        get_set(request.args, "internal_fields", ""),
+        get_set(request.args, "index", "")
+    )
+    if len(fields) and len(internal_fields):
+        return ResponseError(
+            "cannot use 'fields' and 'internal_fields' together", 400
+        )
+    if fields:
+        if index:
+            repr_df = assay.metadata.loc[list(index), list(fields)]
+        else:
+            repr_df = assay.metadata[list(fields)]
+    elif internal_fields:
+        try:
+            if index:
+                repr_df = assay.raw_metadata.loc[
+                    list(index), list(internal_fields)
+                ]
+            else:
+                repr_df = assay.raw_metadata[list(internal_fields)]
+        except KeyError:
+            repr_df = DataFrame()
     elif index:
         repr_df = assay.metadata.loc[list(index)]
-    elif fields:
-        repr_df = assay.metadata[list(fields)]
     else:
         repr_df = assay.metadata.to_frame()
     return display_object(repr_df, rettype, index=True)
