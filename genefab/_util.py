@@ -10,6 +10,7 @@ from re import sub
 
 GENELAB_ROOT = "https://genelab-data.ndc.nasa.gov"
 API_ROOT = "https://genelab-data.ndc.nasa.gov/genelab"
+AS_IS = "as.is"
 
 
 def get_json(url, verbose=False):

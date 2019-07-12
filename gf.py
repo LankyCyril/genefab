@@ -94,9 +94,9 @@ def argget_bool(rargs, key, default_value):
 
 def get_assay(accession, assay_name, rargs):
     """Get assay object via GLDS accession and assay name"""
-    spaces_in_sample_names = argget_bool(rargs, "spaces_in_sample_names", True)
+    name_delim = rargs.get("name_delim", ".")
     try:
-        glds = GLDS(accession, spaces_in_sample_names=spaces_in_sample_names)
+        glds = GLDS(accession, name_delim=name_delim)
     except GeneLabJSONException as e:
         return None, "404; not found: {}".format(e), 404
     if assay_name == "assay":

@@ -14,7 +14,7 @@ class GeneLabDataSet():
     accession, assays, file_urls, storage = None, None, None, None
     verbose = False
 
-    def __init__(self, accession, verbose=False, storage_prefix=".genelab", index_by="Sample Name", spaces_in_sample_names=True):
+    def __init__(self, accession, verbose=False, storage_prefix=".genelab", index_by="Sample Name", name_delim="."):
         """Request JSON representation of ISA metadata and store fields"""
         self.accession = accession
         self.verbose = verbose
@@ -42,7 +42,7 @@ class GeneLabDataSet():
             )
         self.assays = AssayDispatcher(
             parent=self, json=self._info["assays"], storage_prefix=self.storage,
-            spaces_in_sample_names=spaces_in_sample_names, index_by=index_by,
+            name_delim=name_delim, index_by=index_by,
             glds_file_urls=self._get_file_urls()
         )
 

@@ -5,7 +5,7 @@ from collections import defaultdict
 from pandas import concat, Series, Index, DataFrame, read_csv, merge
 from re import search, fullmatch, split, IGNORECASE, sub
 from numpy import nan
-from ._util import fetch_file
+from ._util import fetch_file, AS_IS
 from copy import deepcopy
 
 
@@ -151,9 +151,9 @@ class Assay():
     parent, glds_file_urls = None, None
     storage = None
     _normalized_data, _processed_data = None, None
-    _indexed_by, _spaces_in_sample_names, _field_indexed_by = None, True, None
+    _indexed_by, _name_delim, _field_indexed_by = None, True, None
 
-    def __init__(self, parent, name, json, glds_file_urls, storage_prefix, index_by="Sample Name", spaces_in_sample_names=True):
+    def __init__(self, parent, name, json, glds_file_urls, storage_prefix, index_by, name_delim):
         """Parse JSON into assay metadata"""
         self.parent, self.name, self._json = parent, name, json
         self.glds_file_urls = glds_file_urls
@@ -177,10 +177,10 @@ class Assay():
             )
         self._indexed_by = maybe_indexed_by.pop()
         self.raw_metadata = self.raw_metadata.set_index(self._field_indexed_by)
-        self._spaces_in_sample_names = spaces_in_sample_names
-        if spaces_in_sample_names:
+        self._name_delim = name_delim
+        if name_delim != AS_IS:
             self.raw_metadata.index = self.raw_metadata.index.map(
-                lambda f: sub(r'[._-]', " ", f)
+                lambda f: sub(r'[._-]', name_delim, f)
             )
         del self._fields[self._indexed_by]
         # initialize indexing functions:
@@ -367,9 +367,9 @@ class Assay():
                 data.columns.name = self._indexed_by
                 if translate_sample_names:
                     data = self._translate_data_sample_names(data, data_columns)
-                if self._spaces_in_sample_names:
+                if self._name_delim != AS_IS:
                     data.columns = data.columns.map(
-                        lambda f: sub(r'[._-]', " ", f)
+                        lambda f: sub(r'[._-]', self._name_delim, f)
                     )
                 return data
         else:
@@ -424,7 +424,7 @@ class Assay():
 class AssayDispatcher(dict):
     """Contains Assay objects, indexable by name or by attributes"""
 
-    def __init__(self, parent, json, glds_file_urls, storage_prefix, index_by="Sample Name", spaces_in_sample_names=True):
+    def __init__(self, parent, json, glds_file_urls, storage_prefix, index_by, name_delim):
         """Populate dictionary of assay_name -> Assay()"""
         try:
             for assay_name, assay_json in json.items():
@@ -432,9 +432,8 @@ class AssayDispatcher(dict):
                     assay_name,
                     Assay(
                         parent, assay_name, assay_json, index_by=index_by,
-                        spaces_in_sample_names=spaces_in_sample_names,
-                        storage_prefix=storage_prefix,
-                        glds_file_urls=glds_file_urls,
+                        name_delim=name_delim, storage_prefix=storage_prefix,
+                        glds_file_urls=glds_file_urls
                     )
                 )
         except KeyError:
