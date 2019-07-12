@@ -46,14 +46,19 @@ class AssayMetadataLocator():
         """Query parent.raw_metadata with .loc, using field titles instead of internal field ids"""
         if isinstance(key, tuple): # called with .loc[x, y]
             try:
-                indices, titles = key
+                index_patterns, title_patterns = key
             except ValueError:
                 raise IndexError("Incorrect index for assay metadata")
-            else:
-                row_subset = self.parent.loc[indices]
+            else: # assume both indices and titles are collections of regexes
+                indices = set.union(*({
+                        ix for ix in self.parent.parent.raw_metadata.index
+                        if fullmatch(pattern, ix, flags=IGNORECASE)
+                    } for pattern in index_patterns
+                ))
+                row_subset = self.parent.loc[list(indices)]
                 field_titles = set.union(*(
                     self.parent.parent._match_field_titles(t, method=fullmatch)
-                    for t in titles
+                    for t in title_patterns
                 ))
                 fields = set.union(*(
                     self.parent.parent._fields[title]
@@ -64,7 +69,15 @@ class AssayMetadataLocator():
             if isinstance(key, DataFrame) and (key.shape[1] == 1):
                 # assume being indexed by boolean column, delegate to parent[]:
                 return self.parent[key]
-            else:
+            elif isinstance(key, (tuple, list, set)):
+                # assume it is a collection of regexes:
+                indices = set.union(*({
+                        ix for ix in self.parent.parent.raw_metadata.index
+                        if fullmatch(pattern, ix, flags=IGNORECASE)
+                    } for pattern in key
+                ))
+                return self.parent.parent.raw_metadata.loc[list(indices)]
+            else: # last resort; just pass it to raw_metadata directly
                 return self.parent.parent.raw_metadata.loc[key]
 
 
@@ -110,6 +123,7 @@ class AssayMetadata():
             else:
                 raise IndexError("Cannot index by arbitrary DataFrame")
         if isinstance(patterns, (tuple, list, set, Series, Index)):
+            # assume being indexed by column name regex:
             titles = set.union(set(), *(
                 self.parent._match_field_titles(p, method=fullmatch)
                 for p in patterns
