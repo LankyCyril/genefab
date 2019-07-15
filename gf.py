@@ -250,7 +250,7 @@ def argget_bool(rargs, key, default_value):
     return (raw_value not in {"False", "0"}) and bool(raw_value)
 
 
-@app.route("/<accession>/<assay_name>/<kind>_data/", methods=["GET"])
+@app.route("/<accession>/<assay_name>/data/<kind>/", methods=["GET"])
 def get_table_data(accession, assay_name, kind):
     """Serve up normalized/processed data"""
     assay, message, status = get_assay(accession, assay_name, request.args)
