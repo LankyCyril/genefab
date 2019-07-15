@@ -51,29 +51,29 @@ def to_dataframe(obj):
         return DataFrame(columns=["value"], data=obj)
 
 
-def display_object(obj, rettype, index="auto"):
-    """Select appropriate converter and mimetype for rettype"""
+def display_object(obj, fmt, index="auto"):
+    """Select appropriate converter and mimetype for fmt"""
     if isinstance(obj, (dict, tuple, list)):
-        if rettype == "json":
+        if fmt == "json":
             return Response(dumps(obj, cls=SetEnc), mimetype="text/json")
         else:
             obj, index = to_dataframe(obj), False
     if index == "auto":
-        index = (rettype == "json")
+        index = (fmt == "json")
     if isinstance(obj, DataFrame):
-        if rettype == "list":
+        if fmt == "list":
             if obj.shape == (1, 1):
                 obj_repr = sub(r'\s*,\s*', "\n", str(obj.iloc[0, 0]))
                 return Response(obj_repr, mimetype="text/plain")
             else:
                 return ResponseError("multiple cells selected", 400)
-        elif rettype == "tsv":
+        elif fmt == "tsv":
             obj_repr = obj.to_csv(sep="\t", index=index, na_rep="")
             return Response(obj_repr, mimetype="text/plain")
-        elif rettype == "html":
+        elif fmt == "html":
             with option_context("display.max_colwidth", -1):
                 return obj.to_html(index=index, na_rep="", justify="left")
-        elif rettype == "json":
+        elif fmt == "json":
             try:
                 obj_repr = obj.to_json(index=index, orient="index")
                 return Response(obj_repr, mimetype="text/json")
@@ -113,27 +113,36 @@ def get_assay(accession, assay_name, rargs):
         return None, mask.format(assay_name, accession), 404
 
 
-@app.route("/<accession>.<rettype>")
-def glds_summary(accession, rettype):
+def parse_rargs(rargs):
+    """Get all common arguments from request.args"""
+    return {
+        "fmt": rargs.get("fmt", "raw")
+    }
+
+
+@app.route("/<accession>/", methods=["GET"])
+def glds_summary(accession):
     """Report factors, assays, and/or raw JSON"""
     try:
         glds = GLDS(accession)
     except GeneLabJSONException as e:
         return ResponseError("{}", 404, format(e))
-    if rettype == "rawjson":
+    rargdict = parse_rargs(request.args)
+    if rargdict["fmt"] == "raw":
         return display_object([glds._json], "json")
     else:
-        return display_object(glds._summary_dataframe, rettype)
+        return display_object(glds._summary_dataframe, rargdict["fmt"])
 
 
-@app.route("/<accession>/<assay_name>/factors.<rettype>", methods=["GET"])
-def assay_factors(accession, assay_name, rettype):
+@app.route("/<accession>/<assay_name>/factors/", methods=["GET"])
+def assay_factors(accession, assay_name):
     """DataFrame of samples and factors in human-readable form"""
     assay, message, status = get_assay(accession, assay_name, request.args)
     if assay is None:
         return message, status
     else:
-        return display_object(assay.factors, rettype, index=True)
+        rargdict = parse_rargs(request.args)
+        return display_object(assay.factors, rargdict["fmt"], index=True)
 
 
 def subset_metadata(metadata, rargs):
@@ -152,34 +161,36 @@ def subset_metadata(metadata, rargs):
     return repr_df, is_subset
 
 
-@app.route("/<accession>/<assay_name>.<rettype>", methods=["GET", "POST"])
-def assay_metadata(accession, assay_name, rettype):
+@app.route("/<accession>/<assay_name>/", methods=["GET", "POST"])
+def assay_metadata(accession, assay_name):
     """DataFrame view of metadata, optionally queried"""
     assay, message, status = get_assay(accession, assay_name, request.args)
     if assay is None:
         return message, status
     subset, _ = subset_metadata(assay.metadata, request.args)
-    return display_object(subset, rettype, index=True)
+    rargdict = parse_rargs(request.args)
+    return display_object(subset, rargdict["fmt"], index=True)
 
 
-@app.route("/<accession>/<assay_name>/<prop>.<rettype>", methods=["GET"])
-def assay_summary(accession, assay_name, prop, rettype):
+@app.route("/<accession>/<assay_name>/<prop>/", methods=["GET"])
+def assay_summary(accession, assay_name, prop):
     """Provide overview of samples, fields, factors in metadata"""
     assay, message, status = get_assay(accession, assay_name, request.args)
     if assay is None:
         return message, status
+    rargdict = parse_rargs(request.args)
     if prop == "fields":
-        return display_object(assay._fields, rettype)
+        return display_object(assay._fields, rargdict["fmt"])
     elif prop == "index":
-        return display_object(list(assay.raw_metadata.index), rettype)
+        return display_object(list(assay.raw_metadata.index), rargdict["fmt"])
     elif prop == "factors":
-        return display_object(assay.factor_values, rettype)
+        return display_object(assay.factor_values, rargdict["fmt"])
     else:
         return ResponseError("{} is not a valid property", 400, prop)
 
 
-@app.route("/<accession>/<assay_name>/<kind>_data.<rettype>", methods=["GET"])
-def get_table_data(accession, assay_name, kind, rettype):
+@app.route("/<accession>/<assay_name>/<kind>_data/", methods=["GET"])
+def get_table_data(accession, assay_name, kind):
     """Serve up normalized/processed data"""
     assay, message, status = get_assay(accession, assay_name, request.args)
     if assay is None:
@@ -209,7 +220,8 @@ def get_table_data(accession, assay_name, kind, rettype):
             repr_df = repr_df[:int(nrows)]
         else:
             return ResponseError("'head' must be positive integer", 400)
-    return display_object(repr_df, rettype, index=True)
+    rargdict = parse_rargs(request.args)
+    return display_object(repr_df, rargdict["fmt"], index=True)
 
 
 def filter_cells(subset, filename_filter):
