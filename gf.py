@@ -5,7 +5,7 @@ from genefab._util import fetch_file
 from pandas import DataFrame, option_context
 from json import dumps, JSONEncoder
 from html import escape
-from re import sub
+from re import sub, split, search
 
 app = Flask("genefab")
 
@@ -136,25 +136,30 @@ def assay_factors(accession, assay_name, rettype):
         return display_object(assay.factors, rettype, index=True)
 
 
+def subset_metadata(metadata, rargs):
+    """Subset metadata by fields and index"""
+    fields, index = rargs.get("fields", None), rargs.get("index", None)
+    is_subset = True
+    if fields and index:
+        repr_df = metadata.loc[[index], [fields]]
+    elif fields:
+        repr_df = metadata[[fields]]
+    elif index:
+        repr_df = metadata.loc[[index]]
+    else:
+        repr_df = metadata.to_frame()
+        is_subset = False
+    return repr_df, is_subset
+
+
 @app.route("/<accession>/<assay_name>.<rettype>", methods=["GET", "POST"])
 def assay_metadata(accession, assay_name, rettype):
     """DataFrame view of metadata, optionally queried"""
     assay, message, status = get_assay(accession, assay_name, request.args)
     if assay is None:
         return message, status
-    fields, index = (
-        request.args.get("fields", None),
-        request.args.get("index", None)
-    )
-    if fields and index:
-        repr_df = assay.metadata.loc[[index], [fields]]
-    elif fields:
-        repr_df = assay.metadata[[fields]]
-    elif index:
-        repr_df = assay.metadata.loc[[index]]
-    else:
-        repr_df = assay.metadata.to_frame()
-    return display_object(repr_df, rettype, index=True)
+    subset, _ = subset_metadata(assay.metadata, request.args)
+    return display_object(subset, rettype, index=True)
 
 
 @app.route("/<accession>/<assay_name>/<prop>.<rettype>", methods=["GET"])
@@ -173,26 +178,8 @@ def assay_summary(accession, assay_name, prop, rettype):
         return ResponseError("{} is not a valid property", 400, prop)
 
 
-@app.route("/<accession>/<assay_name>/file/<filemask>")
-def expose_file(accession, assay_name, filemask):
-    """Find file URL that matches filemask, redirect to download"""
-    assay, message, status = get_assay(accession, assay_name, request.args)
-    if assay is None:
-        return message, status
-    try:
-        url = assay._get_file_url(filemask)
-    except GeneLabJSONException:
-        return ResponseError("multiple files match mask", 400)
-    if url is None:
-        return ResponseError("file not found", 404)
-    else:
-        local_filepath = fetch_file(filemask, url, assay.storage)
-        with open(local_filepath, mode="rb") as handle:
-            return Response(handle.read(), mimetype="application")
-
-
 @app.route("/<accession>/<assay_name>/<kind>_data.<rettype>", methods=["GET"])
-def get_data(accession, assay_name, kind, rettype):
+def get_table_data(accession, assay_name, kind, rettype):
     """Serve up normalized/processed data"""
     assay, message, status = get_assay(accession, assay_name, request.args)
     if assay is None:
@@ -223,3 +210,49 @@ def get_data(accession, assay_name, kind, rettype):
         else:
             return ResponseError("'head' must be positive integer", 400)
     return display_object(repr_df, rettype, index=True)
+
+
+def filter_cells(subset, filename_filter):
+    """Filter values in cells based on filename filter"""
+    filtered_values = set()
+    for cell in map(str, subset.values.flatten()):
+        filenames = split(r'[,\s]+', cell)
+        for filename in filenames:
+            if search(filename_filter, filename):
+                filtered_values.add(filename)
+    return filtered_values
+
+
+def serve_file_data(assay, filemask, fmt="raw"):
+    """Find file URL that matches filemask, redirect to download or interpret"""
+    try:
+        url = assay._get_file_url(filemask)
+    except GeneLabJSONException:
+        return ResponseError("multiple files match mask", 400)
+    if url is None:
+        return ResponseError("file not found", 404)
+    local_filepath = fetch_file(filemask, url, assay.storage)
+    if fmt == "raw":
+        with open(local_filepath, mode="rb") as handle:
+            return Response(handle.read(), mimetype="application")
+    else:
+        return ResponseError("coming soon", 501)
+
+
+@app.route("/<accession>/<assay_name>/data/", methods=["GET"])
+def get_data(accession, assay_name):
+    """Serve any kind of data"""
+    assay, message, status = get_assay(accession, assay_name, request.args)
+    if assay is None:
+        return message, status
+    subset, is_subset = subset_metadata(assay.metadata, request.args)
+    if not is_subset:
+        return ResponseError("no entries selected", 400)
+    filename_filter = request.args.get("filter", r'.*')
+    filtered_values = filter_cells(subset, filename_filter)
+    if len(filtered_values) == 0:
+        return ResponseError("no data", 404)
+    elif len(filtered_values) > 1:
+        return ResponseError("multiple data files match search criteria", 400)
+    else:
+        return serve_file_data(assay, filtered_values.pop())
