@@ -53,6 +53,8 @@ def to_dataframe(obj):
 
 def display_object(obj, fmt, index="auto"):
     """Select appropriate converter and mimetype for fmt"""
+    if fmt is None:
+        fmt = "tsv"
     if isinstance(obj, (dict, tuple, list)):
         if fmt == "json":
             return Response(dumps(obj, cls=SetEnc), mimetype="text/json")
@@ -116,7 +118,7 @@ def get_assay(accession, assay_name, rargs):
 def parse_rargs(rargs):
     """Get all common arguments from request.args"""
     return {
-        "fmt": rargs.get("fmt", "raw")
+        "fmt": rargs.get("fmt", None)
     }
 
 
@@ -235,7 +237,7 @@ def filter_cells(subset, filename_filter):
     return filtered_values
 
 
-def serve_file_data(assay, filemask, fmt="raw"):
+def serve_file_data(assay, filemask, rargs):
     """Find file URL that matches filemask, redirect to download or interpret"""
     try:
         url = assay._get_file_url(filemask)
@@ -244,7 +246,8 @@ def serve_file_data(assay, filemask, fmt="raw"):
     if url is None:
         return ResponseError("file not found", 404)
     local_filepath = fetch_file(filemask, url, assay.storage)
-    if fmt == "raw":
+    rargdict = parse_rargs(rargs)
+    if rargdict["fmt"] == "raw":
         with open(local_filepath, mode="rb") as handle:
             return Response(handle.read(), mimetype="application")
     else:
@@ -267,4 +270,4 @@ def get_data(accession, assay_name):
     elif len(filtered_values) > 1:
         return ResponseError("multiple data files match search criteria", 400)
     else:
-        return serve_file_data(assay, filtered_values.pop())
+        return serve_file_data(assay, filtered_values.pop(), request.args)
