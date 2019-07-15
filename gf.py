@@ -86,17 +86,19 @@ def display_object(obj, fmt, index="auto"):
         return ResponseError("{} cannot be displayed", 501, type(obj))
 
 
-def argget_bool(rargs, key, default_value):
-    """Get boolean value from GET request args"""
-    raw_value = rargs.get(key, default_value)
-    return (raw_value not in {"False", "0"}) and bool(raw_value)
+def parse_rargs(rargs):
+    """Get all common arguments from request.args"""
+    return {
+        "fmt": rargs.get("fmt", "tsv"),
+        "name_delim": rargs.get("name_delim", AS_IS)
+    }
 
 
 def get_assay(accession, assay_name, rargs):
     """Get assay object via GLDS accession and assay name"""
-    name_delim = rargs.get("name_delim", AS_IS)
+    rargdict = parse_rargs(rargs)
     try:
-        glds = GLDS(accession, name_delim=name_delim)
+        glds = GLDS(accession, name_delim=rargdict["name_delim"])
     except GeneLabJSONException as e:
         return None, "404; not found: {}".format(e), 404
     if assay_name == "assay":
@@ -113,39 +115,6 @@ def get_assay(accession, assay_name, rargs):
         return None, mask.format(assay_name, accession), 404
 
 
-def parse_rargs(rargs):
-    """Get all common arguments from request.args"""
-    return {
-        "fmt": rargs.get("fmt", "tsv"),
-        "name_delim": rargs.get("name_delim", AS_IS)
-    }
-
-
-@app.route("/<accession>/", methods=["GET"])
-def glds_summary(accession):
-    """Report factors, assays, and/or raw JSON"""
-    try:
-        glds = GLDS(accession)
-    except GeneLabJSONException as e:
-        return ResponseError("{}", 404, format(e))
-    rargdict = parse_rargs(request.args)
-    if rargdict["fmt"] == "raw":
-        return display_object([glds._json], "json")
-    else:
-        return display_object(glds._summary_dataframe, rargdict["fmt"])
-
-
-@app.route("/<accession>/<assay_name>/factors/", methods=["GET"])
-def assay_factors(accession, assay_name):
-    """DataFrame of samples and factors in human-readable form"""
-    assay, message, status = get_assay(accession, assay_name, request.args)
-    if assay is None:
-        return message, status
-    else:
-        rargdict = parse_rargs(request.args)
-        return display_object(assay.factors, rargdict["fmt"], index=True)
-
-
 def subset_metadata(metadata, rargs):
     """Subset metadata by fields and index"""
     fields, index = rargs.get("fields", None), rargs.get("index", None)
@@ -160,69 +129,6 @@ def subset_metadata(metadata, rargs):
         repr_df = metadata.to_frame()
         is_subset = False
     return repr_df, is_subset
-
-
-@app.route("/<accession>/<assay_name>/", methods=["GET", "POST"])
-def assay_metadata(accession, assay_name):
-    """DataFrame view of metadata, optionally queried"""
-    assay, message, status = get_assay(accession, assay_name, request.args)
-    if assay is None:
-        return message, status
-    subset, _ = subset_metadata(assay.metadata, request.args)
-    rargdict = parse_rargs(request.args)
-    return display_object(subset, rargdict["fmt"], index=True)
-
-
-@app.route("/<accession>/<assay_name>/<prop>/", methods=["GET"])
-def assay_summary(accession, assay_name, prop):
-    """Provide overview of samples, fields, factors in metadata"""
-    assay, message, status = get_assay(accession, assay_name, request.args)
-    if assay is None:
-        return message, status
-    rargdict = parse_rargs(request.args)
-    if prop == "fields":
-        return display_object(assay._fields, rargdict["fmt"])
-    elif prop == "index":
-        return display_object(list(assay.raw_metadata.index), rargdict["fmt"])
-    elif prop == "factors":
-        return display_object(assay.factor_values, rargdict["fmt"])
-    else:
-        return ResponseError("{} is not a valid property", 400, prop)
-
-
-@app.route("/<accession>/<assay_name>/<kind>_data/", methods=["GET"])
-def get_table_data(accession, assay_name, kind):
-    """Serve up normalized/processed data"""
-    assay, message, status = get_assay(accession, assay_name, request.args)
-    if assay is None:
-        return message, status
-    translate_sample_names, data_columns = (
-        argget_bool(request.args, "translate_sample_names", False),
-        request.args.get("data_columns", None)
-    )
-    if kind == "normalized":
-        getter_func, getter_attr = assay.get_normalized_data, "normalized_data"
-    elif kind in {"processed", "normalized_annotated"}:
-        getter_func, getter_attr = assay.get_processed_data, "processed_data"
-    else:
-        return ResponseError("unknown data request", 400)
-    if translate_sample_names or data_columns:
-        repr_df = getter_func(
-            translate_sample_names=translate_sample_names,
-            data_columns=data_columns
-        )
-    else:
-        repr_df = getattr(assay, getter_attr)
-    if repr_df is None:
-        return ResponseError("data not available", 404)
-    nrows = request.args.get("head", None)
-    if nrows:
-        if nrows.isdigit():
-            repr_df = repr_df[:int(nrows)]
-        else:
-            return ResponseError("'head' must be positive integer", 400)
-    rargdict = parse_rargs(request.args)
-    return display_object(repr_df, rargdict["fmt"], index=True)
 
 
 def filter_cells(subset, filename_filter):
@@ -263,6 +169,59 @@ def serve_file_data(assay, filemask, rargs):
         return ResponseError("fmt={}".format(rargdict["fmt"]), 501)
 
 
+@app.route("/<accession>/", methods=["GET"])
+def glds_summary(accession):
+    """Report factors, assays, and/or raw JSON"""
+    try:
+        glds = GLDS(accession)
+    except GeneLabJSONException as e:
+        return ResponseError("{}", 404, format(e))
+    rargdict = parse_rargs(request.args)
+    if rargdict["fmt"] == "raw":
+        return display_object([glds._json], "json")
+    else:
+        return display_object(glds._summary_dataframe, rargdict["fmt"])
+
+
+@app.route("/<accession>/<assay_name>/factors/", methods=["GET"])
+def assay_factors(accession, assay_name):
+    """DataFrame of samples and factors in human-readable form"""
+    assay, message, status = get_assay(accession, assay_name, request.args)
+    if assay is None:
+        return message, status
+    else:
+        rargdict = parse_rargs(request.args)
+        return display_object(assay.factors, rargdict["fmt"], index=True)
+
+
+@app.route("/<accession>/<assay_name>/", methods=["GET", "POST"])
+def assay_metadata(accession, assay_name):
+    """DataFrame view of metadata, optionally queried"""
+    assay, message, status = get_assay(accession, assay_name, request.args)
+    if assay is None:
+        return message, status
+    subset, _ = subset_metadata(assay.metadata, request.args)
+    rargdict = parse_rargs(request.args)
+    return display_object(subset, rargdict["fmt"], index=True)
+
+
+@app.route("/<accession>/<assay_name>/<prop>/", methods=["GET"])
+def assay_summary(accession, assay_name, prop):
+    """Provide overview of samples, fields, factors in metadata"""
+    assay, message, status = get_assay(accession, assay_name, request.args)
+    if assay is None:
+        return message, status
+    rargdict = parse_rargs(request.args)
+    if prop == "fields":
+        return display_object(assay._fields, rargdict["fmt"])
+    elif prop == "index":
+        return display_object(list(assay.raw_metadata.index), rargdict["fmt"])
+    elif prop == "factors":
+        return display_object(assay.factor_values, rargdict["fmt"])
+    else:
+        return ResponseError("{} is not a valid property", 400, prop)
+
+
 @app.route("/<accession>/<assay_name>/data/", methods=["GET"])
 def get_data(accession, assay_name):
     """Serve any kind of data"""
@@ -280,3 +239,47 @@ def get_data(accession, assay_name):
         return ResponseError("multiple data files match search criteria", 400)
     else:
         return serve_file_data(assay, filtered_values.pop(), request.args)
+
+
+###################### Below this point: deprecated URLs #######################
+
+
+def argget_bool(rargs, key, default_value):
+    """Get boolean value from GET request args"""
+    raw_value = rargs.get(key, default_value)
+    return (raw_value not in {"False", "0"}) and bool(raw_value)
+
+
+@app.route("/<accession>/<assay_name>/<kind>_data/", methods=["GET"])
+def get_table_data(accession, assay_name, kind):
+    """Serve up normalized/processed data"""
+    assay, message, status = get_assay(accession, assay_name, request.args)
+    if assay is None:
+        return message, status
+    translate_sample_names, data_columns = (
+        argget_bool(request.args, "translate_sample_names", False),
+        request.args.get("data_columns", None)
+    )
+    if kind == "normalized":
+        getter_func, getter_attr = assay.get_normalized_data, "normalized_data"
+    elif kind in {"processed", "normalized_annotated"}:
+        getter_func, getter_attr = assay.get_processed_data, "processed_data"
+    else:
+        return ResponseError("unknown data request", 400)
+    if translate_sample_names or data_columns:
+        repr_df = getter_func(
+            translate_sample_names=translate_sample_names,
+            data_columns=data_columns
+        )
+    else:
+        repr_df = getattr(assay, getter_attr)
+    if repr_df is None:
+        return ResponseError("data not available", 404)
+    nrows = request.args.get("head", None)
+    if nrows:
+        if nrows.isdigit():
+            repr_df = repr_df[:int(nrows)]
+        else:
+            return ResponseError("'head' must be positive integer", 400)
+    rargdict = parse_rargs(request.args)
+    return display_object(repr_df, rargdict["fmt"], index=True)
