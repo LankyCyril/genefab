@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 from flask import Flask, Response, request
 from genefab import GLDS, GeneLabJSONException
-from genefab._util import fetch_file
-from pandas import DataFrame, option_context
+from genefab._util import fetch_file, AS_IS
+from pandas import DataFrame, option_context, read_csv
 from json import dumps, JSONEncoder
 from html import escape
 from re import sub, split, search
@@ -94,7 +94,7 @@ def argget_bool(rargs, key, default_value):
 
 def get_assay(accession, assay_name, rargs):
     """Get assay object via GLDS accession and assay name"""
-    name_delim = rargs.get("name_delim", ".")
+    name_delim = rargs.get("name_delim", AS_IS)
     try:
         glds = GLDS(accession, name_delim=name_delim)
     except GeneLabJSONException as e:
@@ -116,7 +116,8 @@ def get_assay(accession, assay_name, rargs):
 def parse_rargs(rargs):
     """Get all common arguments from request.args"""
     return {
-        "fmt": rargs.get("fmt", "tsv")
+        "fmt": rargs.get("fmt", "tsv"),
+        "name_delim": rargs.get("name_delim", AS_IS)
     }
 
 
@@ -248,6 +249,16 @@ def serve_file_data(assay, filemask, rargs):
     if rargdict["fmt"] == "raw":
         with open(local_filepath, mode="rb") as handle:
             return Response(handle.read(), mimetype="application")
+    elif rargdict["fmt"] in {"tsv", "json"}:
+        try:
+            repr_df = read_csv(local_filepath, sep="\t", index_col=0)
+        except Exception as e:
+            return ResponseError(format(e), 400)
+        if rargdict["name_delim"] != AS_IS:
+            repr_df.columns = repr_df.columns.map(
+                lambda f: sub(r'[._-]', rargdict["name_delim"], f)
+            )
+        return display_object(repr_df, rargdict["fmt"], index=True)
     else:
         return ResponseError("fmt={}".format(rargdict["fmt"]), 501)
 
