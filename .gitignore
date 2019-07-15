@@ -10,3 +10,4 @@ genefab/__init__.pyc
 sandbox*.ipynb
 data
 .genelab
+__pycache__
