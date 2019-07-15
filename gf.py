@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 from flask import Flask, Response, request
 from genefab import GLDS, GeneLabJSONException
-from genefab._util import fetch_file, AS_IS
+from genefab._util import fetch_file, DELIM_AS_IS, DELIM_DEFAULT
 from pandas import DataFrame, option_context, read_csv
 from json import dumps, JSONEncoder
 from html import escape
@@ -90,7 +90,7 @@ def parse_rargs(rargs):
     """Get all common arguments from request.args"""
     return {
         "fmt": rargs.get("fmt", "tsv"),
-        "name_delim": rargs.get("name_delim", AS_IS)
+        "name_delim": rargs.get("name_delim", DELIM_DEFAULT)
     }
 
 
@@ -160,7 +160,7 @@ def serve_file_data(assay, filemask, rargs):
             repr_df = read_csv(local_filepath, sep="\t", index_col=0)
         except Exception as e:
             return ResponseError(format(e), 400)
-        if rargdict["name_delim"] != AS_IS:
+        if rargdict["name_delim"] != DELIM_AS_IS:
             repr_df.columns = repr_df.columns.map(
                 lambda f: sub(r'[._-]', rargdict["name_delim"], f)
             )
