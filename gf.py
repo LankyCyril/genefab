@@ -53,8 +53,6 @@ def to_dataframe(obj):
 
 def display_object(obj, fmt, index="auto"):
     """Select appropriate converter and mimetype for fmt"""
-    if fmt is None:
-        fmt = "tsv"
     if isinstance(obj, (dict, tuple, list)):
         if fmt == "json":
             return Response(dumps(obj, cls=SetEnc), mimetype="text/json")
@@ -118,7 +116,7 @@ def get_assay(accession, assay_name, rargs):
 def parse_rargs(rargs):
     """Get all common arguments from request.args"""
     return {
-        "fmt": rargs.get("fmt", None)
+        "fmt": rargs.get("fmt", "tsv")
     }
 
 
@@ -251,7 +249,7 @@ def serve_file_data(assay, filemask, rargs):
         with open(local_filepath, mode="rb") as handle:
             return Response(handle.read(), mimetype="application")
     else:
-        return ResponseError("coming soon", 501)
+        return ResponseError("fmt={}".format(rargdict["fmt"]), 501)
 
 
 @app.route("/<accession>/<assay_name>/data/", methods=["GET"])
