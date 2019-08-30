@@ -11,7 +11,7 @@ from re import sub
 GENELAB_ROOT = "https://genelab-data.ndc.nasa.gov"
 API_ROOT = "https://genelab-data.ndc.nasa.gov/genelab"
 DELIM_AS_IS = "as.is"
-DELIM_DEFAULT = "."
+DELIM_DEFAULT = "-"
 
 
 def get_json(url, verbose=False):
