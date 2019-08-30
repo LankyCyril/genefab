@@ -149,8 +149,10 @@ def melt_file_data(repr_df, melting):
     foundry = foundry.reset_index().melt(id_vars="Sample Name")
     if melting is True:
         return foundry
-    else:
+    elif isinstance(melting, DataFrame):
         return merge(melting.T.reset_index(), foundry, how="outer")
+    else:
+        raise TypeError("cannot annotate with a non-dataframe object")
 
 
 def serve_file_data(assay, filemask, rargs, melting=False):
@@ -179,7 +181,10 @@ def serve_file_data(assay, filemask, rargs, melting=False):
                 lambda f: sub(r'[._-]', rargdict["name_delim"], f)
             )
         if melting is not False:
-            repr_df = melt_file_data(repr_df, melting=melting)
+            try:
+                repr_df = melt_file_data(repr_df, melting=melting)
+            except Exception as e:
+                return ResponseError(format(e), 400)
         return display_object(repr_df, rargdict["fmt"], index=True)
     else:
         return ResponseError("fmt={}".format(rargdict["fmt"]), 501)
@@ -266,15 +271,20 @@ def get_data(accession, assay_name):
         return ResponseError("no data", 404)
     elif len(filtered_values) > 1:
         return ResponseError("multiple data files match search criteria", 400)
-    elif request.args.get("annotated", "0") == "1":
-        return serve_file_data(
-            assay, filtered_values.pop(), request.args,
-            melting=assay.annotation()
-        )
-    elif request.args.get("melted", "0") == "1":
-        return serve_file_data(
-            assay, filtered_values.pop(), request.args,
-            melting=True
-        )
     else:
-        return serve_file_data(assay, filtered_values.pop(), request.args)
+        try:
+            if request.args.get("annotated", "0") == "1":
+                return serve_file_data(
+                    assay, filtered_values.pop(), request.args,
+                    melting=assay.annotation()
+                )
+            elif request.args.get("melted", "0") == "1":
+                return serve_file_data(
+                    assay, filtered_values.pop(), request.args, melting=True
+                )
+            else:
+                return serve_file_data(
+                    assay, filtered_values.pop(), request.args
+                )
+        except Exception as e:
+            return ResponseError(format(e), 400)
