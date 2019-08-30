@@ -202,11 +202,11 @@ def assay_annotation(accession, assay_name):
         return message, status
     else:
         rargdict = parse_rargs(request.args)
-        differential_annotation = rargdict.get("diff", True)
-        return display_object(
-            assay.annotation(differential_annotation=differential_annotation),
-            rargdict["fmt"], index=True
+        annotation = assay.annotation(
+            differential_annotation=rargdict.get("diff", True),
+            named_only=rargdict.get("named_only", True)
         )
+        return display_object(annotation, rargdict["fmt"], index=True)
 
 
 @app.route("/<accession>/<assay_name>/", methods=["GET", "POST"])

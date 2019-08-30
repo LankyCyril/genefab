@@ -273,7 +273,7 @@ class Assay():
         )
         return factors_dataframe
 
-    def annotation(self, differential_annotation=True, index_by="Sample Name"):
+    def annotation(self, differential_annotation=True, named_only=True, index_by="Sample Name"):
         """Get annotation of samples: entries that differ (default) or all entries"""
         samples_key = sub(r'^a', "s", self.name)
         annotation_dataframe = concat([
@@ -284,8 +284,14 @@ class Assay():
             entry["field"]: entry["title"]
             for entry in self.parent.samples[samples_key]["header"]
         }
+        if named_only:
+            index_subset = [
+                field for field in annotation_dataframe.index
+                if field in samples_field2title
+            ]
+            annotation_dataframe = annotation_dataframe.loc[index_subset]
         annotation_dataframe.index = annotation_dataframe.index.map(
-            lambda f: samples_field2title.get(f, f)
+            lambda field: samples_field2title.get(field, field)
         )
         if differential_annotation:
             differential_rows = annotation_dataframe.apply(
