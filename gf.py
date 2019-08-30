@@ -142,7 +142,15 @@ def filter_cells(subset, filename_filter):
     return filtered_values
 
 
-def serve_file_data(assay, filemask, rargs):
+def melt_file_data(repr_df, melt_via):
+    """Melt dataframe with the use of sample annotation"""
+    foundry = repr_df.T
+    foundry.index.name = "Sample Name"
+    foundry = foundry.reset_index()
+    return foundry.melt(id_vars="Sample Name")
+
+
+def serve_file_data(assay, filemask, rargs, melt_via=None):
     """Find file URL that matches filemask, redirect to download or interpret"""
     try:
         url = assay._get_file_url(filemask)
@@ -153,8 +161,11 @@ def serve_file_data(assay, filemask, rargs):
     local_filepath = fetch_file(filemask, url, assay.storage)
     rargdict = parse_rargs(rargs)
     if rargdict["fmt"] == "raw":
-        with open(local_filepath, mode="rb") as handle:
-            return Response(handle.read(), mimetype="application")
+        if melt_via is not None:
+            return ResponseError("cannot melt raw object", 400)
+        else:
+            with open(local_filepath, mode="rb") as handle:
+                return Response(handle.read(), mimetype="application")
     elif rargdict["fmt"] in {"tsv", "json"}:
         try:
             repr_df = read_csv(local_filepath, sep="\t", index_col=0)
@@ -164,6 +175,8 @@ def serve_file_data(assay, filemask, rargs):
             repr_df.columns = repr_df.columns.map(
                 lambda f: sub(r'[._-]', rargdict["name_delim"], f)
             )
+        if melt_via is not None:
+            repr_df = melt_file_data(repr_df, melt_via)
         return display_object(repr_df, rargdict["fmt"], index=True)
     else:
         return ResponseError("fmt={}".format(rargdict["fmt"]), 501)
@@ -250,5 +263,10 @@ def get_data(accession, assay_name):
         return ResponseError("no data", 404)
     elif len(filtered_values) > 1:
         return ResponseError("multiple data files match search criteria", 400)
+    elif request.args.get("melted", "0") == "1":
+        return serve_file_data(
+            assay, filtered_values.pop(), request.args,
+            melt_via=assay.annotation()
+        )
     else:
         return serve_file_data(assay, filtered_values.pop(), request.args)

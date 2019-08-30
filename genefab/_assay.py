@@ -303,6 +303,7 @@ class Assay():
             annotation_dataframe.columns = annotation_dataframe.columns.map(
                 lambda f: sub(r'[._-]', self._name_delim, f)
             )
+        annotation_dataframe.columns.name = index_by
         return annotation_dataframe
 
     @property
