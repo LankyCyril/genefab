@@ -2,7 +2,7 @@
 from flask import Flask, Response, request
 from genefab import GLDS, GeneLabJSONException
 from genefab._util import fetch_file, DELIM_AS_IS, DELIM_DEFAULT
-from pandas import DataFrame, option_context, read_csv
+from pandas import DataFrame, option_context, read_csv, merge
 from json import dumps, JSONEncoder
 from html import escape
 from re import sub, split, search
@@ -142,7 +142,20 @@ def filter_cells(subset, filename_filter):
     return filtered_values
 
 
-def serve_file_data(assay, filemask, rargs):
+def melt_file_data(repr_df, melting):
+    """Melt dataframe with the use of sample annotation"""
+    foundry = repr_df.T
+    foundry.index.name = "Sample Name"
+    foundry = foundry.reset_index().melt(id_vars="Sample Name")
+    if melting is True:
+        return foundry
+    elif isinstance(melting, DataFrame):
+        return merge(melting.T.reset_index(), foundry, how="outer")
+    else:
+        raise TypeError("cannot describe with a non-dataframe object")
+
+
+def serve_file_data(assay, filemask, rargs, melting=False):
     """Find file URL that matches filemask, redirect to download or interpret"""
     try:
         url = assay._get_file_url(filemask)
@@ -153,8 +166,11 @@ def serve_file_data(assay, filemask, rargs):
     local_filepath = fetch_file(filemask, url, assay.storage)
     rargdict = parse_rargs(rargs)
     if rargdict["fmt"] == "raw":
-        with open(local_filepath, mode="rb") as handle:
-            return Response(handle.read(), mimetype="application")
+        if melting is not False:
+            return ResponseError("cannot melt/describe raw object", 400)
+        else:
+            with open(local_filepath, mode="rb") as handle:
+                return Response(handle.read(), mimetype="application")
     elif rargdict["fmt"] in {"tsv", "json"}:
         try:
             repr_df = read_csv(local_filepath, sep="\t", index_col=0)
@@ -164,6 +180,11 @@ def serve_file_data(assay, filemask, rargs):
             repr_df.columns = repr_df.columns.map(
                 lambda f: sub(r'[._-]', rargdict["name_delim"], f)
             )
+        if melting is not False:
+            try:
+                repr_df = melt_file_data(repr_df, melting=melting)
+            except Exception as e:
+                return ResponseError(format(e), 400)
         return display_object(repr_df, rargdict["fmt"], index=True)
     else:
         return ResponseError("fmt={}".format(rargdict["fmt"]), 501)
@@ -194,6 +215,21 @@ def assay_factors(accession, assay_name):
         return display_object(assay.factors, rargdict["fmt"], index=True)
 
 
+@app.route("/<accession>/<assay_name>/annotation/", methods=["GET"])
+def assay_annotation(accession, assay_name):
+    """DataFrame of samples and factors in human-readable form"""
+    assay, message, status = get_assay(accession, assay_name, request.args)
+    if assay is None:
+        return message, status
+    else:
+        rargdict = parse_rargs(request.args)
+        annotation = assay.annotation(
+            differential_annotation=rargdict.get("diff", True),
+            named_only=rargdict.get("named_only", True)
+        )
+        return display_object(annotation, rargdict["fmt"], index=True)
+
+
 @app.route("/<accession>/<assay_name>/", methods=["GET", "POST"])
 def assay_metadata(accession, assay_name):
     """DataFrame view of metadata, optionally queried"""
@@ -216,26 +252,73 @@ def assay_summary(accession, assay_name, prop):
         return display_object(assay._fields, rargdict["fmt"])
     elif prop == "index":
         return display_object(list(assay.raw_metadata.index), rargdict["fmt"])
-    elif prop == "factors":
-        return display_object(assay.factor_values, rargdict["fmt"])
     else:
         return ResponseError("{} is not a valid property", 400, prop)
 
 
 @app.route("/<accession>/<assay_name>/data/", methods=["GET"])
-def get_data(accession, assay_name):
+def get_data(accession, assay_name, rargs=None):
     """Serve any kind of data"""
-    assay, message, status = get_assay(accession, assay_name, request.args)
+    if rargs is None:
+        rargs = request.args
+    assay, message, status = get_assay(accession, assay_name, rargs)
     if assay is None:
         return message, status
-    subset, is_subset = subset_metadata(assay.metadata, request.args)
+    subset, is_subset = subset_metadata(assay.metadata, rargs)
     if not is_subset:
         return ResponseError("no entries selected", 400)
-    filename_filter = request.args.get("filter", r'.*')
+    filename_filter = rargs.get("filter", r'.*')
     filtered_values = filter_cells(subset, filename_filter)
     if len(filtered_values) == 0:
         return ResponseError("no data", 404)
     elif len(filtered_values) > 1:
         return ResponseError("multiple data files match search criteria", 400)
     else:
-        return serve_file_data(assay, filtered_values.pop(), request.args)
+        try:
+            if rargs.get("descriptive", "0") == "1":
+                return serve_file_data(
+                    assay, filtered_values.pop(), rargs,
+                    melting=assay.annotation()
+                )
+            elif rargs.get("melted", "0") == "1":
+                return serve_file_data(
+                    assay, filtered_values.pop(), rargs, melting=True
+                )
+            else:
+                return serve_file_data(
+                    assay, filtered_values.pop(), rargs
+                )
+        except Exception as e:
+            return ResponseError(format(e), 400)
+
+
+# URL aliases:
+
+@app.route("/<accession>/<assay_name>/data/processed/", methods=["GET"])
+def get_processed_data(accession, assay_name):
+    extra_rargs = {
+        "fields": ".*normalized.*annotated.*", "filter": "txt"
+    }
+    return get_data(
+        accession, assay_name, rargs={**extra_rargs, **request.args}
+    )
+
+@app.route("/<accession>/<assay_name>/data/processed/melted/", methods=["GET"])
+def get_melted_processed_data(accession, assay_name):
+    extra_rargs = {
+        "fields": ".*normalized.*annotated.*", "filter": "txt",
+        "melted": "1"
+    }
+    return get_data(
+        accession, assay_name, rargs={**extra_rargs, **request.args}
+    )
+
+@app.route("/<accession>/<assay_name>/data/processed/descriptive/", methods=["GET"])
+def get_descriptive_processed_data(accession, assay_name):
+    extra_rargs = {
+        "fields": ".*normalized.*annotated.*", "filter": "txt",
+        "descriptive": "1"
+    }
+    return get_data(
+        accession, assay_name, rargs={**extra_rargs, **request.args}
+    )
