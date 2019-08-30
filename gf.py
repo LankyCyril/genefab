@@ -194,6 +194,21 @@ def assay_factors(accession, assay_name):
         return display_object(assay.factors, rargdict["fmt"], index=True)
 
 
+@app.route("/<accession>/<assay_name>/annotation/", methods=["GET"])
+def assay_annotation(accession, assay_name):
+    """DataFrame of samples and factors in human-readable form"""
+    assay, message, status = get_assay(accession, assay_name, request.args)
+    if assay is None:
+        return message, status
+    else:
+        rargdict = parse_rargs(request.args)
+        differential_annotation = rargdict.get("diff", True)
+        return display_object(
+            assay.annotation(differential_annotation=differential_annotation),
+            rargdict["fmt"], index=True
+        )
+
+
 @app.route("/<accession>/<assay_name>/", methods=["GET", "POST"])
 def assay_metadata(accession, assay_name):
     """DataFrame view of metadata, optionally queried"""
@@ -216,8 +231,6 @@ def assay_summary(accession, assay_name, prop):
         return display_object(assay._fields, rargdict["fmt"])
     elif prop == "index":
         return display_object(list(assay.raw_metadata.index), rargdict["fmt"])
-    elif prop == "factors":
-        return display_object(assay.factor_values, rargdict["fmt"])
     else:
         return ResponseError("{} is not a valid property", 400, prop)
 

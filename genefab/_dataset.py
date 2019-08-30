@@ -3,6 +3,7 @@ from re import search, IGNORECASE
 from urllib.parse import quote_plus
 from ._util import get_json
 from ._util import FFIELD_ALIASES, FFIELD_VALUES, API_ROOT, GENELAB_ROOT
+from ._util import DELIM_DEFAULT
 from ._exceptions import GeneLabJSONException
 from ._assay import AssayDispatcher
 from pandas import DataFrame, concat
@@ -14,7 +15,7 @@ class GeneLabDataSet():
     accession, assays, file_urls, storage = None, None, None, None
     verbose = False
 
-    def __init__(self, accession, verbose=False, storage_prefix=".genelab", index_by="Sample Name", name_delim="."):
+    def __init__(self, accession, verbose=False, storage_prefix=".genelab", index_by="Sample Name", name_delim=DELIM_DEFAULT):
         """Request JSON representation of ISA metadata and store fields"""
         self.accession = accession
         self.verbose = verbose

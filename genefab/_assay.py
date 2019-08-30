@@ -273,10 +273,31 @@ class Assay():
         )
         return factors_dataframe
 
-    @property
-    def samples(self):
-        """Get sample names"""
-        return list(self.raw_metadata.index)
+    def annotation(self, differential_annotation=True, index_by="Sample Name"):
+        """Get annotation of samples: entries that differ (default) or all entries"""
+        samples_key = sub(r'^a', "s", self.name)
+        annotation_dataframe = concat([
+            Series(raw_sample_annotation)
+            for raw_sample_annotation in self.parent.samples[samples_key]["raw"]
+        ], axis=1)
+        samples_field2title = {
+            entry["field"]: entry["title"]
+            for entry in self.parent.samples[samples_key]["header"]
+        }
+        annotation_dataframe.index = annotation_dataframe.index.map(
+            lambda f: samples_field2title.get(f, f)
+        )
+        if differential_annotation:
+            differential_rows = annotation_dataframe.apply(
+                lambda r: len(set(r.values))>1, axis=1
+            )
+            annotation_dataframe = annotation_dataframe[differential_rows]
+        annotation_dataframe = annotation_dataframe.T.set_index(index_by).T
+        if self._name_delim != DELIM_AS_IS:
+            annotation_dataframe.columns = annotation_dataframe.columns.map(
+                lambda f: sub(r'[._-]', self._name_delim, f)
+            )
+        return annotation_dataframe
 
     @property
     def has_arrays(self):
