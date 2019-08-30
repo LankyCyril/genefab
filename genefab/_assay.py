@@ -5,7 +5,7 @@ from collections import defaultdict
 from pandas import concat, Series, Index, DataFrame, read_csv, merge
 from re import search, fullmatch, split, IGNORECASE, sub
 from numpy import nan
-from ._util import fetch_file, AS_IS
+from ._util import fetch_file, DELIM_AS_IS
 from copy import deepcopy
 
 
@@ -192,7 +192,7 @@ class Assay():
         self._indexed_by = maybe_indexed_by.pop()
         self.raw_metadata = self.raw_metadata.set_index(self._field_indexed_by)
         self._name_delim = name_delim
-        if name_delim != AS_IS:
+        if name_delim != DELIM_AS_IS:
             self.raw_metadata.index = self.raw_metadata.index.map(
                 lambda f: sub(r'[._-]', name_delim, f)
             )
@@ -381,7 +381,7 @@ class Assay():
                 data.columns.name = self._indexed_by
                 if translate_sample_names:
                     data = self._translate_data_sample_names(data, data_columns)
-                if self._name_delim != AS_IS:
+                if self._name_delim != DELIM_AS_IS:
                     data.columns = data.columns.map(
                         lambda f: sub(r'[._-]', self._name_delim, f)
                     )
