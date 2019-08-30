@@ -3,20 +3,19 @@ from re import search, IGNORECASE
 from urllib.parse import quote_plus
 from ._util import get_json
 from ._util import FFIELD_ALIASES, FFIELD_VALUES, API_ROOT, GENELAB_ROOT
+from ._util import DELIM_DEFAULT
 from ._exceptions import GeneLabJSONException
-from ._assay import Assay
+from ._assay import AssayDispatcher
+from pandas import DataFrame, concat
 from os.path import join
 
 
 class GeneLabDataSet():
     """Stores GLDS metadata associated with an accession number"""
-    accession = None
-    assays = None
-    file_urls = None
+    accession, assays, file_urls, storage = None, None, None, None
     verbose = False
-    storage = None
 
-    def __init__(self, accession, verbose=False, storage_prefix=".genelab", assay_class=Assay, index_by="Sample Name"):
+    def __init__(self, accession, verbose=False, storage_prefix=".genelab", index_by="Sample Name", name_delim=DELIM_DEFAULT):
         """Request JSON representation of ISA metadata and store fields"""
         self.accession = accession
         self.verbose = verbose
@@ -24,8 +23,10 @@ class GeneLabDataSet():
         data_json = get_json(
             "{}/data/study/data/{}/".format(API_ROOT, accession), self.verbose
         )
+        if len(data_json) == 0:
+            raise GeneLabJSONException("Invalid JSON (GLDS does not exist?)")
         if len(data_json) > 1:
-            raise GeneLabJSONException("Too many results returned")
+            raise GeneLabJSONException("Invalid JSON, too many sections")
         self._json = data_json[0]
         try:
             self.internal_id = self._json["_id"]
@@ -40,38 +41,33 @@ class GeneLabDataSet():
             raise GeneLabJSONException(
                 "Malformed JSON ({})".format(self.accession)
             )
-        try:
-            self.assays = [
-                assay_class(
-                    self, assay_name, assay_json, storage_prefix=self.storage,
-                    glds_file_urls=self._get_file_urls(), index_by=index_by
-                )
-                for assay_name, assay_json in self._info["assays"].items()
-            ]
-        except KeyError:
-            raise GeneLabJSONException(
-                "Malformed assay JSON ({})".format(self.accession)
-            )
+        self.assays = AssayDispatcher(
+            parent=self, json=self._info["assays"], storage_prefix=self.storage,
+            name_delim=name_delim, index_by=index_by,
+            glds_file_urls=self._get_file_urls()
+        )
 
     @property
     def factors(self):
         """List factors"""
-        return [
-            factor_info["factor"] for factor_info in self.description["factors"]
-        ]
- 
+        return [fi["factor"] for fi in self.description["factors"]]
+
+    @property
+    def _summary_dataframe(self):
+        """List factors, assay names and types"""
+        assays_df = self.assays._summary_dataframe.copy()
+        assays_df.index.name = "name"
+        assays_df["type"] = "assay"
+        factors_df = DataFrame(
+            columns=["type", "name", "factors"],
+            data=[["dataset", self.accession, factor] for factor in self.factors]
+        )
+        return concat([factors_df, assays_df.reset_index()], axis=0, sort=False)
+
     def __repr__(self):
-        """Simple description, for now"""
-        return "\n".join([
-            "name: " + self.accession,
-            "assays: [" + ", ".join(
-                repr(assay.name) for assay in self.assays
-            ) + "]",
-            "factors: [" + ", ".join(
-                repr(factor) for factor in self.factors
-            ) + "]"
-        ])
- 
+        """Use summary dataframe"""
+        return repr(self._summary_dataframe)
+
     def _get_file_urls(self, force_reload=False):
         """Get filenames and associated URLs"""
         if self.accession is None:
@@ -136,11 +132,12 @@ def get_datasets(maxcount="25", storage=".genelab", verbose=False, onerror="warn
                     hit["_id"], storage_prefix=storage, verbose=verbose
                 )
             )
-        except GeneLabJSONException as e:
+        except Exception as e:
             if onerror == "ignore":
                 pass
             elif onerror == "warn":
-                print("Warning:", e, file=stderr)
+                msgmask = "Warning: Could not process {} due to error:"
+                print(msgmask.format(hit["_id"]), e, file=stderr)
             else:
                 raise
     return datasets
