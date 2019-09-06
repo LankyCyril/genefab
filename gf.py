@@ -333,3 +333,32 @@ def get_descriptive_processed_data(accession, assay_name):
     return get_data(
         accession, assay_name, rargs={**extra_rargs, **request.args}
     )
+
+@app.route("/<accession>/<assay_name>/data/deg/", methods=["GET"])
+def get_deg_data(accession, assay_name):
+    extra_rargs = {
+        "fields": ".*differential.*expression.*", "filter": "expression.csv"
+    }
+    return get_data(
+        accession, assay_name, rargs={**extra_rargs, **request.args}
+    )
+
+@app.route("/<accession>/<assay_name>/data/deg/melted/", methods=["GET"])
+def get_melted_deg_data(accession, assay_name):
+    extra_rargs = {
+        "fields": ".*differential.*expression.*", "filter": "expression.csv",
+        "melted": "1"
+    }
+    return get_data(
+        accession, assay_name, rargs={**extra_rargs, **request.args}
+    )
+
+@app.route("/<accession>/<assay_name>/data/deg/descriptive/", methods=["GET"])
+def get_descriptive_deg_data(accession, assay_name):
+    extra_rargs = {
+        "fields": ".*differential.*expression.*", "filter": "expression.csv",
+        "descriptive": "1"
+    }
+    return get_data(
+        accession, assay_name, rargs={**extra_rargs, **request.args}
+    )
