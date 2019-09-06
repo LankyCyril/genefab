@@ -2,7 +2,7 @@
 from flask import Flask, Response, request
 from genefab import GLDS, GeneLabJSONException
 from genefab._util import fetch_file, DELIM_AS_IS, DELIM_DEFAULT
-from pandas import DataFrame, option_context, read_csv, merge
+from pandas import DataFrame, option_context, read_csv, merge, Index
 from json import dumps, JSONEncoder
 from html import escape
 from re import sub, split, search
@@ -144,12 +144,22 @@ def filter_cells(subset, filename_filter):
 
 def melt_file_data(repr_df, melting):
     """Melt dataframe with the use of sample annotation"""
-    foundry = repr_df.T
-    foundry.index.name = "Sample Name"
-    foundry = foundry.reset_index().melt(id_vars="Sample Name")
+    foundry = repr_df.copy()
     if melting is True:
+        foundry = foundry.T
+        foundry.index.name = "Sample Name"
+        foundry = foundry.reset_index().melt(id_vars="Sample Name")
         return foundry
+    elif isinstance(melting, (list, Index)):
+        id_vars = [c for c in foundry.columns if c not in melting]
+        return foundry.reset_index().melt(
+            id_vars=id_vars, value_vars=melting, var_name="Sample Name"
+        )
     elif isinstance(melting, DataFrame):
+        id_vars = [c for c in foundry.columns if c not in melting.columns]
+        foundry = foundry.reset_index().melt(
+            id_vars=id_vars, value_vars=melting, var_name="Sample Name"
+        )
         return merge(melting.T.reset_index(), foundry, how="outer")
     else:
         raise TypeError("cannot describe with a non-dataframe object")
@@ -173,7 +183,10 @@ def serve_file_data(assay, filemask, rargs, melting=False):
                 return Response(handle.read(), mimetype="application")
     elif rargdict["fmt"] in {"tsv", "json"}:
         try:
-            repr_df = read_csv(local_filepath, sep="\t", index_col=0)
+            if local_filepath.endswith(".csv"):
+                repr_df = read_csv(local_filepath, index_col=0)
+            else:
+                repr_df = read_csv(local_filepath, sep="\t", index_col=0)
         except Exception as e:
             return ResponseError(format(e), 400)
         if rargdict["name_delim"] != DELIM_AS_IS:
@@ -274,20 +287,18 @@ def get_data(accession, assay_name, rargs=None):
     elif len(filtered_values) > 1:
         return ResponseError("multiple data files match search criteria", 400)
     else:
+        fv = filtered_values.pop()
         try:
             if rargs.get("descriptive", "0") == "1":
                 return serve_file_data(
-                    assay, filtered_values.pop(), rargs,
-                    melting=assay.annotation()
+                    assay, fv, rargs, melting=assay.annotation()
                 )
             elif rargs.get("melted", "0") == "1":
                 return serve_file_data(
-                    assay, filtered_values.pop(), rargs, melting=True
+                    assay, fv, rargs, melting=list(assay.annotation().columns)
                 )
             else:
-                return serve_file_data(
-                    assay, filtered_values.pop(), rargs
-                )
+                return serve_file_data(assay, fv, rargs)
         except Exception as e:
             return ResponseError(format(e), 400)
 
@@ -317,6 +328,35 @@ def get_melted_processed_data(accession, assay_name):
 def get_descriptive_processed_data(accession, assay_name):
     extra_rargs = {
         "fields": ".*normalized.*annotated.*", "filter": "txt",
+        "descriptive": "1"
+    }
+    return get_data(
+        accession, assay_name, rargs={**extra_rargs, **request.args}
+    )
+
+@app.route("/<accession>/<assay_name>/data/deg/", methods=["GET"])
+def get_deg_data(accession, assay_name):
+    extra_rargs = {
+        "fields": ".*differential.*expression.*", "filter": "expression.csv"
+    }
+    return get_data(
+        accession, assay_name, rargs={**extra_rargs, **request.args}
+    )
+
+@app.route("/<accession>/<assay_name>/data/deg/melted/", methods=["GET"])
+def get_melted_deg_data(accession, assay_name):
+    extra_rargs = {
+        "fields": ".*differential.*expression.*", "filter": "expression.csv",
+        "melted": "1"
+    }
+    return get_data(
+        accession, assay_name, rargs={**extra_rargs, **request.args}
+    )
+
+@app.route("/<accession>/<assay_name>/data/deg/descriptive/", methods=["GET"])
+def get_descriptive_deg_data(accession, assay_name):
+    extra_rargs = {
+        "fields": ".*differential.*expression.*", "filter": "expression.csv",
         "descriptive": "1"
     }
     return get_data(
