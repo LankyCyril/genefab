@@ -173,7 +173,10 @@ def serve_file_data(assay, filemask, rargs, melting=False):
                 return Response(handle.read(), mimetype="application")
     elif rargdict["fmt"] in {"tsv", "json"}:
         try:
-            repr_df = read_csv(local_filepath, sep="\t", index_col=0)
+            if local_filepath.endswith(".csv"):
+                repr_df = read_csv(local_filepath, index_col=0)
+            else:
+                repr_df = read_csv(local_filepath, sep="\t", index_col=0)
         except Exception as e:
             return ResponseError(format(e), 400)
         if rargdict["name_delim"] != DELIM_AS_IS:
@@ -274,20 +277,16 @@ def get_data(accession, assay_name, rargs=None):
     elif len(filtered_values) > 1:
         return ResponseError("multiple data files match search criteria", 400)
     else:
+        fv = filtered_values.pop()
         try:
             if rargs.get("descriptive", "0") == "1":
                 return serve_file_data(
-                    assay, filtered_values.pop(), rargs,
-                    melting=assay.annotation()
+                    assay, fv, rargs, melting=assay.annotation()
                 )
             elif rargs.get("melted", "0") == "1":
-                return serve_file_data(
-                    assay, filtered_values.pop(), rargs, melting=True
-                )
+                return serve_file_data(assay, fv, rargs, melting=True)
             else:
-                return serve_file_data(
-                    assay, filtered_values.pop(), rargs
-                )
+                return serve_file_data(assay, fv, rargs)
         except Exception as e:
             return ResponseError(format(e), 400)
 
