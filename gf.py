@@ -2,7 +2,7 @@
 from flask import Flask, Response, request
 from genefab import GLDS, GeneLabJSONException
 from genefab._util import fetch_file, DELIM_AS_IS, DELIM_DEFAULT
-from pandas import DataFrame, option_context, read_csv, merge
+from pandas import DataFrame, option_context, read_csv, merge, Index
 from json import dumps, JSONEncoder
 from html import escape
 from re import sub, split, search
@@ -144,12 +144,22 @@ def filter_cells(subset, filename_filter):
 
 def melt_file_data(repr_df, melting):
     """Melt dataframe with the use of sample annotation"""
-    foundry = repr_df.T
-    foundry.index.name = "Sample Name"
-    foundry = foundry.reset_index().melt(id_vars="Sample Name")
+    foundry = repr_df.copy()
     if melting is True:
+        foundry = foundry.T
+        foundry.index.name = "Sample Name"
+        foundry = foundry.reset_index().melt(id_vars="Sample Name")
         return foundry
+    elif isinstance(melting, (list, Index)):
+        id_vars = [c for c in foundry.columns if c not in melting]
+        return foundry.reset_index().melt(
+            id_vars=id_vars, value_vars=melting, var_name="Sample Name"
+        )
     elif isinstance(melting, DataFrame):
+        id_vars = [c for c in foundry.columns if c not in melting.columns]
+        foundry = foundry.reset_index().melt(
+            id_vars=id_vars, value_vars=melting, var_name="Sample Name"
+        )
         return merge(melting.T.reset_index(), foundry, how="outer")
     else:
         raise TypeError("cannot describe with a non-dataframe object")
@@ -284,7 +294,9 @@ def get_data(accession, assay_name, rargs=None):
                     assay, fv, rargs, melting=assay.annotation()
                 )
             elif rargs.get("melted", "0") == "1":
-                return serve_file_data(assay, fv, rargs, melting=True)
+                return serve_file_data(
+                    assay, fv, rargs, melting=list(assay.annotation().columns)
+                )
             else:
                 return serve_file_data(assay, fv, rargs)
         except Exception as e:
