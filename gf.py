@@ -365,3 +365,30 @@ def get_descriptive_deg_data(accession, assay_name):
     return get_data(
         accession, assay_name, rargs={**extra_rargs, **request.args}
     )
+
+@app.route("/<accession>/<assay_name>/data/viz-table/", methods=["GET"])
+def get_viz_data(accession, assay_name):
+    extra_rargs = {
+        "filter": ".*visualization_output_table.csv"
+    }
+    return get_data(
+        accession, assay_name, rargs={**extra_rargs, **request.args}
+    )
+
+@app.route("/<accession>/<assay_name>/data/viz-table/melted/", methods=["GET"])
+def get_melted_viz_data(accession, assay_name):
+    extra_rargs = {
+        "filter": ".*visualization_output_table.csv", "melted": "1"
+    }
+    return get_data(
+        accession, assay_name, rargs={**extra_rargs, **request.args}
+    )
+
+@app.route("/<accession>/<assay_name>/data/viz-table/descriptive/", methods=["GET"])
+def get_descriptive_viz_data(accession, assay_name):
+    extra_rargs = {
+        "filter": ".*visualization_output_table.csv", "descriptive": "1"
+    }
+    return get_data(
+        accession, assay_name, rargs={**extra_rargs, **request.args}
+    )
