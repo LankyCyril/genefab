@@ -144,25 +144,20 @@ def filter_cells(subset, filename_filter):
 
 def melt_file_data(repr_df, melting):
     """Melt dataframe with the use of sample annotation"""
-    foundry = repr_df.copy()
-    if melting is True:
-        foundry = foundry.T
-        foundry.index.name = "Sample Name"
-        foundry = foundry.reset_index().melt(id_vars="Sample Name")
-        return foundry
-    elif isinstance(melting, (list, Index)):
+    foundry = repr_df.reset_index().copy()
+    if isinstance(melting, (list, Index)):
         id_vars = [c for c in foundry.columns if c not in melting]
-        return foundry.reset_index().melt(
+        return foundry.melt(
             id_vars=id_vars, value_vars=melting, var_name="Sample Name"
         )
     elif isinstance(melting, DataFrame):
         id_vars = [c for c in foundry.columns if c not in melting.columns]
-        foundry = foundry.reset_index().melt(
+        foundry = foundry.melt(
             id_vars=id_vars, value_vars=melting, var_name="Sample Name"
         )
         return merge(melting.T.reset_index(), foundry, how="outer")
     else:
-        raise TypeError("cannot describe with a non-dataframe object")
+        raise TypeError("cannot melt/describe with a non-dataframe object")
 
 
 def serve_file_data(assay, filemask, rargs, melting=False):
