@@ -195,7 +195,7 @@ def serve_file_data(assay, filemask, rargs, melting=False):
                 return ResponseError(format(e), 400)
         else:
             repr_df = repr_df.reset_index()
-        return display_object(repr_df, rargdict["fmt"], index=False)
+        return display_object(repr_df, rargdict["fmt"], index="auto")
     else:
         return ResponseError("fmt={}".format(rargdict["fmt"]), 501)
 
