@@ -275,10 +275,16 @@ def get_data(accession, assay_name, rargs=None):
     if assay is None:
         return message, status
     subset, is_subset = subset_metadata(assay.metadata, rargs)
-    if not is_subset:
-        return ResponseError("no entries selected", 400)
-    filename_filter = rargs.get("filter", r'.*')
-    filtered_values = filter_cells(subset, filename_filter)
+    if not is_subset: # no specific cells selected
+        if "filter" not in rargs: # no filenames selected either
+            return ResponseError("no entries selected", 400)
+        else: # filenames selected, should match just one
+            filtered_values = filter_cells(
+                DataFrame(assay.glds_file_urls.keys()), rargs["filter"]
+            )
+    else:
+        filename_filter = rargs.get("filter", r'.*')
+        filtered_values = filter_cells(subset, filename_filter)
     if len(filtered_values) == 0:
         return ResponseError("no data", 404)
     elif len(filtered_values) > 1:
