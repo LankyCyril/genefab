@@ -193,7 +193,9 @@ def serve_file_data(assay, filemask, rargs, melting=False):
                 repr_df = melt_file_data(repr_df, melting=melting)
             except Exception as e:
                 return ResponseError(format(e), 400)
-        return display_object(repr_df, rargdict["fmt"], index=True)
+        else:
+            repr_df = repr_df.reset_index()
+        return display_object(repr_df, rargdict["fmt"], index=False)
     else:
         return ResponseError("fmt={}".format(rargdict["fmt"]), 501)
 
