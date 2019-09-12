@@ -144,25 +144,20 @@ def filter_cells(subset, filename_filter):
 
 def melt_file_data(repr_df, melting):
     """Melt dataframe with the use of sample annotation"""
-    foundry = repr_df.copy()
-    if melting is True:
-        foundry = foundry.T
-        foundry.index.name = "Sample Name"
-        foundry = foundry.reset_index().melt(id_vars="Sample Name")
-        return foundry
-    elif isinstance(melting, (list, Index)):
+    foundry = repr_df.reset_index().copy()
+    if isinstance(melting, (list, Index)):
         id_vars = [c for c in foundry.columns if c not in melting]
-        return foundry.reset_index().melt(
+        return foundry.melt(
             id_vars=id_vars, value_vars=melting, var_name="Sample Name"
         )
     elif isinstance(melting, DataFrame):
         id_vars = [c for c in foundry.columns if c not in melting.columns]
-        foundry = foundry.reset_index().melt(
+        foundry = foundry.melt(
             id_vars=id_vars, value_vars=melting, var_name="Sample Name"
         )
         return merge(melting.T.reset_index(), foundry, how="outer")
     else:
-        raise TypeError("cannot describe with a non-dataframe object")
+        raise TypeError("cannot melt/describe with a non-dataframe object")
 
 
 def serve_file_data(assay, filemask, rargs, melting=False):
@@ -198,7 +193,9 @@ def serve_file_data(assay, filemask, rargs, melting=False):
                 repr_df = melt_file_data(repr_df, melting=melting)
             except Exception as e:
                 return ResponseError(format(e), 400)
-        return display_object(repr_df, rargdict["fmt"], index=True)
+        else:
+            repr_df = repr_df.reset_index()
+        return display_object(repr_df, rargdict["fmt"], index="auto")
     else:
         return ResponseError("fmt={}".format(rargdict["fmt"]), 501)
 
@@ -278,10 +275,16 @@ def get_data(accession, assay_name, rargs=None):
     if assay is None:
         return message, status
     subset, is_subset = subset_metadata(assay.metadata, rargs)
-    if not is_subset:
-        return ResponseError("no entries selected", 400)
-    filename_filter = rargs.get("filter", r'.*')
-    filtered_values = filter_cells(subset, filename_filter)
+    if not is_subset: # no specific cells selected
+        if "filter" not in rargs: # no filenames selected either
+            return ResponseError("no entries selected", 400)
+        else: # filenames selected, should match just one
+            filtered_values = filter_cells(
+                DataFrame(assay.glds_file_urls.keys()), rargs["filter"]
+            )
+    else:
+        filename_filter = rargs.get("filter", r'.*')
+        filtered_values = filter_cells(subset, filename_filter)
     if len(filtered_values) == 0:
         return ResponseError("no data", 404)
     elif len(filtered_values) > 1:
@@ -358,6 +361,33 @@ def get_descriptive_deg_data(accession, assay_name):
     extra_rargs = {
         "fields": ".*differential.*expression.*", "filter": "expression.csv",
         "descriptive": "1"
+    }
+    return get_data(
+        accession, assay_name, rargs={**extra_rargs, **request.args}
+    )
+
+@app.route("/<accession>/<assay_name>/data/viz-table/", methods=["GET"])
+def get_viz_data(accession, assay_name):
+    extra_rargs = {
+        "filter": ".*visualization_output_table.csv"
+    }
+    return get_data(
+        accession, assay_name, rargs={**extra_rargs, **request.args}
+    )
+
+@app.route("/<accession>/<assay_name>/data/viz-table/melted/", methods=["GET"])
+def get_melted_viz_data(accession, assay_name):
+    extra_rargs = {
+        "filter": ".*visualization_output_table.csv", "melted": "1"
+    }
+    return get_data(
+        accession, assay_name, rargs={**extra_rargs, **request.args}
+    )
+
+@app.route("/<accession>/<assay_name>/data/viz-table/descriptive/", methods=["GET"])
+def get_descriptive_viz_data(accession, assay_name):
+    extra_rargs = {
+        "filter": ".*visualization_output_table.csv", "descriptive": "1"
     }
     return get_data(
         accession, assay_name, rargs={**extra_rargs, **request.args}
