@@ -108,7 +108,7 @@ def get_filtered_repr_df(repr_df, value_filter_raw):
             field_indexer = compare(repr_df[field], value)
         except TypeError:
             emsk = "Invalid comparison (TypeError): {} {} {}"
-            raise(emsk.format(field, comparison, value))
+            raise TypeError(emsk.format(field, comparison, value))
         if indexer is None:
             indexer = field_indexer
         else:
