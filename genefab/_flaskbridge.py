@@ -4,6 +4,14 @@ from genefab._flaskutil import parse_rargs, display_object, ResponseError
 from re import sub, split, search
 from pandas import DataFrame, read_csv, Index, merge
 from flask import Response
+from csv import reader
+from operator import __lt__, __le__, __eq__, __ne__, __ge__, __gt__
+
+
+OPERATOR_MAPPER = {
+    "<": __lt__, "<=": __le__, ">=": __ge__, ">": __gt__,
+    "==": __eq__, "!=": __ne__
+}
 
 
 def get_assay(accession, assay_name, rargs):
@@ -72,9 +80,45 @@ def melt_file_data(repr_df, melting):
         raise TypeError("cannot melt/describe with a non-dataframe object")
 
 
+def get_filtered_repr_df(repr_df, value_filter_raw):
+    """Interpret the filter request argument and subset the repr dataframe"""
+    value_filter = sub(r'(^\')|(\'$)', "", value_filter_raw)
+    indexer = None
+    for field_filter in next(reader([value_filter])):
+        match = search(r'(^[^<>=]+)([<>=]+)(.+)$', field_filter)
+        if not match:
+            return ResponseError("Malformed `filter`", 400)
+        field, comparison, value = match.groups()
+        if comparison not in OPERATOR_MAPPER:
+            error_mask = "Bad comparison: '{}'"
+            return ResponseError(error_mask.format(comparison), 400)
+        else:
+            compare = OPERATOR_MAPPER[comparison]
+        if field not in repr_df.columns:
+            error_mask = "Unknown field (column): '{}'"
+            return ResponseError(error_mask.format(field), 400)
+        try:
+            value = float(value)
+        except ValueError:
+            if value == "True":
+                value = True
+            elif value == "False":
+                value = False
+        try:
+            field_indexer = compare(repr_df[field], value)
+        except TypeError:
+            emsk = "Invalid comparison (TypeError): {} {} {}"
+            return ResponseError(emsk.format(field, comparison, value), 400)
+        if indexer is None:
+            indexer = field_indexer
+        else:
+            indexer &= field_indexer
+    return repr_df[indexer]
+
+
 def serve_formatted_file_data(local_filepath, rargdict, melting):
     """Format file data accoring to rargdict and melting"""
-    if rargdict.get("header", "0") == "1":
+    if rargdict["header"] == "1":
         read_kwargs = {"index_col": 0, "nrows": 1}
     else:
         read_kwargs = {"index_col": 0}
@@ -95,7 +139,11 @@ def serve_formatted_file_data(local_filepath, rargdict, melting):
             return ResponseError(format(e), 400)
     else:
         repr_df = repr_df.reset_index()
-    if rargdict.get("header", "0") == "1":
+    if rargdict["filter"] is not None:
+        repr_df = get_filtered_repr_df(repr_df, rargdict["filter"])
+        if not isinstance(repr_df, DataFrame):
+            return ResponseError(*repr_df)
+    if rargdict["header"] == "1":
         repr_df = DataFrame(columns=repr_df.columns, index=[0])
     return display_object(repr_df, rargdict["fmt"], index="auto")
 
