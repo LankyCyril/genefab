@@ -87,16 +87,16 @@ def get_filtered_repr_df(repr_df, value_filter_raw):
     for field_filter in next(reader([value_filter])):
         match = search(r'(^[^<>=]+)([<>=]+)(.+)$', field_filter)
         if not match:
-            return ResponseError("Malformed `filter`", 400)
+            raise ValueError("Malformed `filter`")
         field, comparison, value = match.groups()
         if comparison not in OPERATOR_MAPPER:
             error_mask = "Bad comparison: '{}'"
-            return ResponseError(error_mask.format(comparison), 400)
+            raise ValueError(error_mask.format(comparison))
         else:
             compare = OPERATOR_MAPPER[comparison]
         if field not in repr_df.columns:
             error_mask = "Unknown field (column): '{}'"
-            return ResponseError(error_mask.format(field), 400)
+            raise ValueError(error_mask.format(field))
         try:
             value = float(value)
         except ValueError:
@@ -108,7 +108,7 @@ def get_filtered_repr_df(repr_df, value_filter_raw):
             field_indexer = compare(repr_df[field], value)
         except TypeError:
             emsk = "Invalid comparison (TypeError): {} {} {}"
-            return ResponseError(emsk.format(field, comparison, value), 400)
+            raise(emsk.format(field, comparison, value))
         if indexer is None:
             indexer = field_indexer
         else:
@@ -139,12 +139,13 @@ def serve_formatted_file_data(local_filepath, rargdict, melting):
             return ResponseError(format(e), 400)
     else:
         repr_df = repr_df.reset_index()
-    if rargdict["filter"] is not None:
-        repr_df = get_filtered_repr_df(repr_df, rargdict["filter"])
-        if not isinstance(repr_df, DataFrame):
-            return ResponseError(*repr_df)
-    if rargdict["header"] == "1":
-        repr_df = DataFrame(columns=repr_df.columns, index=[0])
+    try:
+        if rargdict["filter"] is not None:
+            repr_df = get_filtered_repr_df(repr_df, rargdict["filter"])
+        if rargdict["header"] == "1":
+            repr_df = DataFrame(columns=repr_df.columns, index=["header"])
+    except Exception as e:
+        return ResponseError(format(e), 400)
     return display_object(repr_df, rargdict["fmt"], index="auto")
 
 
