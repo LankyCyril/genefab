@@ -90,14 +90,14 @@ def get_data(accession, assay_name, rargs=None):
         return message, status
     subset, is_subset = subset_metadata(assay.metadata, rargs)
     if not is_subset: # no specific cells selected
-        if "filter" not in rargs: # no filenames selected either
+        if "file_filter" not in rargs: # no filenames selected either
             return ResponseError("no entries selected", 400)
         else: # filenames selected, should match just one
             filtered_values = filter_cells(
-                DataFrame(assay.glds_file_urls.keys()), rargs["filter"]
+                DataFrame(assay.glds_file_urls.keys()), rargs["file_filter"]
             )
     else:
-        filename_filter = rargs.get("filter", r'.*')
+        filename_filter = rargs.get("file_filter", r'.*')
         filtered_values = filter_cells(subset, filename_filter)
     if len(filtered_values) == 0:
         return ResponseError("no data", 404)
@@ -125,15 +125,17 @@ def get_data(accession, assay_name, rargs=None):
 def get_data_alias_helper(accession, assay_name, data_type, rargs, transformation_type=None):
     if data_type == "processed":
         data_fields = {
-            "fields": ".*normalized.*annotated.*", "filter": "txt"
+            "fields": ".*normalized.*annotated.*",
+            "file_filter": "txt"
         }
     elif data_type == "deg":
         data_fields = {
-            "fields": ".*differential.*expression.*", "filter": "expression.csv"
+            "fields": ".*differential.*expression.*",
+            "file_filter": "expression.csv"
         }
     elif data_type == "viz-table":
         data_fields = {
-            "filter": ".*visualization_output_table.csv"
+            "file_filter": ".*visualization_output_table.csv"
         }
     else:
         error_mask = "Unknown data alias: '{}'"

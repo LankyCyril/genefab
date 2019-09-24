@@ -14,7 +14,8 @@ def parse_rargs(rargs):
         "header": rargs.get("header", "0"),
         "melted": rargs.get("melted", "0"),
         "descriptive": rargs.get("descriptive", "0"),
-        "filter": rargs.get("filter", ".*")
+        "file_filter": rargs.get("file_filter", ".*"),
+        "filter": rargs.get("filter", None)
     }
 
 
