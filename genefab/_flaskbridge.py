@@ -75,22 +75,19 @@ def melt_file_data(repr_df, melting):
 def serve_formatted_file_data(local_filepath, rargdict, melting):
     """Format file data accoring to rargdict and melting"""
     if rargdict.get("header", "0") == "1":
-        extra_kwrags = {"nrows": 1}
+        read_kwargs = {"index_col": 0, "nrows": 1}
     else:
-        extra_kwrags = {}
+        read_kwargs = {"index_col": 0}
     try:
         if local_filepath.endswith(".csv"):
-            repr_df = read_csv(local_filepath, index_col=0, **extra_kwrags)
+            repr_df = read_csv(local_filepath, **read_kwargs)
         else:
-            repr_df = read_csv(
-                local_filepath, sep="\t", index_col=0, **extra_kwrags
-            )
+            repr_df = read_csv(local_filepath, sep="\t", **read_kwargs)
     except Exception as e:
         return ResponseError(format(e), 400)
     if rargdict["name_delim"] != DELIM_AS_IS:
-        repr_df.columns = repr_df.columns.map(
-            lambda f: sub(r'[._-]', rargdict["name_delim"], f)
-        )
+        convert_delim = lambda f: sub(r'[._-]', rargdict["name_delim"], f)
+        repr_df.columns = repr_df.columns.map(convert_delim)
     if melting is not False:
         try:
             repr_df = melt_file_data(repr_df, melting=melting)
@@ -98,13 +95,9 @@ def serve_formatted_file_data(local_filepath, rargdict, melting):
             return ResponseError(format(e), 400)
     else:
         repr_df = repr_df.reset_index()
-    if rargdict.get("header", "0") == "0":
-        return display_object(repr_df, rargdict["fmt"], index="auto")
-    else:
-        return display_object(
-            DataFrame(columns=repr_df.columns, index=[0]),
-            rargdict["fmt"], index="auto"
-        )
+    if rargdict.get("header", "0") == "1":
+        repr_df = DataFrame(columns=repr_df.columns, index=[0])
+    return display_object(repr_df, rargdict["fmt"], index="auto")
 
 
 def serve_file_data(assay, filemask, rargs, melting=False):
@@ -120,6 +113,8 @@ def serve_file_data(assay, filemask, rargs, melting=False):
     if rargdict["fmt"] == "raw":
         if melting is not False:
             return ResponseError("cannot melt/describe raw object", 400)
+        elif rargdict["filter"] is not None:
+            return ResponseError("cannot filter raw object", 400)
         else:
             with open(local_filepath, mode="rb") as handle:
                 return Response(handle.read(), mimetype="application")
