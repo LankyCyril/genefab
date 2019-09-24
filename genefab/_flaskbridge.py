@@ -72,15 +72,8 @@ def melt_file_data(repr_df, melting):
         raise TypeError("cannot melt/describe with a non-dataframe object")
 
 
-def serve_raw_file_data(local_filepath, melting):
-    if melting is not False:
-        return ResponseError("cannot melt/describe raw object", 400)
-    else:
-        with open(local_filepath, mode="rb") as handle:
-            return Response(handle.read(), mimetype="application")
-
-
 def serve_formatted_file_data(local_filepath, rargdict, melting):
+    """Format file data accoring to rargdict and melting"""
     if rargdict.get("header", "0") == "1":
         extra_kwrags = {"nrows": 1}
     else:
@@ -125,7 +118,11 @@ def serve_file_data(assay, filemask, rargs, melting=False):
     local_filepath = fetch_file(filemask, url, assay.storage)
     rargdict = parse_rargs(rargs)
     if rargdict["fmt"] == "raw":
-        return serve_raw_file_data(local_filepath, melting)
+        if melting is not False:
+            return ResponseError("cannot melt/describe raw object", 400)
+        else:
+            with open(local_filepath, mode="rb") as handle:
+                return Response(handle.read(), mimetype="application")
     elif rargdict["fmt"] in {"tsv", "json"}:
         return serve_formatted_file_data(local_filepath, rargdict, melting)
     else:
