@@ -10,7 +10,11 @@ def parse_rargs(rargs):
     """Get all common arguments from request.args"""
     return {
         "fmt": rargs.get("fmt", "tsv"),
-        "name_delim": rargs.get("name_delim", DELIM_DEFAULT)
+        "name_delim": rargs.get("name_delim", DELIM_DEFAULT),
+        "header": rargs.get("header", "0"),
+        "melted": rargs.get("melted", "0"),
+        "descriptive": rargs.get("descriptive", "0"),
+        "filter": rargs.get("filter", ".*")
     }
 
 

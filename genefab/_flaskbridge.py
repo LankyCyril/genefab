@@ -72,6 +72,48 @@ def melt_file_data(repr_df, melting):
         raise TypeError("cannot melt/describe with a non-dataframe object")
 
 
+def serve_raw_file_data(local_filepath, melting):
+    if melting is not False:
+        return ResponseError("cannot melt/describe raw object", 400)
+    else:
+        with open(local_filepath, mode="rb") as handle:
+            return Response(handle.read(), mimetype="application")
+
+
+def serve_formatted_file_data(local_filepath, rargdict, melting):
+    if rargdict.get("header", "0") == "1":
+        extra_kwrags = {"nrows": 1}
+    else:
+        extra_kwrags = {}
+    try:
+        if local_filepath.endswith(".csv"):
+            repr_df = read_csv(local_filepath, index_col=0, **extra_kwrags)
+        else:
+            repr_df = read_csv(
+                local_filepath, sep="\t", index_col=0, **extra_kwrags
+            )
+    except Exception as e:
+        return ResponseError(format(e), 400)
+    if rargdict["name_delim"] != DELIM_AS_IS:
+        repr_df.columns = repr_df.columns.map(
+            lambda f: sub(r'[._-]', rargdict["name_delim"], f)
+        )
+    if melting is not False:
+        try:
+            repr_df = melt_file_data(repr_df, melting=melting)
+        except Exception as e:
+            return ResponseError(format(e), 400)
+    else:
+        repr_df = repr_df.reset_index()
+    if rargdict.get("header", "0") == "0":
+        return display_object(repr_df, rargdict["fmt"], index="auto")
+    else:
+        return display_object(
+            DataFrame(columns=repr_df.columns, index=[0]),
+            rargdict["fmt"], index="auto"
+        )
+
+
 def serve_file_data(assay, filemask, rargs, melting=False):
     """Find file URL that matches filemask, redirect to download or interpret"""
     try:
@@ -83,30 +125,8 @@ def serve_file_data(assay, filemask, rargs, melting=False):
     local_filepath = fetch_file(filemask, url, assay.storage)
     rargdict = parse_rargs(rargs)
     if rargdict["fmt"] == "raw":
-        if melting is not False:
-            return ResponseError("cannot melt/describe raw object", 400)
-        else:
-            with open(local_filepath, mode="rb") as handle:
-                return Response(handle.read(), mimetype="application")
+        return serve_raw_file_data(local_filepath, melting)
     elif rargdict["fmt"] in {"tsv", "json"}:
-        try:
-            if local_filepath.endswith(".csv"):
-                repr_df = read_csv(local_filepath, index_col=0)
-            else:
-                repr_df = read_csv(local_filepath, sep="\t", index_col=0)
-        except Exception as e:
-            return ResponseError(format(e), 400)
-        if rargdict["name_delim"] != DELIM_AS_IS:
-            repr_df.columns = repr_df.columns.map(
-                lambda f: sub(r'[._-]', rargdict["name_delim"], f)
-            )
-        if melting is not False:
-            try:
-                repr_df = melt_file_data(repr_df, melting=melting)
-            except Exception as e:
-                return ResponseError(format(e), 400)
-        else:
-            repr_df = repr_df.reset_index()
-        return display_object(repr_df, rargdict["fmt"], index="auto")
+        return serve_formatted_file_data(local_filepath, rargdict, melting)
     else:
         return ResponseError("fmt={}".format(rargdict["fmt"]), 501)
