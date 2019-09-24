@@ -122,35 +122,39 @@ def get_data(accession, assay_name, rargs=None):
 
 # URL aliases:
 
-DATA_FIELDS = {"fields": ".*normalized.*annotated.*", "filter": "txt"}
-DEG_FIELDS = {"fields": ".*differential.*expression.*", "filter": "expression.csv"}
-VIZ_FIELDS = {"filter": ".*visualization_output_table.csv"}
-MELTER = {"melted": "1"}
-DESCER = {"descriptive": "1"}
+def get_data_alias_helper(accession, assay_name, data_type, rargs, transformation_type=None):
+    if data_type == "processed":
+        data_fields = {
+            "fields": ".*normalized.*annotated.*", "filter": "txt"
+        }
+    elif data_type == "deg":
+        data_fields = {
+            "fields": ".*differential.*expression.*", "filter": "expression.csv"
+        }
+    elif data_type == "viz-table":
+        data_fields = {
+            "filter": ".*visualization_output_table.csv"
+        }
+    else:
+        error_mask = "Unknown data alias: '{}'"
+        return ResponseError(error_mask.format(data_type), 400)
+    if transformation_type is None:
+        query_fields = {**data_fields, **rargs}
+    elif transformation_type == "melted":
+        query_fields = {**data_fields, **{"melted": "1"}, **rargs}
+    elif transformation_type == "descriptive":
+        query_fields = {**data_fields, **{"descriptive": "1"}, **rargs}
+    else:
+        error_mask = "Unknown transformation alias: '{}'"
+        return ResponseError(error_mask.format(transformation_type), 400)
+    return get_data(accession, assay_name, rargs=query_fields)
 
-@app.route("/<accession>/<assay_name>/data/processed/", methods=["GET"])
-def get_processed_data(accession, assay_name): return get_data(accession, assay_name, rargs={**DATA_FIELDS, **request.args})
+@app.route("/<accession>/<assay_name>/data/<data_type>/", methods=["GET"])
+def get_data_plain_alias(accession, assay_name, data_type):
+    return get_data_alias_helper(accession, assay_name, data_type, request.args)
 
-@app.route("/<accession>/<assay_name>/data/processed/melted/", methods=["GET"])
-def get_melted_processed_data(accession, assay_name): return get_data(accession, assay_name, rargs={**DATA_FIELDS, **MELTER, **request.args})
-
-@app.route("/<accession>/<assay_name>/data/processed/descriptive/", methods=["GET"])
-def get_descriptive_processed_data(accession, assay_name): return get_data(accession, assay_name, rargs={**DATA_FIELDS, **DESCER, **request.args})
-
-@app.route("/<accession>/<assay_name>/data/deg/", methods=["GET"])
-def get_deg_data(accession, assay_name): return get_data(accession, assay_name, rargs={**DEG_FIELDS, **request.args})
-
-@app.route("/<accession>/<assay_name>/data/deg/melted/", methods=["GET"])
-def get_melted_deg_data(accession, assay_name): return get_data(accession, assay_name, rargs={**DEG_FIELDS, **MELTER, **request.args})
-
-@app.route("/<accession>/<assay_name>/data/deg/descriptive/", methods=["GET"])
-def get_descriptive_deg_data(accession, assay_name): return get_data(accession, assay_name, rargs={**DEG_FIELDS, **DESCER, **request.args})
-
-@app.route("/<accession>/<assay_name>/data/viz-table/", methods=["GET"])
-def get_viz_data(accession, assay_name): return get_data(accession, assay_name, rargs={**VIZ_FIELDS, **request.args})
-
-@app.route("/<accession>/<assay_name>/data/viz-table/melted/", methods=["GET"])
-def get_melted_viz_data(accession, assay_name): return get_data(accession, assay_name, rargs={**VIZ_FIELDS, **MELTER, **request.args})
-
-@app.route("/<accession>/<assay_name>/data/viz-table/descriptive/", methods=["GET"])
-def get_descriptive_viz_data(accession, assay_name): return get_data(accession, assay_name, rargs={**VIZ_FIELDS, **DESCER, **request.args})
+@app.route("/<accession>/<assay_name>/data/<data_type>/<transformation_type>/", methods=["GET"])
+def get_data_transformed_alias(accession, assay_name, data_type, transformation_type):
+    return get_data_alias_helper(
+        accession, assay_name, data_type, request.args, transformation_type
+    )
