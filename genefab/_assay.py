@@ -457,6 +457,14 @@ class Assay():
         else:
             return self._processed_data
 
+    @property
+    def gct(self):
+        pdata = self.processed_data.copy()
+        pdata.insert(loc=0, column="Description", value=pdata.index)
+        pdata.insert(loc=0, column="Name", value=pdata.index)
+        gct_header = "#1.2\n{}\t{}\n".format(pdata.shape[0], pdata.shape[1]-2)
+        return gct_header + pdata.to_csv(sep="\t", index=False)
+
     # alias:
     def get_normalized_annotated_data(self, force_redownload=False):
         return self.get_processed_data(force_redownload=force_redownload)

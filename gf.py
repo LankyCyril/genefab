@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from flask import Flask, request
+from flask import Flask, request, Response
 from genefab import GLDS, GeneLabJSONException, GeneLabException
 from pandas import DataFrame
 from genefab._flaskutil import parse_rargs, ResponseError, display_object
@@ -149,6 +149,25 @@ def get_data(accession, assay_name, rargs=None):
             return ResponseError(format(e), 400)
 
 
+def get_gct(accession, assay_name, rargs):
+    """Get GCT formatted processed data"""
+    assay, message, status = get_assay(accession, assay_name, rargs)
+    if assay is None:
+        return message, status
+    rargdict = parse_rargs(rargs)
+    are_rargs_sane = (
+        (rargdict["fmt"] == "tsv") and (rargdict["header"] == "0") and
+        (rargdict["melted"] == "0") and (rargdict["descriptive"] == "0")
+    )
+    if not are_rargs_sane:
+        error_message = (
+            "None of the 'fmt', 'header', 'melted', 'descriptive' " +
+            "arguments make sense with the GCT format"
+        )
+        return ResponseError(error_message, 400)
+    return display_object(assay.gct, fmt="raw")
+
+
 # URL aliases:
 
 def get_data_alias_helper(accession, assay_name, data_type, rargs, transformation_type=None):
@@ -175,6 +194,11 @@ def get_data_alias_helper(accession, assay_name, data_type, rargs, transformatio
         query_fields = {**data_fields, **{"melted": "1"}, **rargs}
     elif transformation_type == "descriptive":
         query_fields = {**data_fields, **{"descriptive": "1"}, **rargs}
+    elif transformation_type == "gct":
+        if data_type == "processed":
+            return get_gct(accession, assay_name, rargs=rargs)
+        else:
+            return ResponseError("GCT only available for processed data", 400)
     else:
         error_mask = "Unknown transformation alias: '{}'"
         return ResponseError(error_mask.format(transformation_type), 400)
