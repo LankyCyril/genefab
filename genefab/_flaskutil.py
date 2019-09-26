@@ -18,7 +18,8 @@ def parse_rargs(rargs):
         "filter": rargs.get("filter", None),
         "diff": rargs.get("diff", True),
         "named_only": rargs.get("named_only", True),
-        "cls": rargs.get("cls", None)
+        "cls": rargs.get("cls", None),
+        "continuous": rargs.get("continuous", "infer")
     }
 
 

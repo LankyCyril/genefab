@@ -42,8 +42,10 @@ def assay_factors(accession, assay_name):
                 return ResponseError(error_mask.format(rargdict["fmt"]), 400)
             else:
                 try:
-                    obj = assay.factors(cls=rargdict["cls"])
-                except GeneLabException as e:
+                    obj = assay.factors(
+                        cls=rargdict["cls"], continuous=rargdict["continuous"]
+                    )
+                except Exception as e:
                     return ResponseError(format(e), 400)
                 else:
                     return display_object(obj, "raw")
@@ -67,7 +69,8 @@ def assay_annotation(accession, assay_name):
                 try:
                     annotation = assay.annotation(
                         differential_annotation=rargdict["diff"],
-                        named_only=rargdict["named_only"], cls=rargdict["cls"]
+                        named_only=rargdict["named_only"],
+                        cls=rargdict["cls"], continuous=rargdict["continuous"]
                     )
                 except GeneLabException as e:
                     return ResponseError(format(e), 400)
