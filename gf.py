@@ -36,7 +36,10 @@ def assay_factors(accession, assay_name):
         return message, status
     else:
         rargdict = parse_rargs(request.args)
-        return display_object(assay.factors, rargdict["fmt"], index=True)
+        if rargdict["fmt"] == "cls":
+            return display_object(assay.factors_cls, "tsv", index=True)
+        else:
+            return display_object(assay.factors, rargdict["fmt"], index=True)
 
 
 @app.route("/<accession>/<assay_name>/annotation/", methods=["GET"])
@@ -48,8 +51,8 @@ def assay_annotation(accession, assay_name):
     else:
         rargdict = parse_rargs(request.args)
         annotation = assay.annotation(
-            differential_annotation=rargdict.get("diff", True),
-            named_only=rargdict.get("named_only", True)
+            differential_annotation=rargdict["diff"],
+            named_only=rargdict["named_only"]
         )
         return display_object(annotation, rargdict["fmt"], index=True)
 

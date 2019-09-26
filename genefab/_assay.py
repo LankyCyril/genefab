@@ -304,7 +304,7 @@ class Assay():
                 lambda f: sub(r'[._-]', self._name_delim, f)
             )
         annotation_dataframe.columns.name = index_by
-        return annotation_dataframe
+        return annotation_dataframe.T
 
     @property
     def has_arrays(self):

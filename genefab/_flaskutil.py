@@ -15,7 +15,9 @@ def parse_rargs(rargs):
         "melted": rargs.get("melted", "0"),
         "descriptive": rargs.get("descriptive", "0"),
         "file_filter": rargs.get("file_filter", ".*"),
-        "filter": rargs.get("filter", None)
+        "filter": rargs.get("filter", None),
+        "diff": rargs.get("diff", True),
+        "named_only": rargs.get("named_only", True)
     }
 
 
