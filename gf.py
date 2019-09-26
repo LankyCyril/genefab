@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 from flask import Flask, request
-from genefab import GLDS, GeneLabJSONException
+from genefab import GLDS, GeneLabJSONException, GeneLabException
 from pandas import DataFrame
 from genefab._flaskutil import parse_rargs, ResponseError, display_object
 from genefab._flaskbridge import get_assay, subset_metadata, filter_cells
@@ -37,9 +37,14 @@ def assay_factors(accession, assay_name):
     else:
         rargdict = parse_rargs(request.args)
         if rargdict["fmt"] == "cls":
-            return display_object(assay.factors_cls, "tsv", index=True)
+            try:
+                obj = assay.factors(cls=True)
+            except GeneLabException as e:
+                return ResponseError(format(e), 400)
+            else:
+                return display_object(obj, "raw")
         else:
-            return display_object(assay.factors, rargdict["fmt"], index=True)
+            return display_object(assay.factors(), rargdict["fmt"], index=True)
 
 
 @app.route("/<accession>/<assay_name>/annotation/", methods=["GET"])
@@ -50,11 +55,21 @@ def assay_annotation(accession, assay_name):
         return message, status
     else:
         rargdict = parse_rargs(request.args)
-        annotation = assay.annotation(
-            differential_annotation=rargdict["diff"],
-            named_only=rargdict["named_only"]
-        )
-        return display_object(annotation, rargdict["fmt"], index=True)
+        if rargdict["fmt"] == "cls":
+            try:
+                annotation = assay.annotation(
+                    differential_annotation=rargdict["diff"],
+                    named_only=rargdict["named_only"], cls=True
+                )
+            except GeneLabException as e:
+                return ResponseError(format(e), 400)
+            return display_object(annotation, "raw")
+        else:
+            annotation = assay.annotation(
+                differential_annotation=rargdict["diff"],
+                named_only=rargdict["named_only"]
+            )
+            return display_object(annotation, rargdict["fmt"], index=True)
 
 
 @app.route("/<accession>/<assay_name>/", methods=["GET", "POST"])

@@ -7,6 +7,7 @@ from requests import get
 from requests.exceptions import InvalidSchema
 from urllib.error import URLError
 from re import sub
+from ._exceptions import GeneLabException
 
 GENELAB_ROOT = "https://genelab-data.ndc.nasa.gov"
 API_ROOT = "https://genelab-data.ndc.nasa.gov/genelab"
@@ -55,6 +56,25 @@ def fetch_file(file_name, url, target_directory, update=False, verbose=False, ht
         remove(target_file)
         raise URLError("Failed to download the correct number of bytes")
     return target_file
+
+
+def to_cls(dataframe, space_sub=lambda s: sub(r'\s', "", s)):
+    """Convert a presumed annotation/factor dataframe to CLS format"""
+    sample_count, factor_count = dataframe.shape
+    if factor_count != 1:
+        raise GeneLabException("CLS invalid with multiple factors")
+    factor_name = dataframe.columns[0]
+    classes = dataframe[factor_name].unique()
+    if space_sub is None:
+        space_sub = lambda s: s
+    cls_data = [
+        [sample_count, len(classes), 1],
+        ["# " + space_sub(classes[0])] + [space_sub(c) for c in classes[1:]],
+        [space_sub(v) for v in dataframe[factor_name]]
+    ]
+    return "\n".join([
+        "\t".join([str(f) for f in fields]) for fields in cls_data
+    ])
 
 
 FFIELD_VALUES = {

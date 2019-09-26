@@ -5,7 +5,7 @@ from collections import defaultdict
 from pandas import concat, Series, Index, DataFrame, read_csv, merge
 from re import search, fullmatch, split, IGNORECASE, sub
 from numpy import nan
-from ._util import fetch_file, DELIM_AS_IS
+from ._util import fetch_file, DELIM_AS_IS, to_cls
 from copy import deepcopy
 
 
@@ -249,18 +249,14 @@ class Assay():
             for field_title in self._match_field_titles(r'^factor value:  ')
         }
 
-    @property
-    def factors(self):
+    def factors(self, cls=False):
         """Get DataFrame of samples and factors in human-readable form"""
         factor_field2title = {}
         for factor in self.factor_values:
             factor_titles = self._fields[factor]
             if len(factor_titles) != 1:
-                raise GeneLabJSONException(
-                    "Nonexistent or ambiguous factor fields: '{}'".format(
-                        factor
-                    )
-                )
+                error_mask = "Nonexistent or ambiguous factor fields: '{}'"
+                raise GeneLabJSONException(error_mask.format(factor))
             else:
                 factor_field2title[list(factor_titles)[0]] = factor
         raw_factors_dataframe = self.metadata[list(self.factor_values.keys())]
@@ -271,9 +267,12 @@ class Assay():
         factors_dataframe.index.name, factors_dataframe.columns.name = (
             self._indexed_by, "Factor"
         )
-        return factors_dataframe
+        if cls:
+            return to_cls(factors_dataframe)
+        else:
+            return factors_dataframe
 
-    def annotation(self, differential_annotation=True, named_only=True, index_by="Sample Name"):
+    def annotation(self, differential_annotation=True, named_only=True, index_by="Sample Name", cls=False):
         """Get annotation of samples: entries that differ (default) or all entries"""
         samples_key = sub(r'^a', "s", self.name)
         annotation_dataframe = concat([
@@ -304,7 +303,10 @@ class Assay():
                 lambda f: sub(r'[._-]', self._name_delim, f)
             )
         annotation_dataframe.columns.name = index_by
-        return annotation_dataframe.T
+        if cls:
+            raise GeneLabException("CLS format not available for annotation")
+        else:
+            return annotation_dataframe.T
 
     @property
     def has_arrays(self):

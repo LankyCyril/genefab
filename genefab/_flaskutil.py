@@ -88,5 +88,7 @@ def display_object(obj, fmt, index="auto"):
                 return Response(obj_repr, mimetype="text/json")
         else:
             return ResponseError("wrong extension or type?", 400)
+    elif fmt == "raw":
+        return Response(obj, mimetype="application")
     else:
         return ResponseError("{} cannot be displayed", 501, type(obj))
