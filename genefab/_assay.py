@@ -249,7 +249,7 @@ class Assay():
             for field_title in self._match_field_titles(r'^factor value:  ')
         }
 
-    def factors(self, cls=False):
+    def factors(self, cls=None):
         """Get DataFrame of samples and factors in human-readable form"""
         factor_field2title = {}
         for factor in self.factor_values:
@@ -268,11 +268,11 @@ class Assay():
             self._indexed_by, "Factor"
         )
         if cls:
-            return to_cls(factors_dataframe)
+            return to_cls(factors_dataframe, target=cls)
         else:
             return factors_dataframe
 
-    def annotation(self, differential_annotation=True, named_only=True, index_by="Sample Name", cls=False):
+    def annotation(self, differential_annotation=True, named_only=True, index_by="Sample Name", cls=None):
         """Get annotation of samples: entries that differ (default) or all entries"""
         samples_key = sub(r'^a', "s", self.name)
         annotation_dataframe = concat([
@@ -304,7 +304,7 @@ class Assay():
             )
         annotation_dataframe.columns.name = index_by
         if cls:
-            raise GeneLabException("CLS format not available for annotation")
+            return to_cls(annotation_dataframe.T, target=cls)
         else:
             return annotation_dataframe.T
 

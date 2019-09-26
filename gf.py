@@ -36,13 +36,17 @@ def assay_factors(accession, assay_name):
         return message, status
     else:
         rargdict = parse_rargs(request.args)
-        if rargdict["fmt"] == "cls":
-            try:
-                obj = assay.factors(cls=True)
-            except GeneLabException as e:
-                return ResponseError(format(e), 400)
+        if rargdict["cls"]:
+            if rargdict["fmt"] != "tsv":
+                error_mask = "{} format is unsuitable for CLS (use tsv)"
+                return ResponseError(error_mask.format(rargdict["fmt"]), 400)
             else:
-                return display_object(obj, "raw")
+                try:
+                    obj = assay.factors(cls=rargdict["cls"])
+                except GeneLabException as e:
+                    return ResponseError(format(e), 400)
+                else:
+                    return display_object(obj, "raw")
         else:
             return display_object(assay.factors(), rargdict["fmt"], index=True)
 
@@ -55,15 +59,19 @@ def assay_annotation(accession, assay_name):
         return message, status
     else:
         rargdict = parse_rargs(request.args)
-        if rargdict["fmt"] == "cls":
-            try:
-                annotation = assay.annotation(
-                    differential_annotation=rargdict["diff"],
-                    named_only=rargdict["named_only"], cls=True
-                )
-            except GeneLabException as e:
-                return ResponseError(format(e), 400)
-            return display_object(annotation, "raw")
+        if rargdict["cls"]:
+            if rargdict["fmt"] != "tsv":
+                error_mask = "{} format is unsuitable for CLS (use tsv)"
+                return ResponseError(error_mask.format(rargdict["fmt"]), 400)
+            else:
+                try:
+                    annotation = assay.annotation(
+                        differential_annotation=rargdict["diff"],
+                        named_only=rargdict["named_only"], cls=rargdict["cls"]
+                    )
+                except GeneLabException as e:
+                    return ResponseError(format(e), 400)
+                return display_object(annotation, "raw")
         else:
             annotation = assay.annotation(
                 differential_annotation=rargdict["diff"],
