@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from flask import Flask, request, Response
+from flask import Flask, request
 from genefab import GLDS, GeneLabJSONException, GeneLabException
 from pandas import DataFrame
 from genefab._flaskutil import parse_rargs, ResponseError, display_object
