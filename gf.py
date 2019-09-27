@@ -61,6 +61,22 @@ def assay_factors(accession, assay_name):
             return display_object(assay.factors(), rargdict["fmt"], index=True)
 
 
+@app.route("/<accession>/<assay_name>/factors/cls/", methods=["GET"])
+def assay_factors_cls(accession, assay_name):
+    """DataFrame of samples and factors in CLS format"""
+    assay, message, status = get_assay(accession, assay_name, request.args)
+    if assay is None:
+        return message, status
+    else:
+        rargdict = parse_rargs(request.args)
+        if rargdict["fmt"] != "tsv":
+            error_mask = "{} format is unsuitable for CLS (use tsv)"
+            return GeneLabException(error_mask.format(rargdict["fmt"]), 400)
+        else:
+            obj = assay.factors(cls="*", continuous=rargdict["continuous"])
+            return display_object(obj, "raw")
+
+
 @app.route("/<accession>/<assay_name>/annotation/", methods=["GET"])
 def assay_annotation(accession, assay_name):
     """DataFrame of samples and factors in human-readable form"""

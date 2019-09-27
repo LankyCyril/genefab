@@ -267,7 +267,13 @@ class Assay():
         factors_dataframe.index.name, factors_dataframe.columns.name = (
             self._indexed_by, "Factor"
         )
-        if cls:
+        if cls == "*":
+            if factors_dataframe.shape[1] != 1:
+                raise KeyError("one of multiple factors needs to be specified")
+            else:
+                cls = str(factors_dataframe.columns[0])
+            return to_cls(factors_dataframe, target=cls, continuous=continuous)
+        elif cls is not None:
             return to_cls(factors_dataframe, target=cls, continuous=continuous)
         else:
             return factors_dataframe
