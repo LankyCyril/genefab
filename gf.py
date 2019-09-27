@@ -163,11 +163,11 @@ def get_data(accession, assay_name, rargs=None):
         fv = filtered_values.pop()
         if rargs.get("descriptive", "0") == "1":
             return serve_file_data(
-                assay, fv, rargs, melting=assay.annotation()
+                assay, fv, rargs, melting=assay.annotation().T
             )
         elif rargs.get("melted", "0") == "1":
             return serve_file_data(
-                assay, fv, rargs, melting=list(assay.annotation().columns)
+                assay, fv, rargs, melting=list(assay.annotation().T.columns)
             )
         else:
             return serve_file_data(assay, fv, rargs)
