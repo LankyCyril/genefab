@@ -168,9 +168,8 @@ def get_gct(accession, assay_name, rargs):
     return display_object(assay.gct, fmt="raw")
 
 
-# URL aliases:
-
 def get_data_alias_helper(accession, assay_name, data_type, rargs, transformation_type=None):
+    """Dispatch data for URL aliases"""
     if data_type == "processed":
         data_fields = {
             "fields": ".*normalized.*annotated.*",
@@ -204,12 +203,16 @@ def get_data_alias_helper(accession, assay_name, data_type, rargs, transformatio
         return ResponseError(error_mask.format(transformation_type), 400)
     return get_data(accession, assay_name, rargs=query_fields)
 
+
 @app.route("/<accession>/<assay_name>/data/<data_type>/", methods=["GET"])
 def get_data_plain_alias(accession, assay_name, data_type):
+    """Alias 'processed', 'deg', and 'viz-table' endpoints"""
     return get_data_alias_helper(accession, assay_name, data_type, request.args)
+
 
 @app.route("/<accession>/<assay_name>/data/<data_type>/<transformation_type>/", methods=["GET"])
 def get_data_transformed_alias(accession, assay_name, data_type, transformation_type):
+    """Alias 'melted', 'descriptive', and 'gct' endpoints"""
     return get_data_alias_helper(
         accession, assay_name, data_type, request.args, transformation_type
     )
