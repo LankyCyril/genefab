@@ -73,7 +73,13 @@ def assay_factors_cls(accession, assay_name):
             error_mask = "{} format is unsuitable for CLS (use tsv)"
             return GeneLabException(error_mask.format(rargdict["fmt"]), 400)
         else:
-            obj = assay.factors(cls="*", continuous=rargdict["continuous"])
+            if rargdict["cls"]:
+                obj = assay.factors(
+                    cls=rargdict["cls"],
+                    continuous=rargdict["continuous"]
+                )
+            else:
+                obj = assay.factors(cls="*", continuous=rargdict["continuous"])
             return display_object(obj, "raw")
 
 
