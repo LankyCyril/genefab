@@ -1,6 +1,6 @@
-from genefab import GLDS, GeneLabJSONException
+from genefab import GLDS, GeneLabJSONException, GeneLabException
 from genefab._util import fetch_file, DELIM_AS_IS
-from genefab._flaskutil import parse_rargs, display_object, ResponseError
+from genefab._flaskutil import parse_rargs, display_object
 from re import sub, split, search
 from pandas import DataFrame, read_csv, Index, merge
 from flask import Response
@@ -122,30 +122,21 @@ def serve_formatted_file_data(local_filepath, rargdict, melting):
         read_kwargs = {"index_col": 0, "nrows": 1}
     else:
         read_kwargs = {"index_col": 0}
-    try:
-        if local_filepath.endswith(".csv"):
-            repr_df = read_csv(local_filepath, **read_kwargs)
-        else:
-            repr_df = read_csv(local_filepath, sep="\t", **read_kwargs)
-    except Exception as e:
-        return ResponseError(format(e), 400)
+    if local_filepath.endswith(".csv"):
+        repr_df = read_csv(local_filepath, **read_kwargs)
+    else:
+        repr_df = read_csv(local_filepath, sep="\t", **read_kwargs)
     if rargdict["name_delim"] != DELIM_AS_IS:
         convert_delim = lambda f: sub(r'[._-]', rargdict["name_delim"], f)
         repr_df.columns = repr_df.columns.map(convert_delim)
     if melting is not False:
-        try:
-            repr_df = melt_file_data(repr_df, melting=melting)
-        except Exception as e:
-            return ResponseError(format(e), 400)
+        repr_df = melt_file_data(repr_df, melting=melting)
     else:
         repr_df = repr_df.reset_index()
-    try:
-        if rargdict["filter"] is not None:
-            repr_df = get_filtered_repr_df(repr_df, rargdict["filter"])
-        if rargdict["header"] == "1":
-            repr_df = DataFrame(columns=repr_df.columns, index=["header"])
-    except Exception as e:
-        return ResponseError(format(e), 400)
+    if rargdict["filter"] is not None:
+        repr_df = get_filtered_repr_df(repr_df, rargdict["filter"])
+    if rargdict["header"] == "1":
+        repr_df = DataFrame(columns=repr_df.columns, index=["header"])
     return display_object(repr_df, rargdict["fmt"], index="auto")
 
 
@@ -154,20 +145,20 @@ def serve_file_data(assay, filemask, rargs, melting=False):
     try:
         url = assay._get_file_url(filemask)
     except GeneLabJSONException:
-        return ResponseError("multiple files match mask", 400)
+        raise ValueError("multiple files match mask")
     if url is None:
-        return ResponseError("file not found", 404)
+        raise FileNotFoundError
     local_filepath = fetch_file(filemask, url, assay.storage)
     rargdict = parse_rargs(rargs)
     if rargdict["fmt"] == "raw":
         if melting is not False:
-            return ResponseError("cannot melt/describe raw object", 400)
+            raise GeneLabException("cannot melt/describe raw object")
         elif rargdict["filter"] is not None:
-            return ResponseError("cannot filter raw object", 400)
+            raise GeneLabException("cannot filter raw object")
         else:
             with open(local_filepath, mode="rb") as handle:
                 return Response(handle.read(), mimetype="application")
     elif rargdict["fmt"] in {"tsv", "json"}:
         return serve_formatted_file_data(local_filepath, rargdict, melting)
     else:
-        return ResponseError("fmt={}".format(rargdict["fmt"]), 501)
+        raise NotImplementedError("fmt={}".format(rargdict["fmt"]))
