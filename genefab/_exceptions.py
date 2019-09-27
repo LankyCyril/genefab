@@ -1,8 +1,8 @@
-class GeneLabJSONException(Exception):
-    pass
-
-class GeneLabFileException(Exception):
-    pass
-
 class GeneLabException(Exception):
+    pass
+
+class GeneLabJSONException(GeneLabException):
+    pass
+
+class GeneLabFileException(GeneLabException):
     pass

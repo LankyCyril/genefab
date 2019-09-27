@@ -2,10 +2,9 @@
 from flask import Flask, request
 from genefab import GLDS, GeneLabJSONException, GeneLabException
 from pandas import DataFrame
-from genefab._flaskutil import parse_rargs, ResponseError, display_object
+from genefab._flaskutil import parse_rargs, display_object
 from genefab._flaskbridge import get_assay, subset_metadata, filter_cells
 from genefab._flaskbridge import serve_file_data
-from re import sub
 
 app = Flask("genefab")
 
@@ -17,8 +16,14 @@ def hello_space():
 
 @app.errorhandler(Exception)
 def exception_catcher(e):
-    e_repr = sub(r'[<>]', "", repr(type(e)))
-    return "400; <b>{}</b>: {}".format(e_repr, str(e)), 400
+    if isinstance(e, FileNotFoundError):
+        code, explanation = 404, "Not Found"
+    elif isinstance(e, NotImplementedError):
+        code, explanation = 501, "Not Implemented"
+    else:
+        code, explanation = 400, "Bad Request"
+    error_mask = "<b>HTTP error</b>: {} ({})<br><b>{}</b>: {}"
+    return error_mask.format(code, explanation, type(e).__name__, str(e)), code
 
 
 @app.route("/<accession>/", methods=["GET"])
@@ -27,7 +32,7 @@ def glds_summary(accession):
     try:
         glds = GLDS(accession)
     except GeneLabJSONException as e:
-        return ResponseError("{}", 404, format(e))
+        raise FileNotFoundError(e)
     rargdict = parse_rargs(request.args)
     if rargdict["fmt"] == "raw":
         return display_object([glds._json], "json")
@@ -46,16 +51,12 @@ def assay_factors(accession, assay_name):
         if rargdict["cls"]:
             if rargdict["fmt"] != "tsv":
                 error_mask = "{} format is unsuitable for CLS (use tsv)"
-                return ResponseError(error_mask.format(rargdict["fmt"]), 400)
+                return GeneLabException(error_mask.format(rargdict["fmt"]), 400)
             else:
-                try:
-                    obj = assay.factors(
-                        cls=rargdict["cls"], continuous=rargdict["continuous"]
-                    )
-                except Exception as e:
-                    return ResponseError(format(e), 400)
-                else:
-                    return display_object(obj, "raw")
+                obj = assay.factors(
+                    cls=rargdict["cls"], continuous=rargdict["continuous"]
+                )
+                return display_object(obj, "raw")
         else:
             return display_object(assay.factors(), rargdict["fmt"], index=True)
 
@@ -71,16 +72,13 @@ def assay_annotation(accession, assay_name):
         if rargdict["cls"]:
             if rargdict["fmt"] != "tsv":
                 error_mask = "{} format is unsuitable for CLS (use tsv)"
-                return ResponseError(error_mask.format(rargdict["fmt"]), 400)
+                raise GeneLabException(error_mask.format(rargdict["fmt"]))
             else:
-                try:
-                    annotation = assay.annotation(
-                        differential_annotation=rargdict["diff"],
-                        named_only=rargdict["named_only"],
-                        cls=rargdict["cls"], continuous=rargdict["continuous"]
-                    )
-                except GeneLabException as e:
-                    return ResponseError(format(e), 400)
+                annotation = assay.annotation(
+                    differential_annotation=rargdict["diff"],
+                    named_only=rargdict["named_only"],
+                    cls=rargdict["cls"], continuous=rargdict["continuous"]
+                )
                 return display_object(annotation, "raw")
         else:
             annotation = assay.annotation(
@@ -113,7 +111,7 @@ def assay_summary(accession, assay_name, prop):
     elif prop == "index":
         return display_object(list(assay.raw_metadata.index), rargdict["fmt"])
     else:
-        return ResponseError("{} is not a valid property", 400, prop)
+        raise AttributeError("{} is not a valid property".format(prop))
 
 
 @app.route("/<accession>/<assay_name>/data/", methods=["GET"])
@@ -127,7 +125,7 @@ def get_data(accession, assay_name, rargs=None):
     subset, is_subset = subset_metadata(assay.metadata, rargs)
     if not is_subset: # no specific cells selected
         if "file_filter" not in rargs: # no filenames selected either
-            return ResponseError("no entries selected", 400)
+            raise ValueError("no entries selected")
         else: # filenames selected, should match just one
             filtered_values = filter_cells(
                 DataFrame(assay.glds_file_urls.keys()), rargs["file_filter"]
@@ -136,24 +134,21 @@ def get_data(accession, assay_name, rargs=None):
         filename_filter = rargs.get("file_filter", r'.*')
         filtered_values = filter_cells(subset, filename_filter)
     if len(filtered_values) == 0:
-        return ResponseError("no data", 404)
+        raise FileNotFoundError("no data")
     elif len(filtered_values) > 1:
-        return ResponseError("multiple data files match search criteria", 400)
+        raise ValueError("multiple data files match search criteria")
     else:
         fv = filtered_values.pop()
-        try:
-            if rargs.get("descriptive", "0") == "1":
-                return serve_file_data(
-                    assay, fv, rargs, melting=assay.annotation()
-                )
-            elif rargs.get("melted", "0") == "1":
-                return serve_file_data(
-                    assay, fv, rargs, melting=list(assay.annotation().columns)
-                )
-            else:
-                return serve_file_data(assay, fv, rargs)
-        except Exception as e:
-            return ResponseError(format(e), 400)
+        if rargs.get("descriptive", "0") == "1":
+            return serve_file_data(
+                assay, fv, rargs, melting=assay.annotation()
+            )
+        elif rargs.get("melted", "0") == "1":
+            return serve_file_data(
+                assay, fv, rargs, melting=list(assay.annotation().columns)
+            )
+        else:
+            return serve_file_data(assay, fv, rargs)
 
 
 def get_gct(accession, assay_name, rargs):
@@ -167,11 +162,10 @@ def get_gct(accession, assay_name, rargs):
         (rargdict["melted"] == "0") and (rargdict["descriptive"] == "0")
     )
     if not are_rargs_sane:
-        error_message = (
-            "None of the 'fmt', 'header', 'melted', 'descriptive' " +
+        raise AttributeError(
+            "None of the 'fmt', 'header', 'melted', 'descriptive' "
             "arguments make sense with the GCT format"
         )
-        return ResponseError(error_message, 400)
     return display_object(assay.gct, fmt="raw")
 
 
@@ -192,8 +186,7 @@ def get_data_alias_helper(accession, assay_name, data_type, rargs, transformatio
             "file_filter": ".*visualization_output_table.csv"
         }
     else:
-        error_mask = "Unknown data alias: '{}'"
-        return ResponseError(error_mask.format(data_type), 400)
+        raise GeneLabException("Unknown data alias: '{}'".format(data_type))
     if transformation_type is None:
         query_fields = {**data_fields, **rargs}
     elif transformation_type == "melted":
@@ -204,10 +197,10 @@ def get_data_alias_helper(accession, assay_name, data_type, rargs, transformatio
         if data_type == "processed":
             return get_gct(accession, assay_name, rargs=rargs)
         else:
-            return ResponseError("GCT only available for processed data", 400)
+            raise ValueError("GCT only available for processed data")
     else:
         error_mask = "Unknown transformation alias: '{}'"
-        return ResponseError(error_mask.format(transformation_type), 400)
+        raise GeneLabException(error_mask.format(transformation_type))
     return get_data(accession, assay_name, rargs=query_fields)
 
 

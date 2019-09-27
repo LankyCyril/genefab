@@ -23,22 +23,6 @@ def parse_rargs(rargs):
     }
 
 
-def ResponseError(mask, code, *args):
-    """Generate HTTP error code and message"""
-    if code == 400: explanation = "; bad request"
-    elif code == 404: explanation = "; not found"
-    elif code == 501: explanation = "; not implemented"
-    else: explanation = ""
-    if args:
-        converted_args = [
-            escape(str(arg)) if type(arg) == type(type) else arg for arg in args
-        ]
-        message = str(code) + explanation + ": " + mask.format(*converted_args)
-    else:
-        message = str(code) + explanation + ": " + mask
-    return message, code
-
-
 class SetEnc(JSONEncoder):
     """Allow dumps to convert sets to serializable lists"""
     def default(self, entry):
@@ -74,7 +58,7 @@ def display_object(obj, fmt, index="auto"):
                 obj_repr = sub(r'\s*,\s*', "\n", str(obj.iloc[0, 0]))
                 return Response(obj_repr, mimetype="text/plain")
             else:
-                return ResponseError("multiple cells selected", 400)
+                raise ValueError("multiple cells selected")
         elif fmt == "tsv":
             obj_repr = obj.to_csv(sep="\t", index=index, na_rep="")
             return Response(obj_repr, mimetype="text/plain")
@@ -89,8 +73,10 @@ def display_object(obj, fmt, index="auto"):
                 obj_repr = obj.to_json(index=index, orient="records")
                 return Response(obj_repr, mimetype="text/json")
         else:
-            return ResponseError("wrong extension or type?", 400)
+            raise ValueError("wrong extension or type?")
     elif fmt == "raw":
         return Response(obj, mimetype="application")
     else:
-        return ResponseError("{} cannot be displayed", 501, type(obj))
+        return NotImplementedError(
+            "{} cannot be displayed".format(type(obj).__name__)
+        )
