@@ -5,6 +5,7 @@ from pandas import DataFrame
 from genefab._flaskutil import parse_rargs, ResponseError, display_object
 from genefab._flaskbridge import get_assay, subset_metadata, filter_cells
 from genefab._flaskbridge import serve_file_data
+from re import sub
 
 app = Flask("genefab")
 
@@ -12,6 +13,12 @@ app = Flask("genefab")
 def hello_space():
     """Hello, Space!"""
     return "Hello, {}!".format(request.args.get("name", "Space"))
+
+
+@app.errorhandler(Exception)
+def exception_catcher(e):
+    e_repr = sub(r'[<>]', "", repr(type(e)))
+    return "400; <b>{}</b>: {}".format(e_repr, str(e)), 400
 
 
 @app.route("/<accession>/", methods=["GET"])
