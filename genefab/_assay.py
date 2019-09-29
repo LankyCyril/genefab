@@ -249,35 +249,6 @@ class Assay():
             for field_title in self._match_field_titles(r'^factor value:  ')
         }
 
-    def factors(self, cls=None, continuous="infer"):
-        """Get DataFrame of samples and factors in human-readable form"""
-        factor_field2title = {}
-        for factor in self.factor_values:
-            factor_titles = self._fields[factor]
-            if len(factor_titles) != 1:
-                error_mask = "Nonexistent or ambiguous factor fields: '{}'"
-                raise GeneLabJSONException(error_mask.format(factor))
-            else:
-                factor_field2title[list(factor_titles)[0]] = factor
-        raw_factors_dataframe = self.metadata[list(self.factor_values.keys())]
-        factors_dataframe = raw_factors_dataframe.copy()
-        factors_dataframe.columns = [
-            factor_field2title[field] for field in raw_factors_dataframe.columns
-        ]
-        factors_dataframe.index.name, factors_dataframe.columns.name = (
-            self._indexed_by, "Factor"
-        )
-        if cls == "*":
-            if factors_dataframe.shape[1] != 1:
-                raise KeyError("one of multiple factors needs to be specified")
-            else:
-                cls = str(factors_dataframe.columns[0])
-            return to_cls(factors_dataframe, target=cls, continuous=continuous)
-        elif cls is not None:
-            return to_cls(factors_dataframe, target=cls, continuous=continuous)
-        else:
-            return factors_dataframe
-
     def annotation(self, differential_annotation=True, named_only=True, index_by="Sample Name", cls=None, continuous="infer"):
         """Get annotation of samples: entries that differ (default) or all entries"""
         samples_keys = set(self.parent.samples.keys())
@@ -322,6 +293,28 @@ class Assay():
             )
         else:
             return annotation_dataframe.T
+
+    def factors(self, cls=None, continuous="infer"):
+        """Get DataFrame of samples and factors in human-readable form"""
+        annotation = self.annotation()
+        factor_fields = [
+            field for field in annotation.columns
+            if search(r'^factor value', field, flags=IGNORECASE)
+        ]
+        factors_dataframe = annotation[factor_fields]
+        factors_dataframe.index.name, factors_dataframe.columns.name = (
+            self._indexed_by, "Factor"
+        )
+        if cls == "*":
+            if factors_dataframe.shape[1] != 1:
+                raise KeyError("one of multiple factors needs to be specified")
+            else:
+                cls = str(factors_dataframe.columns[0])
+            return to_cls(factors_dataframe, target=cls, continuous=continuous)
+        elif cls is not None:
+            return to_cls(factors_dataframe, target=cls, continuous=continuous)
+        else:
+            return factors_dataframe
 
     @property
     def has_arrays(self):

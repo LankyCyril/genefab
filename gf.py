@@ -184,6 +184,10 @@ def get_data(accession, assay_name, rargs=None, storage=STORAGE_PREFIX):
             file_data = serve_file_data(
                 assay, fv, rargs, melting=assay.annotation().T
             )
+        elif rargs.get("with_factors", "0") == "1":
+            file_data = serve_file_data(
+                assay, fv, rargs, melting=assay.factors().T
+            )
         elif rargs.get("melted", "0") == "1":
             file_data = serve_file_data(
                 assay, fv, rargs, melting=list(assay.annotation().T.columns)
@@ -234,6 +238,8 @@ def get_data_alias_helper(accession, assay_name, data_type, rargs, transformatio
         query_fields = {**data_fields, **rargs}
     elif transformation_type == "melted":
         query_fields = {**data_fields, **{"melted": "1"}, **rargs}
+    elif transformation_type == "with-factors":
+        query_fields = {**data_fields, **{"with_factors": "1"}, **rargs}
     elif transformation_type == "descriptive":
         query_fields = {**data_fields, **{"descriptive": "1"}, **rargs}
     elif transformation_type == "gct":
