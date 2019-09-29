@@ -6,6 +6,9 @@ from pandas import DataFrame, read_csv, Index, merge
 from flask import Response
 from csv import reader
 from operator import __lt__, __le__, __eq__, __ne__, __ge__, __gt__
+from os import path
+from hashlib import sha512
+from pickle import dump, load, UnpicklingError
 
 
 OPERATOR_MAPPER = {
@@ -162,3 +165,23 @@ def serve_file_data(assay, filemask, rargs, melting=False):
         return serve_formatted_file_data(local_filepath, rargdict, melting)
     else:
         raise NotImplementedError("fmt={}".format(rargdict["fmt"]))
+
+
+def get_cached(url, storage):
+    cache_hash = sha512(url.encode("utf-8")).hexdigest()
+    filename = path.join(storage, "flaskbridge-"+cache_hash)
+    if path.exists(filename):
+        try:
+            with open(filename, mode="rb") as pkl:
+                return load(pkl)
+        except (UnpicklingError, IsADirectoryError):
+            return None
+    else:
+        return None
+
+
+def dump_cache(file_data, url, storage):
+    cache_hash = sha512(url.encode("utf-8")).hexdigest()
+    filename = path.join(storage, "flaskbridge-"+cache_hash)
+    with open(filename, mode="wb") as pkl:
+        dump(file_data, pkl)

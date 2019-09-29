@@ -2,9 +2,10 @@
 from flask import Flask, request
 from genefab import GLDS, GeneLabJSONException, GeneLabException
 from pandas import DataFrame
+from genefab._util import STORAGE_PREFIX
 from genefab._flaskutil import parse_rargs, display_object
 from genefab._flaskbridge import get_assay, subset_metadata, filter_cells
-from genefab._flaskbridge import serve_file_data
+from genefab._flaskbridge import serve_file_data, get_cached, dump_cache
 
 app = Flask("genefab")
 
@@ -137,8 +138,11 @@ def assay_summary(accession, assay_name, prop):
 
 
 @app.route("/<accession>/<assay_name>/data/", methods=["GET"])
-def get_data(accession, assay_name, rargs=None):
+def get_data(accession, assay_name, rargs=None, storage=STORAGE_PREFIX):
     """Serve any kind of data"""
+    file_data = get_cached(request.url, storage)
+    if file_data:
+        return file_data
     if rargs is None:
         rargs = request.args
     assay, message, status = get_assay(accession, assay_name, rargs)
@@ -162,15 +166,17 @@ def get_data(accession, assay_name, rargs=None):
     else:
         fv = filtered_values.pop()
         if rargs.get("descriptive", "0") == "1":
-            return serve_file_data(
+            file_data = serve_file_data(
                 assay, fv, rargs, melting=assay.annotation().T
             )
         elif rargs.get("melted", "0") == "1":
-            return serve_file_data(
+            file_data = serve_file_data(
                 assay, fv, rargs, melting=list(assay.annotation().T.columns)
             )
         else:
-            return serve_file_data(assay, fv, rargs)
+            file_data = serve_file_data(assay, fv, rargs)
+    dump_cache(file_data, request.url, storage)
+    return file_data
 
 
 def get_gct(accession, assay_name, rargs):
