@@ -1,7 +1,7 @@
 from genefab import GLDS, GeneLabJSONException, GeneLabException
 from genefab._util import fetch_file, DELIM_AS_IS
 from genefab._flaskutil import parse_rargs, display_object
-from re import sub, split, search
+from re import sub, split, search, IGNORECASE
 from pandas import DataFrame, read_csv, Index, merge
 from flask import Response
 from csv import reader
@@ -119,6 +119,22 @@ def get_filtered_repr_df(repr_df, value_filter_raw):
     return repr_df[indexer]
 
 
+def get_padj_filtered_repr_df(repr_df, any_below):
+    """Only pass entries where at least one Adj-p-value field is significant"""
+    cutoff = float(any_below)
+    filterable_fields = [
+        field for field in repr_df.columns
+        if search(r'^adj-p-value', field, flags=IGNORECASE)
+    ]
+    indexer = None
+    for field in filterable_fields:
+        if indexer is None:
+            indexer = (repr_df[field] < cutoff)
+        else:
+            indexer |= (repr_df[field] < cutoff)
+    return repr_df[indexer]
+
+
 def serve_formatted_file_data(local_filepath, rargdict, melting):
     """Format file data accoring to rargdict and melting"""
     if rargdict["header"] == "1":
@@ -132,6 +148,8 @@ def serve_formatted_file_data(local_filepath, rargdict, melting):
     if rargdict["name_delim"] != DELIM_AS_IS:
         convert_delim = lambda f: sub(r'[._-]', rargdict["name_delim"], f)
         repr_df.columns = repr_df.columns.map(convert_delim)
+    if rargdict["any_below"] is not None:
+        repr_df = get_padj_filtered_repr_df(repr_df, rargdict["any_below"])
     if rargdict["filter"] is not None:
         repr_df = get_filtered_repr_df(repr_df, rargdict["filter"])
     if melting is not False:
