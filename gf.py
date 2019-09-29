@@ -41,6 +41,13 @@ def exception_catcher(e):
 
 if environ.get("FLASK_ENV", None) != "development":
     exception_catcher = app.errorhandler(Exception)(exception_catcher)
+else:
+    try:
+        from flask_cors import CORS
+        CORS(app)
+    except ModuleNotFoundError:
+        print("No module flask_cors (in FLASK_ENV==development)", file=stderr)
+        pass
 
 
 @app.route("/<accession>/", methods=["GET"])
