@@ -6,6 +6,8 @@ from pandas import DataFrame, read_csv, Index, merge, read_sql_query
 from csv import reader
 from operator import __lt__, __le__, __eq__, __ne__, __ge__, __gt__
 from sqlite3 import connect
+from hashlib import sha512
+from io import BytesIO
 from pandas.io.sql import DatabaseError as PandasDatabaseError
 
 
@@ -200,3 +202,27 @@ def serve_file_data(assay, filemask, rargs, melting=False):
         return serve_formatted_table_data(table_name, rargdict, melting)
     else:
         raise NotImplementedError("fmt={}".format(rargdict["fmt"]))
+
+
+def try_sqlite(url, rargs):
+    """Try to load dataframe from DB_NAME"""
+    table_name = "flaskbridge-" + sha512(url.encode("utf-8")).hexdigest()
+    query = "SELECT * FROM '{}'".format(table_name)
+    db = connect(DB_NAME)
+    try:
+        repr_df = read_sql_query(query, db, index_col="index")
+        repr_df = repr_df.set_index(repr_df.columns[0])
+        rargdict = parse_rargs(rargs)
+        return display_object(repr_df, rargdict["fmt"])
+    except PandasDatabaseError:
+        return None
+
+
+def dump_to_sqlite(file_data, url):
+    """Save transformed dataframe to DB_NAME"""
+    table_name = "flaskbridge-" + sha512(url.encode("utf-8")).hexdigest()
+    db = connect(DB_NAME)
+    bytedata = BytesIO(file_data.data)
+    read_csv(bytedata, sep="\t").to_sql(table_name, db)
+    db.commit()
+    db.close()

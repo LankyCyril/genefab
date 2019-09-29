@@ -115,6 +115,8 @@ def update_table(filemask, url, table_prefix, verbose=False, http_fallback=True)
             remove(target_file)
             raise URLError("Failed to download the correct number of bytes")
         read_csv(target_file, sep=sep).to_sql(table_name, db)
+        db.commit()
+        db.close()
     return table_name
 
 

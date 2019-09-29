@@ -3,10 +3,9 @@ from sys import stderr
 from flask import Flask, request
 from genefab import GLDS, GeneLabJSONException, GeneLabException
 from pandas import DataFrame
-from genefab._util import STORAGE_PREFIX
 from genefab._flaskutil import parse_rargs, display_object
 from genefab._flaskbridge import get_assay, subset_metadata, filter_cells
-from genefab._flaskbridge import serve_file_data
+from genefab._flaskbridge import serve_file_data, try_sqlite, dump_to_sqlite
 
 
 app = Flask("genefab")
@@ -153,10 +152,13 @@ def assay_summary(accession, assay_name, prop):
 
 
 @app.route("/<accession>/<assay_name>/data/", methods=["GET"])
-def get_data(accession, assay_name, rargs=None, storage=STORAGE_PREFIX):
+def get_data(accession, assay_name, rargs=None):
     """Serve any kind of data"""
     if rargs is None:
         rargs = request.args
+    file_data = try_sqlite(request.url, rargs)
+    if file_data is not None:
+        return file_data
     assay, message, status = get_assay(accession, assay_name, rargs)
     if assay is None:
         return message, status
@@ -191,6 +193,7 @@ def get_data(accession, assay_name, rargs=None, storage=STORAGE_PREFIX):
             )
         else:
             file_data = serve_file_data(assay, fv, rargs)
+    dump_to_sqlite(file_data, request.url)
     return file_data
 
 
