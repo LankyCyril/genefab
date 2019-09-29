@@ -113,17 +113,34 @@ def assay_annotation(accession, assay_name):
                 raise GeneLabException(error_mask.format(rargdict["fmt"]))
             else:
                 annotation = assay.annotation(
-                    differential_annotation=rargdict["diff"],
-                    named_only=rargdict["named_only"],
                     cls=rargdict["cls"], continuous=rargdict["continuous"]
                 )
                 return display_object(annotation, "raw")
         else:
-            annotation = assay.annotation(
-                differential_annotation=rargdict["diff"],
-                named_only=rargdict["named_only"]
-            )
+            annotation = assay.annotation()
             return display_object(annotation, rargdict["fmt"], index=True)
+
+
+@app.route("/<accession>/<assay_name>/parameters/", methods=["GET"])
+def assay_parameters(accession, assay_name):
+    """DataFrame of samples and factors in human-readable form"""
+    assay, message, status = get_assay(accession, assay_name, request.args)
+    if assay is None:
+        return message, status
+    else:
+        rargdict = parse_rargs(request.args)
+        if rargdict["cls"]:
+            if rargdict["fmt"] != "tsv":
+                error_mask = "{} format is unsuitable for CLS (use tsv)"
+                raise GeneLabException(error_mask.format(rargdict["fmt"]))
+            else:
+                annotation = assay.parameters(
+                    cls=rargdict["cls"], continuous=rargdict["continuous"]
+                )
+                return display_object(annotation, "raw")
+        else:
+            parameters = assay.parameters()
+            return display_object(parameters, rargdict["fmt"], index=True)
 
 
 @app.route("/<accession>/<assay_name>/", methods=["GET", "POST"])
@@ -182,11 +199,11 @@ def get_data(accession, assay_name, rargs=None, storage=STORAGE_PREFIX):
         fv = filtered_values.pop()
         if rargs.get("descriptive", "0") == "1":
             file_data = serve_file_data(
-                assay, fv, rargs, melting=assay.annotation().T
+                assay, fv, rargs, melting=assay.parameters().T
             )
         elif rargs.get("melted", "0") == "1":
             file_data = serve_file_data(
-                assay, fv, rargs, melting=list(assay.annotation().T.columns)
+                assay, fv, rargs, melting=list(assay.parameters().T.columns)
             )
         else:
             file_data = serve_file_data(assay, fv, rargs)

@@ -278,8 +278,23 @@ class Assay():
         else:
             return factors_dataframe
 
-    def annotation(self, differential_annotation=True, named_only=True, index_by="Sample Name", cls=None, continuous="infer"):
-        """Get annotation of samples: entries that differ (default) or all entries"""
+    def parameters(self, index_by="Sample Name", cls=None, continuous="infer", field_mask=r'^(parameter value|characteristics|factor value)'):
+        """Get differential non-comment fields from the sample annotation"""
+        annotation = self.annotation(index_by=index_by)
+        parameter_colnames = [
+            field for field in annotation.columns
+            if search(field_mask, field, flags=IGNORECASE)
+        ]
+        parameters_datafame = annotation[parameter_colnames]
+        differential_cols = parameters_datafame.apply(
+            lambda r: len(set(r.values))>1, axis=0
+        )
+        differential_colnames = differential_cols[differential_cols].index
+        parameters_datafame = parameters_datafame[differential_colnames]
+        return parameters_datafame
+
+    def annotation(self, index_by="Sample Name", cls=None, continuous="infer"):
+        """Get annotation of samples"""
         samples_keys = set(self.parent.samples.keys())
         if len(samples_keys) == 1:
             samples_key = samples_keys.pop()
@@ -296,20 +311,9 @@ class Assay():
             entry["field"]: entry["title"]
             for entry in self.parent.samples[samples_key]["header"]
         }
-        if named_only:
-            index_subset = [
-                field for field in annotation_dataframe.index
-                if field in samples_field2title
-            ]
-            annotation_dataframe = annotation_dataframe.loc[index_subset]
         annotation_dataframe.index = annotation_dataframe.index.map(
             lambda field: samples_field2title.get(field, field)
         )
-        if differential_annotation:
-            differential_rows = annotation_dataframe.apply(
-                lambda r: len(set(r.values))>1, axis=1
-            )
-            annotation_dataframe = annotation_dataframe[differential_rows]
         annotation_dataframe = annotation_dataframe.T.set_index(index_by).T
         if self._name_delim != DELIM_AS_IS:
             annotation_dataframe.columns = annotation_dataframe.columns.map(

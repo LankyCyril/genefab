@@ -1,6 +1,5 @@
 from genefab._util import DELIM_DEFAULT
 from flask import Response
-from html import escape
 from json import JSONEncoder, dumps
 from pandas import DataFrame, option_context
 from re import sub
@@ -16,8 +15,6 @@ def parse_rargs(rargs):
         "descriptive": rargs.get("descriptive", "0"),
         "file_filter": rargs.get("file_filter", ".*"),
         "filter": rargs.get("filter", None),
-        "diff": rargs.get("diff", True),
-        "named_only": rargs.get("named_only", True),
         "cls": rargs.get("cls", None),
         "continuous": rargs.get("continuous", "infer")
     }
