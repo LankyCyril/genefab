@@ -280,7 +280,14 @@ class Assay():
 
     def annotation(self, differential_annotation=True, named_only=True, index_by="Sample Name", cls=None, continuous="infer"):
         """Get annotation of samples: entries that differ (default) or all entries"""
-        samples_key = sub(r'^a', "s", self.name)
+        samples_keys = set(self.parent.samples.keys())
+        if len(samples_keys) == 1:
+            samples_key = samples_keys.pop()
+        else:
+            samples_key = sub(r'^a', "s", self.name)
+        if samples_key not in self.parent.samples:
+            error_message = "Could not find an unambiguous samples key"
+            raise GeneLabJSONException(error_message)
         annotation_dataframe = concat([
             Series(raw_sample_annotation)
             for raw_sample_annotation in self.parent.samples[samples_key]["raw"]

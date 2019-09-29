@@ -6,6 +6,9 @@ from pandas import DataFrame, read_csv, Index, merge
 from flask import Response
 from csv import reader
 from operator import __lt__, __le__, __eq__, __ne__, __ge__, __gt__
+from os import path
+from hashlib import sha512
+from pickle import dump, load, UnpicklingError
 
 
 OPERATOR_MAPPER = {
@@ -129,12 +132,12 @@ def serve_formatted_file_data(local_filepath, rargdict, melting):
     if rargdict["name_delim"] != DELIM_AS_IS:
         convert_delim = lambda f: sub(r'[._-]', rargdict["name_delim"], f)
         repr_df.columns = repr_df.columns.map(convert_delim)
+    if rargdict["filter"] is not None:
+        repr_df = get_filtered_repr_df(repr_df, rargdict["filter"])
     if melting is not False:
         repr_df = melt_file_data(repr_df, melting=melting)
     else:
         repr_df = repr_df.reset_index()
-    if rargdict["filter"] is not None:
-        repr_df = get_filtered_repr_df(repr_df, rargdict["filter"])
     if rargdict["header"] == "1":
         repr_df = DataFrame(columns=repr_df.columns, index=["header"])
     return display_object(repr_df, rargdict["fmt"], index="auto")
@@ -162,3 +165,23 @@ def serve_file_data(assay, filemask, rargs, melting=False):
         return serve_formatted_file_data(local_filepath, rargdict, melting)
     else:
         raise NotImplementedError("fmt={}".format(rargdict["fmt"]))
+
+
+def get_cached(url, storage):
+    cache_hash = sha512(url.encode("utf-8")).hexdigest()
+    filename = path.join(storage, "flaskbridge-"+cache_hash)
+    if path.exists(filename):
+        try:
+            with open(filename, mode="rb") as pkl:
+                return load(pkl)
+        except (UnpicklingError, IsADirectoryError):
+            return None
+    else:
+        return None
+
+
+def dump_cache(file_data, url, storage):
+    cache_hash = sha512(url.encode("utf-8")).hexdigest()
+    filename = path.join(storage, "flaskbridge-"+cache_hash)
+    with open(filename, mode="wb") as pkl:
+        dump(file_data, pkl)
