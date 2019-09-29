@@ -1,6 +1,5 @@
 from genefab._util import DELIM_DEFAULT
 from flask import Response
-from html import escape
 from json import JSONEncoder, dumps
 from pandas import DataFrame, option_context
 from re import sub

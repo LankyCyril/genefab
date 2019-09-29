@@ -1,14 +1,12 @@
-from genefab import GLDS, GeneLabJSONException, GeneLabException
-from genefab._util import fetch_file, DELIM_AS_IS
+from genefab import GLDS, GeneLabJSONException
+from genefab._util import update_table, DELIM_AS_IS, DB_NAME
 from genefab._flaskutil import parse_rargs, display_object
 from re import sub, split, search, IGNORECASE
-from pandas import DataFrame, read_csv, Index, merge
-from flask import Response
+from pandas import DataFrame, read_csv, Index, merge, read_sql_query
 from csv import reader
 from operator import __lt__, __le__, __eq__, __ne__, __ge__, __gt__
-from os import path
-from hashlib import sha512
-from pickle import dump, load, UnpicklingError
+from sqlite3 import connect
+from pandas.io.sql import DatabaseError as PandasDatabaseError
 
 
 OPERATOR_MAPPER = {
@@ -161,6 +159,31 @@ def serve_formatted_file_data(local_filepath, rargdict, melting):
     return display_object(repr_df, rargdict["fmt"], index="auto")
 
 
+def serve_formatted_table_data(table_name, rargdict, melting):
+    """Format file data accoring to rargdict and melting"""
+    query = "SELECT * FROM '{}'".format(table_name)
+    db = connect(DB_NAME)
+    try:
+        repr_df = read_sql_query(query, db, index_col="index")
+        repr_df = repr_df.set_index(repr_df.columns[0])
+    except PandasDatabaseError:
+        raise PandasDatabaseError("Expected a table but none found")
+    if rargdict["name_delim"] != DELIM_AS_IS:
+        convert_delim = lambda f: sub(r'[._-]', rargdict["name_delim"], f)
+        repr_df.columns = repr_df.columns.map(convert_delim)
+    if rargdict["any_below"] is not None:
+        repr_df = get_padj_filtered_repr_df(repr_df, rargdict["any_below"])
+    if rargdict["filter"] is not None:
+        repr_df = get_filtered_repr_df(repr_df, rargdict["filter"])
+    if melting is not False:
+        repr_df = melt_file_data(repr_df, melting=melting)
+    else:
+        repr_df = repr_df.reset_index()
+    if rargdict["header"] == "1":
+        repr_df = DataFrame(columns=repr_df.columns, index=["header"])
+    return display_object(repr_df, rargdict["fmt"], index="auto")
+
+
 def serve_file_data(assay, filemask, rargs, melting=False):
     """Find file URL that matches filemask, redirect to download or interpret"""
     try:
@@ -169,37 +192,11 @@ def serve_file_data(assay, filemask, rargs, melting=False):
         raise ValueError("multiple files match mask")
     if url is None:
         raise FileNotFoundError
-    local_filepath = fetch_file(filemask, url, assay.storage)
+    table_name = update_table(filemask, url, assay.storage)
     rargdict = parse_rargs(rargs)
     if rargdict["fmt"] == "raw":
-        if melting is not False:
-            raise GeneLabException("cannot melt/describe raw object")
-        elif rargdict["filter"] is not None:
-            raise GeneLabException("cannot filter raw object")
-        else:
-            with open(local_filepath, mode="rb") as handle:
-                return Response(handle.read(), mimetype="application")
+        raise NotImplementedError("fmt=raw with SQLite3")
     elif rargdict["fmt"] in {"tsv", "json"}:
-        return serve_formatted_file_data(local_filepath, rargdict, melting)
+        return serve_formatted_table_data(table_name, rargdict, melting)
     else:
         raise NotImplementedError("fmt={}".format(rargdict["fmt"]))
-
-
-def get_cached(url, storage):
-    cache_hash = sha512(url.encode("utf-8")).hexdigest()
-    filename = path.join(storage, "flaskbridge-"+cache_hash)
-    if path.exists(filename):
-        try:
-            with open(filename, mode="rb") as pkl:
-                return load(pkl)
-        except (UnpicklingError, IsADirectoryError):
-            return None
-    else:
-        return None
-
-
-def dump_cache(file_data, url, storage):
-    cache_hash = sha512(url.encode("utf-8")).hexdigest()
-    filename = path.join(storage, "flaskbridge-"+cache_hash)
-    with open(filename, mode="wb") as pkl:
-        dump(file_data, pkl)

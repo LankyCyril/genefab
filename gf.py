@@ -6,7 +6,7 @@ from pandas import DataFrame
 from genefab._util import STORAGE_PREFIX
 from genefab._flaskutil import parse_rargs, display_object
 from genefab._flaskbridge import get_assay, subset_metadata, filter_cells
-from genefab._flaskbridge import serve_file_data, get_cached, dump_cache
+from genefab._flaskbridge import serve_file_data
 
 
 app = Flask("genefab")
@@ -30,16 +30,16 @@ def hello_space():
     return "Hello, {}!".format(request.args.get("name", "Space"))
 
 
-@app.errorhandler(Exception)
-def exception_catcher(e):
-    if isinstance(e, FileNotFoundError):
-        code, explanation = 404, "Not Found"
-    elif isinstance(e, NotImplementedError):
-        code, explanation = 501, "Not Implemented"
-    else:
-        code, explanation = 400, "Bad Request"
-    error_mask = "<b>HTTP error</b>: {} ({})<br><b>{}</b>: {}"
-    return error_mask.format(code, explanation, type(e).__name__, str(e)), code
+#@app.errorhandler(Exception)
+#def exception_catcher(e):
+#    if isinstance(e, FileNotFoundError):
+#        code, explanation = 404, "Not Found"
+#    elif isinstance(e, NotImplementedError):
+#        code, explanation = 501, "Not Implemented"
+#    else:
+#        code, explanation = 400, "Bad Request"
+#    error_mask = "<b>HTTP error</b>: {} ({})<br><b>{}</b>: {}"
+#    return error_mask.format(code, explanation, type(e).__name__, str(e)), code
 
 
 @app.route("/<accession>/", methods=["GET"])
@@ -155,9 +155,6 @@ def assay_summary(accession, assay_name, prop):
 @app.route("/<accession>/<assay_name>/data/", methods=["GET"])
 def get_data(accession, assay_name, rargs=None, storage=STORAGE_PREFIX):
     """Serve any kind of data"""
-    file_data = get_cached(request.url, storage)
-    if file_data:
-        return file_data
     if rargs is None:
         rargs = request.args
     assay, message, status = get_assay(accession, assay_name, rargs)
@@ -194,7 +191,6 @@ def get_data(accession, assay_name, rargs=None, storage=STORAGE_PREFIX):
             )
         else:
             file_data = serve_file_data(assay, fv, rargs)
-    dump_cache(file_data, request.url, storage)
     return file_data
 
 
