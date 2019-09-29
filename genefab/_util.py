@@ -18,7 +18,6 @@ API_ROOT = "https://genelab-data.ndc.nasa.gov/genelab"
 DELIM_AS_IS = "as.is"
 DELIM_DEFAULT = "-"
 STORAGE_PREFIX = ".genelab"
-DB_NAME = join(STORAGE_PREFIX, "genefab.db")
 
 
 def get_json(url, verbose=False):
@@ -79,9 +78,11 @@ def guess_format(filemask):
     return sep, compression
 
 
-def update_table(filemask, url, table_prefix, verbose=False, http_fallback=True):
+def update_table(accession, assay_name, filemask, url, table_prefix, verbose=False, http_fallback=True):
     """Check if table already in database, if not, download and store; return table name"""
-    db = connect(DB_NAME)
+    db = connect(join(
+        STORAGE_PREFIX, accession + "-" + assay_name + ".sqlite3"
+    ))
     filemask_hash = sha512(filemask.encode("utf-8")).hexdigest()
     table_name = "{}/{}".format(table_prefix, filemask_hash)
     query_mask = (

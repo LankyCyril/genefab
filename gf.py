@@ -154,14 +154,14 @@ def assay_summary(accession, assay_name, prop):
 @app.route("/<accession>/<assay_name>/data/", methods=["GET"])
 def get_data(accession, assay_name, rargs=None):
     """Serve any kind of data"""
-    if rargs is None:
-        rargs = request.args
-    file_data = try_sqlite(request.url, rargs)
-    if file_data is not None:
-        return file_data
     assay, message, status = get_assay(accession, assay_name, rargs)
     if assay is None:
         return message, status
+    if rargs is None:
+        rargs = request.args
+    file_data = try_sqlite(accession, assay.name, request.url, rargs)
+    if file_data is not None:
+        return file_data
     subset, is_subset = subset_metadata(assay.metadata, rargs)
     if not is_subset: # no specific cells selected
         if "file_filter" not in rargs: # no filenames selected either
@@ -193,7 +193,7 @@ def get_data(accession, assay_name, rargs=None):
             )
         else:
             file_data = serve_file_data(assay, fv, rargs)
-    dump_to_sqlite(file_data, request.url)
+    dump_to_sqlite(accession, assay.name, file_data, request.url)
     return file_data
 
 

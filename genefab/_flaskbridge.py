@@ -1,5 +1,5 @@
 from genefab import GLDS, GeneLabJSONException
-from genefab._util import update_table, DELIM_AS_IS, DB_NAME
+from genefab._util import update_table, DELIM_AS_IS, STORAGE_PREFIX
 from genefab._flaskutil import parse_rargs, display_object
 from re import sub, split, search, IGNORECASE
 from pandas import DataFrame, read_csv, Index, merge, read_sql_query
@@ -9,6 +9,7 @@ from sqlite3 import connect
 from hashlib import sha512
 from io import BytesIO
 from pandas.io.sql import DatabaseError as PandasDatabaseError
+from os import path
 
 
 OPERATOR_MAPPER = {
@@ -161,10 +162,12 @@ def serve_formatted_file_data(local_filepath, rargdict, melting):
     return display_object(repr_df, rargdict["fmt"], index="auto")
 
 
-def serve_formatted_table_data(table_name, rargdict, melting):
+def serve_formatted_table_data(accession, assay_name, table_name, rargdict, melting):
     """Format file data accoring to rargdict and melting"""
+    db = connect(path.join(
+        STORAGE_PREFIX, accession + "-" + assay_name + ".sqlite3"
+    ))
     query = "SELECT * FROM '{}'".format(table_name)
-    db = connect(DB_NAME)
     try:
         repr_df = read_sql_query(query, db, index_col="index")
         repr_df = repr_df.set_index(repr_df.columns[0])
@@ -194,21 +197,27 @@ def serve_file_data(assay, filemask, rargs, melting=False):
         raise ValueError("multiple files match mask")
     if url is None:
         raise FileNotFoundError
-    table_name = update_table(filemask, url, assay.storage)
+    table_name = update_table(
+        assay.parent.accession, assay.name, filemask, url, assay.storage
+    )
     rargdict = parse_rargs(rargs)
     if rargdict["fmt"] == "raw":
         raise NotImplementedError("fmt=raw with SQLite3")
     elif rargdict["fmt"] in {"tsv", "json"}:
-        return serve_formatted_table_data(table_name, rargdict, melting)
+        return serve_formatted_table_data(
+            assay.parent.accession, assay.name, table_name, rargdict, melting
+        )
     else:
         raise NotImplementedError("fmt={}".format(rargdict["fmt"]))
 
 
-def try_sqlite(url, rargs):
+def try_sqlite(accession, assay_name, url, rargs):
     """Try to load dataframe from DB_NAME"""
+    db = connect(path.join(
+        STORAGE_PREFIX, accession + "-" + assay_name + ".sqlite3"
+    ))
     table_name = "flaskbridge-" + sha512(url.encode("utf-8")).hexdigest()
     query = "SELECT * FROM '{}'".format(table_name)
-    db = connect(DB_NAME)
     try:
         repr_df = read_sql_query(query, db, index_col="index")
         repr_df = repr_df.set_index(repr_df.columns[0])
@@ -218,11 +227,17 @@ def try_sqlite(url, rargs):
         return None
 
 
-def dump_to_sqlite(file_data, url):
+def dump_to_sqlite(accession, assay_name, file_data, url):
     """Save transformed dataframe to DB_NAME"""
     table_name = "flaskbridge-" + sha512(url.encode("utf-8")).hexdigest()
-    db = connect(DB_NAME)
+    db = connect(path.join(
+        STORAGE_PREFIX, accession + "-" + assay_name + ".sqlite3"
+    ))
     bytedata = BytesIO(file_data.data)
-    read_csv(bytedata, sep="\t").to_sql(table_name, db)
-    db.commit()
+    try:
+        read_csv(bytedata, sep="\t").to_sql(table_name, db)
+    except ValueError:
+        pass
+    else:
+        db.commit()
     db.close()
