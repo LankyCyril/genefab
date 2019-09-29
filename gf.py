@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from sys import stderr
 from flask import Flask, request
 from genefab import GLDS, GeneLabJSONException, GeneLabException
 from pandas import DataFrame
@@ -7,7 +8,21 @@ from genefab._flaskutil import parse_rargs, display_object
 from genefab._flaskbridge import get_assay, subset_metadata, filter_cells
 from genefab._flaskbridge import serve_file_data, get_cached, dump_cache
 
+
 app = Flask("genefab")
+
+try:
+    from flask_compress import Compress
+    COMPRESS_MIMETYPES = [
+        "text/plain", "text/html", "text/css", "text/xml",
+        "application/json", "application/javascript"
+    ]
+    Compress(app)
+except Exception as e: # I'm sorry
+    print("Warning: Could not apply auto-compression", file=stderr)
+    print("The error was:", e, file=stderr)
+    pass
+
 
 @app.route("/", methods=["GET"])
 def hello_space():
