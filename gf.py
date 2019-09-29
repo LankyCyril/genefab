@@ -6,6 +6,7 @@ from pandas import DataFrame
 from genefab._flaskutil import parse_rargs, display_object
 from genefab._flaskbridge import get_assay, subset_metadata, filter_cells
 from genefab._flaskbridge import serve_file_data, try_sqlite, dump_to_sqlite
+from os import environ
 
 
 app = Flask("genefab")
@@ -20,7 +21,6 @@ try:
 except Exception as e: # I'm sorry
     print("Warning: Could not apply auto-compression", file=stderr)
     print("The error was:", e, file=stderr)
-    pass
 
 
 @app.route("/", methods=["GET"])
@@ -29,16 +29,18 @@ def hello_space():
     return "Hello, {}!".format(request.args.get("name", "Space"))
 
 
-#@app.errorhandler(Exception)
-#def exception_catcher(e):
-#    if isinstance(e, FileNotFoundError):
-#        code, explanation = 404, "Not Found"
-#    elif isinstance(e, NotImplementedError):
-#        code, explanation = 501, "Not Implemented"
-#    else:
-#        code, explanation = 400, "Bad Request"
-#    error_mask = "<b>HTTP error</b>: {} ({})<br><b>{}</b>: {}"
-#    return error_mask.format(code, explanation, type(e).__name__, str(e)), code
+def exception_catcher(e):
+    if isinstance(e, FileNotFoundError):
+        code, explanation = 404, "Not Found"
+    elif isinstance(e, NotImplementedError):
+        code, explanation = 501, "Not Implemented"
+    else:
+        code, explanation = 400, "Bad Request"
+    error_mask = "<b>HTTP error</b>: {} ({})<br><b>{}</b>: {}"
+    return error_mask.format(code, explanation, type(e).__name__, str(e)), code
+
+if environ.get("FLASK_ENV", None) != "development":
+    exception_catcher = app.errorhandler(Exception)(exception_catcher)
 
 
 @app.route("/<accession>/", methods=["GET"])
