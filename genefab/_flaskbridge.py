@@ -220,7 +220,6 @@ def try_sqlite(accession, assay_name, url, rargs):
     query = "SELECT * FROM '{}'".format(table_name)
     try:
         repr_df = read_sql_query(query, db, index_col="index")
-        repr_df = repr_df.set_index(repr_df.columns[0])
         rargdict = parse_rargs(rargs)
         return display_object(repr_df, rargdict["fmt"])
     except PandasDatabaseError:
