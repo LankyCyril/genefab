@@ -2,11 +2,13 @@
 from sys import stderr
 from flask import Flask, request
 from genefab import GLDS, GeneLabJSONException, GeneLabException
-from pandas import DataFrame
+from pandas import DataFrame, read_csv
 from genefab._flaskutil import parse_rargs, display_object
 from genefab._flaskbridge import get_assay, subset_metadata, filter_cells
 from genefab._flaskbridge import serve_file_data, try_sqlite, dump_to_sqlite
 from os import environ
+from re import sub
+from io import BytesIO
 
 
 app = Flask("genefab")
@@ -207,21 +209,33 @@ def get_data(accession, assay_name, rargs=None):
 
 
 def get_gct(accession, assay_name, rargs):
-    """Get GCT formatted processed data"""
+    """Get GCT formatted processed data; needs to be refactored!"""
     assay, message, status = get_assay(accession, assay_name, rargs)
     if assay is None:
         return message, status
-    rargdict = parse_rargs(rargs)
-    are_rargs_sane = (
-        (rargdict["fmt"] == "tsv") and (rargdict["header"] == "0") and
-        (rargdict["melted"] == "0") and (rargdict["descriptive"] == "0")
+    pdata_request_url = sub(r'/gct/$', "/", request.url)
+    processed_file_data = try_sqlite(
+        accession, assay.name, pdata_request_url, rargs
     )
-    if not are_rargs_sane:
-        raise AttributeError(
-            "None of the 'fmt', 'header', 'melted', 'descriptive' "
-            "arguments make sense with the GCT format"
+    if processed_file_data is None:
+        rargdict = parse_rargs(rargs)
+        are_rargs_sane = (
+            (rargdict["fmt"] == "tsv") and (rargdict["header"] == "0") and
+            (rargdict["melted"] == "0") and (rargdict["descriptive"] == "0")
         )
-    return display_object(assay.gct, fmt="raw")
+        if not are_rargs_sane:
+            raise AttributeError(
+                "None of the 'fmt', 'header', 'melted', 'descriptive' "
+                "arguments make sense with the GCT format"
+            )
+        processed_file_data = get_data(accession, assay.name, rargs=rargs)
+    pdata_bytes = BytesIO(processed_file_data.data)
+    pdata = read_csv(pdata_bytes, sep="\t", index_col=0)
+    pdata.insert(loc=0, column="Description", value=pdata.index)
+    pdata.insert(loc=0, column="Name", value=pdata.index)
+    gct_header = "#1.2\n{}\t{}\n".format(pdata.shape[0], pdata.shape[1]-2)
+    file_data = gct_header + pdata.to_csv(sep="\t", index=False)
+    return display_object(file_data, fmt="raw")
 
 
 def get_data_alias_helper(accession, assay_name, data_type, rargs, transformation_type=None):
@@ -252,7 +266,7 @@ def get_data_alias_helper(accession, assay_name, data_type, rargs, transformatio
         query_fields = {**data_fields, **{"descriptive": "1"}, **rargs}
     elif transformation_type == "gct":
         if data_type == "processed":
-            return get_gct(accession, assay_name, rargs=rargs)
+            return get_gct(accession, assay_name, {**data_fields, **rargs})
         else:
             raise ValueError("GCT only available for processed data")
     else:
