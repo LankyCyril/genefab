@@ -56,13 +56,12 @@ class GeneLabDataSet():
     def _summary_dataframe(self):
         """List factors, assay names and types"""
         assays_df = self.assays._summary_dataframe.copy()
-        assays_df.index.name = "name"
         assays_df["type"] = "assay"
         factors_df = DataFrame(
             columns=["type", "name", "factors"],
             data=[["dataset", self.accession, factor] for factor in self.factors]
         )
-        return concat([factors_df, assays_df.reset_index()], axis=0, sort=False)
+        return concat([factors_df, assays_df], axis=0, sort=False)
 
     def __repr__(self):
         """Use summary dataframe"""

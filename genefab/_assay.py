@@ -8,6 +8,16 @@ from numpy import nan
 from ._util import fetch_file, DELIM_AS_IS, to_cls
 from copy import deepcopy
 
+ASSAY_CHARACTERISTICS = [
+    "normalized annotated data file",
+    "differential expression analysis data transformation",
+    "normalized counts data file"
+]
+ASSAY_PROTOCOL_LIST = [
+    "genelab microarray data processing protocol",
+    "genelab rnaseq data processing protocol"
+]
+
 
 class MetadataRow():
     """Implements a slice of assay metadata for one sample, Series-like"""
@@ -504,30 +514,29 @@ class AssayDispatcher(dict):
     @property
     def _summary_dataframe(self):
         """List assay names and types"""
-        repr_dataframe = DataFrame(
-            index=Index(self.keys(), name=""),
-            columns=[
-                "material_type", "factors", "has_arrays",
-                "has_normalized_data", "has_processed_data"
-            ],
-            data=nan
-        )
+        repr_rows = []
         for assay_name, assay in self.items():
-            material_types = set(
-                assay.metadata[["material type"]].values.flatten()
-            )
-            if len(material_types) >= 1:
-                repr_dataframe.loc[assay_name, "material_type"] = ", ".join(
-                    material_types
-                )
+            protocol_set = set(map(
+                str.lower,
+                assay.metadata[["Protocol REF"]].values.flatten()
+            ))
             factors = set(
-                sub('^factor value:  ', "", f, flags=IGNORECASE)
-                for f in assay.factor_values.keys()
+                sub('^factor value:\s+', "", f, flags=IGNORECASE)
+                for f in assay.factors().columns
             )
-            repr_dataframe.loc[assay_name, "factors"] = ", ".join(factors)
-            repr_dataframe.loc[assay_name, "has_arrays"] = assay.has_arrays
-            repr_dataframe.loc[assay_name, "has_normalized_data"] = assay.has_normalized_data
-            repr_dataframe.loc[assay_name, "has_processed_data"] = assay.has_processed_data
+            for factor in factors:
+                repr_row = [assay_name, factor]
+                for characteristic in ASSAY_CHARACTERISTICS:
+                    repr_row.append(
+                        len(assay._match_field_titles(characteristic)) > 0
+                    )
+                for protocol in ASSAY_PROTOCOL_LIST:
+                    repr_row.append(protocol in protocol_set)
+                repr_rows.append(repr_row)
+        repr_dataframe = DataFrame(
+            data=repr_rows,
+            columns=["name","factors"]+ASSAY_CHARACTERISTICS+ASSAY_PROTOCOL_LIST
+        )
         return repr_dataframe.copy()
 
     def __repr__(self):
