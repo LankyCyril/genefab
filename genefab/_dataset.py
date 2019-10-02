@@ -3,7 +3,7 @@ from re import search, IGNORECASE
 from urllib.parse import quote_plus
 from ._util import get_json
 from ._util import FFIELD_ALIASES, FFIELD_VALUES, API_ROOT, GENELAB_ROOT
-from ._util import DELIM_DEFAULT
+from ._util import DELIM_DEFAULT, STORAGE_PREFIX
 from ._exceptions import GeneLabJSONException
 from ._assay import AssayDispatcher
 from pandas import DataFrame, concat
@@ -15,7 +15,7 @@ class GeneLabDataSet():
     accession, assays, file_urls, storage = None, None, None, None
     verbose = False
 
-    def __init__(self, accession, verbose=False, storage_prefix=".genelab", index_by="Sample Name", name_delim=DELIM_DEFAULT):
+    def __init__(self, accession, verbose=False, storage_prefix=STORAGE_PREFIX, index_by="Sample Name", name_delim=DELIM_DEFAULT):
         """Request JSON representation of ISA metadata and store fields"""
         self.accession = accession
         self.verbose = verbose
@@ -109,7 +109,7 @@ def get_ffield_matches(verbose=False, **ffield_kwargs):
             print("\b", file=stderr)
 
 
-def get_datasets(maxcount="25", storage=".genelab", verbose=False, onerror="warn", **ffield_kwargs):
+def get_datasets(maxcount="25", storage=STORAGE_PREFIX, verbose=False, onerror="warn", **ffield_kwargs):
     """Match passed regexes and combine into search URL, get JSON and parse for accessions"""
     url_lead_components = [
         API_ROOT+"/data/search/?term=GLDS", "type=cgene", "size="+str(maxcount)

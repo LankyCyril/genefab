@@ -5,7 +5,7 @@ from collections import defaultdict
 from pandas import concat, Series, Index, DataFrame, read_csv, merge
 from re import search, fullmatch, split, IGNORECASE, sub
 from numpy import nan
-from ._util import fetch_file, DELIM_AS_IS
+from ._util import fetch_file, DELIM_AS_IS, to_cls
 from copy import deepcopy
 
 
@@ -249,33 +249,16 @@ class Assay():
             for field_title in self._match_field_titles(r'^factor value:  ')
         }
 
-    @property
-    def factors(self):
-        """Get DataFrame of samples and factors in human-readable form"""
-        factor_field2title = {}
-        for factor in self.factor_values:
-            factor_titles = self._fields[factor]
-            if len(factor_titles) != 1:
-                raise GeneLabJSONException(
-                    "Nonexistent or ambiguous factor fields: '{}'".format(
-                        factor
-                    )
-                )
-            else:
-                factor_field2title[list(factor_titles)[0]] = factor
-        raw_factors_dataframe = self.metadata[list(self.factor_values.keys())]
-        factors_dataframe = raw_factors_dataframe.copy()
-        factors_dataframe.columns = [
-            factor_field2title[field] for field in raw_factors_dataframe.columns
-        ]
-        factors_dataframe.index.name, factors_dataframe.columns.name = (
-            self._indexed_by, "Factor"
-        )
-        return factors_dataframe
-
-    def annotation(self, differential_annotation=True, named_only=True, index_by="Sample Name"):
+    def annotation(self, differential_annotation=True, named_only=True, index_by="Sample Name", cls=None, continuous="infer"):
         """Get annotation of samples: entries that differ (default) or all entries"""
-        samples_key = sub(r'^a', "s", self.name)
+        samples_keys = set(self.parent.samples.keys())
+        if len(samples_keys) == 1:
+            samples_key = samples_keys.pop()
+        else:
+            samples_key = sub(r'^a', "s", self.name)
+        if samples_key not in self.parent.samples:
+            error_message = "Could not find an unambiguous samples key"
+            raise GeneLabJSONException(error_message)
         annotation_dataframe = concat([
             Series(raw_sample_annotation)
             for raw_sample_annotation in self.parent.samples[samples_key]["raw"]
@@ -304,7 +287,34 @@ class Assay():
                 lambda f: sub(r'[._-]', self._name_delim, f)
             )
         annotation_dataframe.columns.name = index_by
-        return annotation_dataframe
+        if cls:
+            return to_cls(
+                annotation_dataframe.T, target=cls, continuous=continuous
+            )
+        else:
+            return annotation_dataframe.T
+
+    def factors(self, cls=None, continuous="infer"):
+        """Get DataFrame of samples and factors in human-readable form"""
+        annotation = self.annotation()
+        factor_fields = [
+            field for field in annotation.columns
+            if search(r'^factor value', field, flags=IGNORECASE)
+        ]
+        factors_dataframe = annotation[factor_fields]
+        factors_dataframe.index.name, factors_dataframe.columns.name = (
+            self._indexed_by, "Factor"
+        )
+        if cls == "*":
+            if factors_dataframe.shape[1] != 1:
+                raise KeyError("one of multiple factors needs to be specified")
+            else:
+                cls = str(factors_dataframe.columns[0])
+            return to_cls(factors_dataframe, target=cls, continuous=continuous)
+        elif cls is not None:
+            return to_cls(factors_dataframe, target=cls, continuous=continuous)
+        else:
+            return factors_dataframe
 
     @property
     def has_arrays(self):
@@ -452,6 +462,14 @@ class Assay():
             return self.get_processed_data()
         else:
             return self._processed_data
+
+    @property
+    def gct(self):
+        pdata = self.processed_data.copy()
+        pdata.insert(loc=0, column="Description", value=pdata.index)
+        pdata.insert(loc=0, column="Name", value=pdata.index)
+        gct_header = "#1.2\n{}\t{}\n".format(pdata.shape[0], pdata.shape[1]-2)
+        return gct_header + pdata.to_csv(sep="\t", index=False)
 
     # alias:
     def get_normalized_annotated_data(self, force_redownload=False):
