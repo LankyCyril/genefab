@@ -183,8 +183,6 @@ def serve_formatted_table_data(accession, assay_name, table_name, rargdict, melt
     if rargdict["sort_by"] is not None:
         if rargdict["sort_by"] in repr_df.columns:
             ascending = False if rargdict["ascending"] == "0" else True
-            print(rargdict["sort_by"])
-            print(ascending)
             repr_df = repr_df.sort_values(
                 by=rargdict["sort_by"], ascending=ascending
             )
