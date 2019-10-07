@@ -20,7 +20,10 @@ def parse_rargs(rargs):
         "named_only": rargs.get("named_only", True),
         "cls": rargs.get("cls", None),
         "continuous": rargs.get("continuous", "infer"),
-        "any_below": rargs.get("any_below", None)
+        "any_below": rargs.get("any_below", None),
+        "sort_by": rargs.get("sort_by", None),
+        "ascending": rargs.get("ascending", "1"),
+        "top": rargs.get("top", None)
     }
 
 
