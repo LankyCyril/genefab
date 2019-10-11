@@ -9,7 +9,7 @@ from urllib.error import URLError
 from re import sub, search
 from sqlite3 import connect
 from hashlib import sha512
-from pandas import read_csv
+from pandas import read_csv, Series
 from tempfile import TemporaryDirectory
 
 
@@ -147,10 +147,11 @@ def to_cls(dataframe, target, continuous="infer", space_sub=lambda s: sub(r'\s',
         if space_sub is None:
             space_sub = lambda s: s
         classes = dataframe[target].unique()
+        class2id = Series(index=classes, data=range(len(classes)))
         cls_data = [
             [sample_count, len(classes), 1],
             ["# "+space_sub(classes[0])] + [space_sub(c) for c in classes[1:]],
-            [space_sub(v) for v in dataframe[target]]
+            [class2id[v] for v in dataframe[target]]
         ]
     return "\n".join([
         "\t".join([str(f) for f in fields]) for fields in cls_data
