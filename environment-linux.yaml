@@ -45,6 +45,7 @@ dependencies:
     - chardet==3.0.4
     - docopt==0.6.2
     - flask-compress==1.4.0
+    - flask-cors==3.0.8
     - idna==2.8
     - jedi==0.15.1
     - parso==0.5.1
@@ -54,3 +55,5 @@ dependencies:
     - requests==2.21.0
     - urllib3==1.24.1
     - wcwidth==0.1.7
+prefix: /home/kirill/usr/opt/miniconda/envs/genefab
+

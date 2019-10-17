@@ -6,7 +6,12 @@ from os import makedirs, remove
 from requests import get
 from requests.exceptions import InvalidSchema
 from urllib.error import URLError
-from re import sub
+from re import sub, search
+from sqlite3 import connect
+from hashlib import sha512
+from pandas import read_csv
+from tempfile import TemporaryDirectory
+
 
 GENELAB_ROOT = "https://genelab-data.ndc.nasa.gov"
 API_ROOT = "https://genelab-data.ndc.nasa.gov/genelab"
@@ -24,7 +29,7 @@ def get_json(url, verbose=False):
 
 
 def fetch_file(file_name, url, target_directory, update=False, verbose=False, http_fallback=True):
-    """Perform checks, download file"""
+    """Soon to be deprecated: perform checks, download file"""
     if not isdir(target_directory):
         if isfile(target_directory):
             raise OSError("Local storage exists and is not a directory")
@@ -56,6 +61,64 @@ def fetch_file(file_name, url, target_directory, update=False, verbose=False, ht
         remove(target_file)
         raise URLError("Failed to download the correct number of bytes")
     return target_file
+
+
+def guess_format(filemask):
+    """Guess whether the file is a CSV or a TSV and whether it is compressed"""
+    comp_ext_match = search(r'\.(gz|bz2|xz)$', filemask)
+    if comp_ext_match:
+        compression = comp_ext_match.group(1)
+    else:
+        compression = None
+    fmt_ext_match = search(r'\.csv', filemask)
+    if fmt_ext_match:
+        sep = ","
+    else:
+        sep = "\t"
+    return sep, compression
+
+
+def update_table(accession, assay_name, filemask, url, table_prefix, verbose=False, http_fallback=True):
+    """Check if table already in database, if not, download and store; return table name"""
+    db = connect(join(
+        STORAGE_PREFIX, accession + "-" + assay_name + ".sqlite3"
+    ))
+    filemask_hash = sha512(filemask.encode("utf-8")).hexdigest()
+    table_name = "{}/{}".format(table_prefix, filemask_hash)
+    query_mask = (
+        "SELECT count(name) FROM sqlite_master WHERE type='table' AND name='{}'"
+    )
+    cursor = db.execute(query_mask.format(table_name))
+    if cursor.fetchone()[0] > 0: # table exists
+        return table_name
+    # otherwise, table doesn't exist and we need to download data:
+    try:
+        stream = get(url, stream=True)
+    except InvalidSchema:
+        if http_fallback:
+            stream = get(sub(r'^ftp:\/\/', "http://", url), stream=True)
+        else:
+            raise
+    if stream.status_code != 200:
+        raise URLError("{}: status code {}".format(url, stream.status_code))
+    total_bytes = int(stream.headers.get("content-length", 0))
+    with TemporaryDirectory() as tempdir:
+        sep, compression = guess_format(filemask)
+        target_file = join(tempdir, filemask_hash)
+        if compression:
+            target_file = target_file + "." + compression
+        with open(target_file, "wb") as output_handle:
+            written_bytes = 0
+            for block in stream.iter_content(1024):
+                output_handle.write(block)
+                written_bytes += len(block)
+        if total_bytes != written_bytes:
+            remove(target_file)
+            raise URLError("Failed to download the correct number of bytes")
+        read_csv(target_file, sep=sep).to_sql(table_name, db)
+        db.commit()
+        db.close()
+    return table_name
 
 
 def to_cls(dataframe, target, continuous="infer", space_sub=lambda s: sub(r'\s', "", s)):
