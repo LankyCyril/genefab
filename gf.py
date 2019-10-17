@@ -11,6 +11,7 @@ from re import sub
 from io import BytesIO
 
 
+FLASK_DEBUG_MARKERS = {"development", "staging", "stage", "debug", "debugging"}
 app = Flask("genefab")
 
 try:
@@ -41,7 +42,7 @@ def exception_catcher(e):
     error_mask = "<b>HTTP error</b>: {} ({})<br><b>{}</b>: {}"
     return error_mask.format(code, explanation, type(e).__name__, str(e)), code
 
-if environ.get("FLASK_ENV", None) != "development":
+if environ.get("FLASK_ENV", None) not in FLASK_DEBUG_MARKERS:
     exception_catcher = app.errorhandler(Exception)(exception_catcher)
 else:
     try:
