@@ -148,21 +148,6 @@ def assay_metadata(accession, assay_name):
     return display_object(subset, rargdict["fmt"], index=True)
 
 
-@app.route("/<accession>/<assay_name>/<prop>/", methods=["GET"])
-def assay_summary(accession, assay_name, prop):
-    """Provide overview of samples, fields, factors in metadata"""
-    assay, message, status = get_assay(accession, assay_name, request.args)
-    if assay is None:
-        return message, status
-    rargdict = parse_rargs(request.args)
-    if prop == "fields":
-        return display_object(assay._fields, rargdict["fmt"])
-    elif prop == "index":
-        return display_object(list(assay.raw_metadata.index), rargdict["fmt"])
-    else:
-        raise AttributeError("{} is not a valid property".format(prop))
-
-
 @app.route("/<accession>/<assay_name>/data/", methods=["GET"])
 def get_data(accession, assay_name, rargs=None):
     """Serve any kind of data"""
