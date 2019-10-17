@@ -3,12 +3,15 @@ from sys import stderr
 from flask import Flask, request
 from genefab import GLDS, GeneLabJSONException, GeneLabException
 from pandas import DataFrame
-from genefab._util import STORAGE_PREFIX
 from genefab._flaskutil import parse_rargs, display_object
 from genefab._flaskbridge import get_assay, subset_metadata, filter_cells
-from genefab._flaskbridge import serve_file_data, get_cached, dump_cache
+from genefab._flaskbridge import serve_file_data, try_sqlite, dump_to_sqlite
+from os import environ
+from re import sub
+from io import BytesIO
 
 
+FLASK_DEBUG_MARKERS = {"development", "staging", "stage", "debug", "debugging"}
 app = Flask("genefab")
 
 try:
@@ -21,7 +24,6 @@ try:
 except Exception as e: # I'm sorry
     print("Warning: Could not apply auto-compression", file=stderr)
     print("The error was:", e, file=stderr)
-    pass
 
 
 @app.route("/", methods=["GET"])
@@ -30,7 +32,6 @@ def hello_space():
     return "Hello, {}!".format(request.args.get("name", "Space"))
 
 
-@app.errorhandler(Exception)
 def exception_catcher(e):
     if isinstance(e, FileNotFoundError):
         code, explanation = 404, "Not Found"
@@ -40,6 +41,16 @@ def exception_catcher(e):
         code, explanation = 400, "Bad Request"
     error_mask = "<b>HTTP error</b>: {} ({})<br><b>{}</b>: {}"
     return error_mask.format(code, explanation, type(e).__name__, str(e)), code
+
+if environ.get("FLASK_ENV", None) not in FLASK_DEBUG_MARKERS:
+    exception_catcher = app.errorhandler(Exception)(exception_catcher)
+else:
+    try:
+        from flask_cors import CORS
+        CORS(app)
+    except ModuleNotFoundError:
+        print("No module flask_cors (in FLASK_ENV==development)", file=stderr)
+        pass
 
 
 @app.route("/<accession>/", methods=["GET"])
@@ -153,16 +164,16 @@ def assay_summary(accession, assay_name, prop):
 
 
 @app.route("/<accession>/<assay_name>/data/", methods=["GET"])
-def get_data(accession, assay_name, rargs=None, storage=STORAGE_PREFIX):
+def get_data(accession, assay_name, rargs=None):
     """Serve any kind of data"""
-    file_data = get_cached(request.url, storage)
-    if file_data:
-        return file_data
-    if rargs is None:
-        rargs = request.args
     assay, message, status = get_assay(accession, assay_name, rargs)
     if assay is None:
         return message, status
+    if rargs is None:
+        rargs = request.args
+    file_data = try_sqlite(accession, assay.name, request.url, rargs)
+    if file_data is not None:
+        return file_data
     subset, is_subset = subset_metadata(assay.metadata, rargs)
     if not is_subset: # no specific cells selected
         if "file_filter" not in rargs: # no filenames selected either
@@ -194,26 +205,47 @@ def get_data(accession, assay_name, rargs=None, storage=STORAGE_PREFIX):
             )
         else:
             file_data = serve_file_data(assay, fv, rargs)
-    dump_cache(file_data, request.url, storage)
+    dump_to_sqlite(accession, assay.name, file_data, request.url)
     return file_data
 
 
 def get_gct(accession, assay_name, rargs):
-    """Get GCT formatted processed data"""
+    """Get GCT formatted processed data; needs to be refactored!"""
     assay, message, status = get_assay(accession, assay_name, rargs)
     if assay is None:
         return message, status
-    rargdict = parse_rargs(rargs)
-    are_rargs_sane = (
-        (rargdict["fmt"] == "tsv") and (rargdict["header"] == "0") and
-        (rargdict["melted"] == "0") and (rargdict["descriptive"] == "0")
+    pdata_request_url = sub(r'/gct/$', "/", request.url)
+    processed_file_data = try_sqlite(
+        accession, assay.name, pdata_request_url, rargs
     )
-    if not are_rargs_sane:
-        raise AttributeError(
-            "None of the 'fmt', 'header', 'melted', 'descriptive' "
-            "arguments make sense with the GCT format"
+    if processed_file_data is None:
+        rargdict = parse_rargs(rargs)
+        are_rargs_sane = (
+            (rargdict["fmt"] == "tsv") and (rargdict["header"] == "0") and
+            (rargdict["melted"] == "0") and (rargdict["descriptive"] == "0")
         )
-    return display_object(assay.gct, fmt="raw")
+        if not are_rargs_sane:
+            raise AttributeError(
+                "None of the 'fmt', 'header', 'melted', 'descriptive' "
+                "arguments make sense with the GCT format"
+            )
+        processed_file_data = get_data(accession, assay.name, rargs=rargs)
+    pdata_bytes = processed_file_data.data
+    converted_lines, nrows, ncols = [], None, None
+    for byteline in map(bytes.strip, BytesIO(pdata_bytes)):
+        if nrows is None:
+            converted_lines.append(
+                sub(br'^[^\t]+', b'Name\tDescription', byteline).decode()
+            )
+            nrows, ncols = 0, byteline.count(b'\t')
+        elif byteline:
+            converted_lines.append(
+                sub(br'^([^\t]+)', br'\1\t\1', byteline).decode()
+            )
+            nrows += 1
+    gct_header = "#1.2\n{}\t{}\n".format(nrows, ncols)
+    file_data = gct_header + "\n".join(converted_lines)
+    return display_object(file_data, fmt="raw")
 
 
 def get_data_alias_helper(accession, assay_name, data_type, rargs, transformation_type=None):
@@ -244,7 +276,7 @@ def get_data_alias_helper(accession, assay_name, data_type, rargs, transformatio
         query_fields = {**data_fields, **{"descriptive": "1"}, **rargs}
     elif transformation_type == "gct":
         if data_type == "processed":
-            return get_gct(accession, assay_name, rargs=rargs)
+            return get_gct(accession, assay_name, {**data_fields, **rargs})
         else:
             raise ValueError("GCT only available for processed data")
     else:

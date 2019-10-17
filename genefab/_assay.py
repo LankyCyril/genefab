@@ -535,7 +535,11 @@ class AssayDispatcher(dict):
                 repr_rows.append(repr_row)
         repr_dataframe = DataFrame(
             data=repr_rows,
-            columns=["name","factors"]+ASSAY_CHARACTERISTICS+ASSAY_PROTOCOL_LIST
+            columns=(
+                ["name", "factors"] +
+                ASSAY_CHARACTERISTICS +
+                ASSAY_PROTOCOL_LIST
+            )
         )
         return repr_dataframe.copy()
 
