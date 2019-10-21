@@ -53,18 +53,26 @@ else:
         pass
 
 
+@app.route("/favicon.<imgtype>")
+def favicon(imgtype):
+    """Catch request for favicons"""
+    return ""
+
+
 @app.route("/<accession>/", methods=["GET"])
 def glds_summary(accession):
     """Report factors, assays, and/or raw JSON"""
+    rargs = parse_rargs(request.args)
     try:
         glds = GLDS(accession)
     except GeneLabJSONException as e:
         raise FileNotFoundError(e)
-    rargdict = parse_rargs(request.args)
-    if rargdict["fmt"] == "raw":
+    if rargs.display_rargs["fmt"] == "raw":
         return display_object([glds._json], "json")
     else:
-        return display_object(glds._summary_dataframe, rargdict["fmt"])
+        return display_object(
+            glds._summary_dataframe, rargs.display_rargs["fmt"]
+        )
 
 
 @app.route("/<accession>/<assay_name>/factors/", methods=["GET"])

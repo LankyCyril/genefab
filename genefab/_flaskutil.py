@@ -1,30 +1,54 @@
+from argparse import Namespace
 from genefab._util import DELIM_DEFAULT
+from copy import deepcopy
 from flask import Response
 from json import JSONEncoder, dumps
 from pandas import DataFrame, option_context
 from re import sub
 
 
-def parse_rargs(rargs):
-    """Get all common arguments from request.args"""
-    return {
-        "fmt": rargs.get("fmt", "tsv"),
-        "name_delim": rargs.get("name_delim", DELIM_DEFAULT),
-        "header": rargs.get("header", "0"),
-        "melted": rargs.get("melted", "0"),
-        "descriptive": rargs.get("descriptive", "0"),
-        "with_factors": rargs.get("with_factors", "0"),
-        "file_filter": rargs.get("file_filter", ".*"),
-        "filter": rargs.get("filter", None),
-        "diff": rargs.get("diff", True),
-        "named_only": rargs.get("named_only", True),
-        "cls": rargs.get("cls", None),
-        "continuous": rargs.get("continuous", "infer"),
-        "any_below": rargs.get("any_below", None),
-        "sort_by": rargs.get("sort_by", None),
-        "ascending": rargs.get("ascending", "1"),
-        "top": rargs.get("top", None)
+DEFAULT_RARGS = Namespace(
+    data_rargs = {
+        "file_filter": ".*",
+        "name_delim": DELIM_DEFAULT,
+        "melted": False,
+        "descriptive": False,
+        "any_below": None,
+    },
+    data_filter_rargs = {
+        "filter": None,
+        "sort_by": None,
+        "ascending": True,
+    },
+    display_rargs = {
+        "fmt": "tsv",
+        "header": False,
+        "top": None,
+        "cols": None,
+        "excludecols": None,
+    },
+    non_data_rargs = {
+        "diff": True,
+        "named_only": True,
+        "cls": None,
+        "continuous": "infer",
     }
+)
+
+
+def parse_rargs(request_args):
+    """Get all common arguments from request.args"""
+    rargs = deepcopy(DEFAULT_RARGS)
+    for rarg_type, rargs_of_type in DEFAULT_RARGS.__dict__.items():
+        for rarg, rarg_default_value in rargs_of_type.items():
+            if rarg in request_args:
+                if not isinstance(rarg_default_value, bool):
+                    getattr(rargs, rarg_type)[rarg] = request_args[rarg]
+                elif request_args[rarg] == "0":
+                    getattr(rargs, rarg_type)[rarg] = False
+                else:
+                    getattr(rargs, rarg_type)[rarg] = True
+    return rargs
 
 
 class SetEnc(JSONEncoder):
