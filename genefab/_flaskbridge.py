@@ -20,9 +20,8 @@ OPERATOR_MAPPER = {
 
 def get_assay(accession, assay_name, rargs):
     """Get assay object via GLDS accession and assay name"""
-    rargdict = parse_rargs(rargs)
     try:
-        glds = GLDS(accession, name_delim=rargdict["name_delim"])
+        glds = GLDS(accession, name_delim=rargs.data_rargs["name_delim"])
     except GeneLabJSONException as e:
         return None, "404; not found: {}".format(e), 404
     if assay_name == "assay":
@@ -41,7 +40,7 @@ def get_assay(accession, assay_name, rargs):
 
 def subset_metadata(metadata, rargs):
     """Subset metadata by fields and index"""
-    fields, index = rargs.get("fields", None), rargs.get("index", None)
+    fields, index = rargs.data_rargs["fields"], rargs.data_rargs["index"]
     is_subset = True
     if fields and index:
         repr_df = metadata.loc[[index], [fields]]

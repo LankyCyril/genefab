@@ -75,6 +75,17 @@ def glds_summary(accession):
         )
 
 
+@app.route("/<accession>/<assay_name>/", methods=["GET", "POST"])
+def assay_metadata(accession, assay_name):
+    """DataFrame view of metadata, optionally queried"""
+    rargs = parse_rargs(request.args)
+    assay, message, status = get_assay(accession, assay_name, rargs)
+    if assay is None:
+        return message, status
+    subset, _ = subset_metadata(assay.metadata, rargs)
+    return display_object(subset, rargs.display_rargs["fmt"], index=True)
+
+
 @app.route("/<accession>/<assay_name>/factors/", methods=["GET"])
 def assay_factors(accession, assay_name):
     """DataFrame of samples and factors in human-readable form"""
@@ -121,17 +132,6 @@ def assay_annotation(accession, assay_name):
                 named_only=rargdict["named_only"]
             )
             return display_object(annotation, rargdict["fmt"], index=True)
-
-
-@app.route("/<accession>/<assay_name>/", methods=["GET", "POST"])
-def assay_metadata(accession, assay_name):
-    """DataFrame view of metadata, optionally queried"""
-    assay, message, status = get_assay(accession, assay_name, request.args)
-    if assay is None:
-        return message, status
-    subset, _ = subset_metadata(assay.metadata, request.args)
-    rargdict = parse_rargs(request.args)
-    return display_object(subset, rargdict["fmt"], index=True)
 
 
 @app.route("/<accession>/<assay_name>/data/", methods=["GET"])

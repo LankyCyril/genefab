@@ -9,6 +9,8 @@ from re import sub
 
 DEFAULT_RARGS = Namespace(
     data_rargs = {
+        "fields": None,
+        "index": None,
         "file_filter": ".*",
         "name_delim": DELIM_DEFAULT,
         "melted": False,
