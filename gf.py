@@ -89,49 +89,59 @@ def assay_metadata(accession, assay_name):
 @app.route("/<accession>/<assay_name>/factors/", methods=["GET"])
 def assay_factors(accession, assay_name):
     """DataFrame of samples and factors in human-readable form"""
-    assay, message, status = get_assay(accession, assay_name, request.args)
+    rargs = parse_rargs(request.args)
+    assay, message, status = get_assay(accession, assay_name, rargs)
     if assay is None:
         return message, status
     else:
-        rargdict = parse_rargs(request.args)
-        if rargdict["cls"]:
-            if rargdict["fmt"] != "tsv":
+        if rargs.non_data_rargs["cls"]:
+            if rargs.display_rargs["fmt"] != "tsv":
                 error_mask = "{} format is unsuitable for CLS (use tsv)"
-                return GeneLabException(error_mask.format(rargdict["fmt"]), 400)
+                raise GeneLabException(
+                    error_mask.format(rargs.display_rargs["fmt"])
+                )
             else:
                 obj = assay.factors(
-                    cls=rargdict["cls"], continuous=rargdict["continuous"]
+                    cls=rargs.non_data_rargs["cls"],
+                    continuous=rargs.non_data_rargs["continuous"]
                 )
                 return display_object(obj, "raw")
         else:
-            return display_object(assay.factors(), rargdict["fmt"], index=True)
+            return display_object(
+                assay.factors(), rargs.display_rargs["fmt"], index=True
+            )
 
 
 @app.route("/<accession>/<assay_name>/annotation/", methods=["GET"])
 def assay_annotation(accession, assay_name):
     """DataFrame of samples and factors in human-readable form"""
-    assay, message, status = get_assay(accession, assay_name, request.args)
+    rargs = parse_rargs(request.args)
+    assay, message, status = get_assay(accession, assay_name, rargs)
     if assay is None:
         return message, status
     else:
-        rargdict = parse_rargs(request.args)
-        if rargdict["cls"]:
-            if rargdict["fmt"] != "tsv":
+        if rargs.non_data_rargs["cls"]:
+            if rargs.display_rargs["fmt"] != "tsv":
                 error_mask = "{} format is unsuitable for CLS (use tsv)"
-                raise GeneLabException(error_mask.format(rargdict["fmt"]))
+                raise GeneLabException(
+                    error_mask.format(rargs.display_rargs["fmt"])
+                )
             else:
                 annotation = assay.annotation(
-                    differential_annotation=rargdict["diff"],
-                    named_only=rargdict["named_only"],
-                    cls=rargdict["cls"], continuous=rargdict["continuous"]
+                    differential_annotation=rargs.non_data_rargs["diff"],
+                    named_only=rargs.non_data_rargs["named_only"],
+                    cls=rargs.non_data_rargs["cls"],
+                    continuous=rargs.non_data_rargs["continuous"]
                 )
                 return display_object(annotation, "raw")
         else:
             annotation = assay.annotation(
-                differential_annotation=rargdict["diff"],
-                named_only=rargdict["named_only"]
+                differential_annotation=rargs.non_data_rargs["diff"],
+                named_only=rargs.non_data_rargs["named_only"]
             )
-            return display_object(annotation, rargdict["fmt"], index=True)
+            return display_object(
+                annotation, rargs.display_rargs["fmt"], index=True
+            )
 
 
 @app.route("/<accession>/<assay_name>/data/", methods=["GET"])
