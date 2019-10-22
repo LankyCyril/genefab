@@ -136,15 +136,16 @@ class Assay():
     """Stores individual assay information and metadata in raw form"""
     name = None
     _fields, raw_metadata, metadata = None, None, None
-    parent, glds_file_urls = None, None
+    parent, glds_file_urls, glds_file_dates = None, None, None
     storage = None
     _normalized_data, _processed_data = None, None
     _indexed_by, _name_delim, _field_indexed_by = None, True, None
 
-    def __init__(self, parent, name, json, glds_file_urls, storage_prefix, index_by, name_delim):
+    def __init__(self, parent, name, json, glds_file_urls, glds_file_dates, storage_prefix, index_by, name_delim):
         """Parse JSON into assay metadata"""
         self.parent, self.name, self._json = parent, name, json
         self.glds_file_urls = glds_file_urls
+        self.glds_file_dates = glds_file_dates
         self.storage = join(storage_prefix, name)
         self._raw, self._header = self._json["raw"], self._json["header"]
         # populate and freeze self._fields (this can be refactored...):
@@ -298,7 +299,7 @@ class Assay():
 class AssayDispatcher(dict):
     """Contains Assay objects, indexable by name or by attributes"""
 
-    def __init__(self, parent, json, glds_file_urls, storage_prefix, index_by, name_delim):
+    def __init__(self, parent, json, glds_file_urls, glds_file_dates, storage_prefix, index_by, name_delim):
         """Populate dictionary of assay_name -> Assay()"""
         try:
             for assay_name, assay_json in json.items():
@@ -307,7 +308,8 @@ class AssayDispatcher(dict):
                     Assay(
                         parent, assay_name, assay_json, index_by=index_by,
                         name_delim=name_delim, storage_prefix=storage_prefix,
-                        glds_file_urls=glds_file_urls
+                        glds_file_urls=glds_file_urls,
+                        glds_file_dates=glds_file_dates
                     )
                 )
         except KeyError:

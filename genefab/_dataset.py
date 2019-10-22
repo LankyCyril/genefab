@@ -12,7 +12,8 @@ from os.path import join
 
 class GeneLabDataSet():
     """Stores GLDS metadata associated with an accession number"""
-    accession, assays, file_urls, storage = None, None, None, None
+    accession, assays, storage = None, None, None
+    _file_urls, _file_dates = None, None
     verbose = False
 
     def __init__(self, accession, verbose=False, storage_prefix=STORAGE_PREFIX, index_by="Sample Name", name_delim=DELIM_DEFAULT):
@@ -44,7 +45,8 @@ class GeneLabDataSet():
         self.assays = AssayDispatcher(
             parent=self, json=self._info["assays"], storage_prefix=self.storage,
             name_delim=name_delim, index_by=index_by,
-            glds_file_urls=self._get_file_urls()
+            glds_file_urls=self._get_file_urls(),
+            glds_file_dates=self._get_file_dates()
         )
 
     @property
@@ -67,8 +69,8 @@ class GeneLabDataSet():
         """Get filenames and associated URLs"""
         if self.accession is None:
             raise ValueError("Uninitialized GLDS instance")
-        elif (not force_reload) and (self.file_urls is not None):
-            return self.file_urls
+        elif (not force_reload) and (self._file_urls is not None):
+            return self._file_urls
         else:
             getter_url = "{}/data/glds/files/{}"
             acc_nr = search(r'\d+$', self.accession).group()
@@ -79,11 +81,32 @@ class GeneLabDataSet():
                 filedata = files_json["studies"][self.accession]["study_files"]
             except KeyError:
                 raise GeneLabJSONException("Malformed JSON")
-            self.file_urls = {
+            self._file_urls = {
                 fd["file_name"]: GENELAB_ROOT+fd["remote_url"]
                 for fd in filedata
             }
-            return self.file_urls
+            return self._file_urls
+
+    def _get_file_dates(self, force_reload=False):
+        """Get filenames and creation dates"""
+        if self.accession is None:
+            raise ValueError("Uninitialized GLDS instance")
+        elif (not force_reload) and (self._file_dates is not None):
+            return self._file_dates
+        else:
+            getter_url = "{}/data/glds/files/{}"
+            acc_nr = search(r'\d+$', self.accession).group()
+            files_json = get_json(
+                getter_url.format(API_ROOT, acc_nr), self.verbose
+            )
+            try:
+                filedata = files_json["studies"][self.accession]["study_files"]
+            except KeyError:
+                raise GeneLabJSONException("Malformed JSON")
+            self._file_dates = {
+                fd["file_name"]: fd["date_created"] for fd in filedata
+            }
+            return self._file_dates
 
 
 def get_ffield_matches(verbose=False, **ffield_kwargs):
