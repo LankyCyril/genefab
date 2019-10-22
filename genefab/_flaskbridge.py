@@ -1,6 +1,5 @@
 from genefab import GLDS, GeneLabJSONException
 from genefab._util import update_table, DELIM_AS_IS, STORAGE_PREFIX
-from genefab._flaskutil import display_object
 from re import sub, split, search, IGNORECASE
 from pandas import DataFrame, Index, merge, read_sql_query
 from csv import reader

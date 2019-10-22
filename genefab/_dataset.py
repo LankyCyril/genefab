@@ -63,10 +63,6 @@ class GeneLabDataSet():
         )
         return concat([factors_df, assays_df], axis=0, sort=False)
 
-    def __repr__(self):
-        """Use summary dataframe"""
-        return repr(self._summary_dataframe)
-
     def _get_file_urls(self, force_reload=False):
         """Get filenames and associated URLs"""
         if self.accession is None:
