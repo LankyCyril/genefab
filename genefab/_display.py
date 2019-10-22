@@ -24,6 +24,37 @@ def to_dataframe(obj):
         return DataFrame(columns=["value"], data=obj)
 
 
+def display_dataframe(obj, display_rargs, index):
+    if display_rargs["fmt"] == "list":
+        if obj.shape == (1, 1):
+            obj_repr = sub(r'\s*,\s*', "\n", str(obj.iloc[0, 0]))
+            return Response(obj_repr, mimetype="text/plain")
+        else:
+            raise ValueError("multiple cells selected")
+    if display_rargs["top"] is not None:
+        if display_rargs["top"].isdigit() and int(display_rargs["top"]):
+            obj = obj[:int(display_rargs["top"])]
+        else:
+            raise ValueError("`top` must be a positive integer")
+    if display_rargs["header"]:
+        obj = DataFrame(columns=obj.columns, index=["header"])
+    if display_rargs["fmt"] == "tsv":
+        obj_repr = obj.to_csv(sep="\t", index=index, na_rep="NA")
+        return Response(obj_repr, mimetype="text/plain")
+    elif display_rargs["fmt"] == "html":
+        with option_context("display.max_colwidth", -1):
+            return obj.to_html(index=index, na_rep="NA", justify="left")
+    elif display_rargs["fmt"] == "json":
+        try:
+            obj_repr = obj.to_json(index=index, orient="index")
+            return Response(obj_repr, mimetype="text/json")
+        except ValueError:
+            obj_repr = obj.to_json(index=index, orient="records")
+            return Response(obj_repr, mimetype="text/json")
+    else:
+        raise ValueError("wrong extension or type?")
+
+
 def display_object(obj, display_rargs, index="auto"):
     """Select appropriate converter and mimetype for fmt"""
     if isinstance(obj, (dict, tuple, list)):
@@ -34,34 +65,7 @@ def display_object(obj, display_rargs, index="auto"):
     if index == "auto":
         index = (display_rargs["fmt"] == "json")
     if isinstance(obj, DataFrame):
-        if display_rargs["fmt"] == "list":
-            if obj.shape == (1, 1):
-                obj_repr = sub(r'\s*,\s*', "\n", str(obj.iloc[0, 0]))
-                return Response(obj_repr, mimetype="text/plain")
-            else:
-                raise ValueError("multiple cells selected")
-        if display_rargs["top"] is not None:
-            if display_rargs["top"].isdigit() and int(display_rargs["top"]):
-                obj = obj[:int(display_rargs["top"])]
-            else:
-                raise ValueError("`top` must be a positive integer")
-        if display_rargs["header"]:
-            obj = DataFrame(columns=obj.columns, index=["header"])
-        if display_rargs["fmt"] == "tsv":
-            obj_repr = obj.to_csv(sep="\t", index=index, na_rep="NA")
-            return Response(obj_repr, mimetype="text/plain")
-        elif display_rargs["fmt"] == "html":
-            with option_context("display.max_colwidth", -1):
-                return obj.to_html(index=index, na_rep="NA", justify="left")
-        elif display_rargs["fmt"] == "json":
-            try:
-                obj_repr = obj.to_json(index=index, orient="index")
-                return Response(obj_repr, mimetype="text/json")
-            except ValueError:
-                obj_repr = obj.to_json(index=index, orient="records")
-                return Response(obj_repr, mimetype="text/json")
-        else:
-            raise ValueError("wrong extension or type?")
+        return display_dataframe(obj, display_rargs, index=index)
     elif display_rargs["fmt"] == "raw":
         return Response(obj, mimetype="application")
     else:
