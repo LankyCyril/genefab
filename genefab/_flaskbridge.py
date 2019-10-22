@@ -192,7 +192,7 @@ def retrieve_table_data(assay, filemask, data_rargs, melting=False):
 
 def try_sqlite(accession, assay_name, url):
     """Try to load dataframe from DB_NAME"""
-    return None # TODO FREEME FIXME
+    return None # FIXME
     db = connect(path.join(
         STORAGE_PREFIX, accession + "-" + assay_name + ".sqlite3"
     ))
@@ -206,7 +206,7 @@ def try_sqlite(accession, assay_name, url):
 
 def dump_to_sqlite(accession, assay_name, table_data, url):
     """Save transformed dataframe to DB_NAME"""
-    return None # TODO FREEME FIXME
+    return None # FIXME
     table_name = "flaskbridge-" + sha512(url.encode("utf-8")).hexdigest()
     db = connect(path.join(
         STORAGE_PREFIX, accession + "-" + assay_name + ".sqlite3"
