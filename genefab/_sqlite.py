@@ -1,4 +1,4 @@
-from genefab import GeneLabJSONException
+from genefab import GeneLabJSONException, GeneLabDataManagerException
 from os import remove, path
 from requests import get
 from requests.exceptions import InvalidSchema
@@ -23,7 +23,9 @@ def download_table(accession, assay_name, filemask, url, verbose=False, http_fal
         else:
             raise
     if stream.status_code != 200:
-        raise URLError("{}: status code {}".format(url, stream.status_code))
+        raise GeneLabDataManagerException("HTTP Error {}: {}".format(
+            stream.status_code, url
+        ))
     total_bytes = int(stream.headers.get("content-length", 0))
     with TemporaryDirectory() as tempdir:
         sep, compression = guess_format(filemask)

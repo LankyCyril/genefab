@@ -2,6 +2,7 @@
 from sys import stderr
 from flask import Flask, request
 from genefab import GLDS, GeneLabJSONException, GeneLabException
+from genefab import GeneLabDataManagerException
 from pandas import DataFrame
 from genefab._display import display_object
 from genefab._util import parse_rargs
@@ -40,6 +41,8 @@ def exception_catcher(e):
         code, explanation = 404, "Not Found"
     elif isinstance(e, NotImplementedError):
         code, explanation = 501, "Not Implemented"
+    elif isinstance(e, GeneLabDataManagerException):
+        code, explanation = 500, "GeneLab Data Manager Internal Server Error"
     else:
         code, explanation = 400, "Bad Request"
     error_mask = "<b>HTTP error</b>: {} ({})<br><b>{}</b>: {}"
