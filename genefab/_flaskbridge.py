@@ -163,7 +163,7 @@ def serve_formatted_file_data(local_filepath, rargdict, melting):
 
 def serve_formatted_table_data(accession, assay_name, table_name, rargs, melting):
     """Format file data accoring to rargdict and melting"""
-    db = connect(path.join(
+    db = connect(path.join( # FIXME
         STORAGE_PREFIX, accession + "-" + assay_name + ".sqlite3"
     ))
     query = "SELECT * FROM '{}'".format(table_name)
@@ -214,7 +214,7 @@ def serve_file_data(assay, filemask, rargs, melting=False):
         raise ValueError("multiple files match mask")
     if url is None:
         raise FileNotFoundError
-    table_name = update_table(
+    table_name = update_table( # FIXME
         assay.parent.accession, assay.name, filemask, url, assay.storage
     )
     if rargs.display_rargs["fmt"] == "raw":
@@ -229,7 +229,7 @@ def serve_file_data(assay, filemask, rargs, melting=False):
 
 def try_sqlite(accession, assay_name, url, rargs):
     """Try to load dataframe from DB_NAME"""
-    return None # TODO FREEME
+    return None # TODO FREEME FIXME
     db = connect(path.join(
         STORAGE_PREFIX, accession + "-" + assay_name + ".sqlite3"
     ))
@@ -237,15 +237,14 @@ def try_sqlite(accession, assay_name, url, rargs):
     query = "SELECT * FROM '{}'".format(table_name)
     try:
         repr_df = read_sql_query(query, db, index_col="index")
-        rargdict = parse_rargs(rargs)
-        return display_object(repr_df, rargdict["fmt"])
+        return display_object(repr_df, rargs.display_rargs["fmt"])
     except PandasDatabaseError:
         return None
 
 
 def dump_to_sqlite(accession, assay_name, file_data, url):
     """Save transformed dataframe to DB_NAME"""
-    return None # TODO FREEME
+    return None # TODO FREEME FIXME
     table_name = "flaskbridge-" + sha512(url.encode("utf-8")).hexdigest()
     db = connect(path.join(
         STORAGE_PREFIX, accession + "-" + assay_name + ".sqlite3"

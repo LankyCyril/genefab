@@ -171,7 +171,7 @@ def get_data(accession, assay_name, rargs=None):
         raise FileNotFoundError("no data")
     elif len(filtered_values) > 1:
         raise ValueError("multiple data files match search criteria")
-    else:
+    else: # FIXME
         fv = filtered_values.pop()
         if rargs.data_rargs["descriptive"]:
             file_data = serve_file_data(
