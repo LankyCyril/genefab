@@ -161,7 +161,7 @@ def serve_formatted_file_data(local_filepath, rargdict, melting):
     return display_object(repr_df, rargdict["fmt"], index="auto")
 
 
-def serve_formatted_table_data(accession, assay_name, table_name, rargdict, melting):
+def serve_formatted_table_data(accession, assay_name, table_name, rargs, melting):
     """Format file data accoring to rargdict and melting"""
     db = connect(path.join(
         STORAGE_PREFIX, accession + "-" + assay_name + ".sqlite3"
@@ -172,34 +172,38 @@ def serve_formatted_table_data(accession, assay_name, table_name, rargdict, melt
         repr_df = repr_df.set_index(repr_df.columns[0])
     except PandasDatabaseError:
         raise PandasDatabaseError("Expected a table but none found")
-    if rargdict["name_delim"] != DELIM_AS_IS:
-        convert_delim = lambda f: sub(r'[._-]', rargdict["name_delim"], f)
-        repr_df.columns = repr_df.columns.map(convert_delim)
-    if rargdict["any_below"] is not None:
-        repr_df = get_padj_filtered_repr_df(repr_df, rargdict["any_below"])
-    if rargdict["filter"] is not None:
-        repr_df = get_filtered_repr_df(repr_df, rargdict["filter"])
-    if rargdict["sort_by"] is not None:
-        if rargdict["sort_by"] in repr_df.columns:
-            ascending = False if rargdict["ascending"] == "0" else True
+    if rargs.data_rargs["name_delim"] != DELIM_AS_IS:
+        conv_delim = lambda f: sub(r'[._-]', rargs.data_rargs["name_delim"], f)
+        repr_df.columns = repr_df.columns.map(conv_delim)
+    if rargs.data_rargs["any_below"] is not None:
+        repr_df = get_padj_filtered_repr_df(
+            repr_df, rargs.data_rargs["any_below"]
+        )
+    if rargs.data_filter_rargs["filter"] is not None: # TODO MOVEME
+        repr_df = get_filtered_repr_df(
+            repr_df, rargs.data_filter_rargs["filter"]
+        )
+    if rargs.data_filter_rargs["sort_by"] is not None: # TODO MOVEME
+        if rargs.data_filter_rargs["sort_by"] in repr_df.columns:
             repr_df = repr_df.sort_values(
-                by=rargdict["sort_by"], ascending=ascending
+                by=rargs.data_filter_rargs["sort_by"],
+                ascending=rargs.data_filter_rargs["ascending"]
             )
         else:
             error_mask = "Unknown field (column) '{}'"
-            raise IndexError(error_mask.format(rargdict["sort_by"]))
-    if rargdict["top"] is not None:
-        if rargdict["top"].isdigit() and int(rargdict["top"]):
-            repr_df = repr_df[:int(rargdict["top"])]
+            raise IndexError(error_mask.format(rargs.data_filter_rargs["sort_by"]))
+    if rargs.display_rargs["top"] is not None: # TODO MOVEME
+        if rargs.display_rargs["top"].isdigit() and int(rargs.display_rargs["top"]):
+            repr_df = repr_df[:int(rargs.display_rargs["top"])]
         else:
             raise ValueError("`top` must be a positive integer")
     if melting is not False:
         repr_df = melt_file_data(repr_df, melting=melting)
     else:
         repr_df = repr_df.reset_index()
-    if rargdict["header"] == "1":
+    if rargs.display_rargs["header"]: # TODO MOVEME
         repr_df = DataFrame(columns=repr_df.columns, index=["header"])
-    return display_object(repr_df, rargdict["fmt"], index="auto")
+    return display_object(repr_df, rargs.display_rargs["fmt"], index="auto")
 
 
 def serve_file_data(assay, filemask, rargs, melting=False):
@@ -213,19 +217,19 @@ def serve_file_data(assay, filemask, rargs, melting=False):
     table_name = update_table(
         assay.parent.accession, assay.name, filemask, url, assay.storage
     )
-    rargdict = parse_rargs(rargs)
-    if rargdict["fmt"] == "raw":
+    if rargs.display_rargs["fmt"] == "raw":
         raise NotImplementedError("fmt=raw with SQLite3")
-    elif rargdict["fmt"] in {"tsv", "json"}:
+    elif rargs.display_rargs["fmt"] in {"tsv", "json"}:
         return serve_formatted_table_data(
-            assay.parent.accession, assay.name, table_name, rargdict, melting
+            assay.parent.accession, assay.name, table_name, rargs, melting
         )
     else:
-        raise NotImplementedError("fmt={}".format(rargdict["fmt"]))
+        raise NotImplementedError("fmt={}".format(rargs.display_rargs["fmt"]))
 
 
 def try_sqlite(accession, assay_name, url, rargs):
     """Try to load dataframe from DB_NAME"""
+    return None # TODO FREEME
     db = connect(path.join(
         STORAGE_PREFIX, accession + "-" + assay_name + ".sqlite3"
     ))
@@ -241,6 +245,7 @@ def try_sqlite(accession, assay_name, url, rargs):
 
 def dump_to_sqlite(accession, assay_name, file_data, url):
     """Save transformed dataframe to DB_NAME"""
+    return None # TODO FREEME
     table_name = "flaskbridge-" + sha512(url.encode("utf-8")).hexdigest()
     db = connect(path.join(
         STORAGE_PREFIX, accession + "-" + assay_name + ".sqlite3"

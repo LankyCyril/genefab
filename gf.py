@@ -9,6 +9,7 @@ from genefab._flaskbridge import serve_file_data, try_sqlite, dump_to_sqlite
 from os import environ
 from re import sub
 from io import BytesIO
+from copy import deepcopy
 
 
 FLASK_DEBUG_MARKERS = {"development", "staging", "stage", "debug", "debugging"}
@@ -147,40 +148,36 @@ def assay_annotation(accession, assay_name):
 @app.route("/<accession>/<assay_name>/data/", methods=["GET"])
 def get_data(accession, assay_name, rargs=None):
     """Serve any kind of data"""
+    if rargs is None:
+        rargs = parse_rargs(request.args)
     assay, message, status = get_assay(accession, assay_name, rargs)
     if assay is None:
         return message, status
-    if rargs is None:
-        rargs = request.args
     file_data = try_sqlite(accession, assay.name, request.url, rargs)
     if file_data is not None:
         return file_data
     subset, is_subset = subset_metadata(assay.metadata, rargs)
     if not is_subset: # no specific cells selected
-        if "file_filter" not in rargs: # no filenames selected either
+        if "file_filter" not in rargs.data_rargs: # no filenames selected either
             raise ValueError("no entries selected")
         else: # filenames selected, should match just one
             filtered_values = filter_cells(
-                DataFrame(assay.glds_file_urls.keys()), rargs["file_filter"]
+                DataFrame(assay.glds_file_urls.keys()),
+                rargs.data_rargs["file_filter"]
             )
     else:
-        filename_filter = rargs.get("file_filter", r'.*')
-        filtered_values = filter_cells(subset, filename_filter)
+        filtered_values = filter_cells(subset, rargs.data_rargs["file_filter"])
     if len(filtered_values) == 0:
         raise FileNotFoundError("no data")
     elif len(filtered_values) > 1:
         raise ValueError("multiple data files match search criteria")
     else:
         fv = filtered_values.pop()
-        if rargs.get("descriptive", "0") == "1":
+        if rargs.data_rargs["descriptive"]:
             file_data = serve_file_data(
                 assay, fv, rargs, melting=assay.annotation().T
             )
-        elif rargs.get("with_factors", "0") == "1":
-            file_data = serve_file_data(
-                assay, fv, rargs, melting=assay.factors().T
-            )
-        elif rargs.get("melted", "0") == "1":
+        elif rargs.data_rargs["melted"]:
             file_data = serve_file_data(
                 assay, fv, rargs, melting=list(assay.annotation().T.columns)
             )
@@ -200,10 +197,11 @@ def get_gct(accession, assay_name, rargs):
         accession, assay.name, pdata_request_url, rargs
     )
     if processed_file_data is None:
-        rargdict = parse_rargs(rargs)
         are_rargs_sane = (
-            (rargdict["fmt"] == "tsv") and (rargdict["header"] == "0") and
-            (rargdict["melted"] == "0") and (rargdict["descriptive"] == "0")
+            (rargs.display_rargs["fmt"] == "tsv") and
+            (rargs.display_rargs["header"] == False) and
+            (rargs.data_rargs["melted"] == False) and
+            (rargs.data_rargs["descriptive"] == False)
         )
         if not are_rargs_sane:
             raise AttributeError(
@@ -229,52 +227,58 @@ def get_gct(accession, assay_name, rargs):
     return display_object(file_data, fmt="raw")
 
 
-def get_data_alias_helper(accession, assay_name, data_type, rargs, transformation_type=None):
+def get_data_alias_helper(accession, assay_name, data_type, rargs, transform=None):
     """Dispatch data for URL aliases"""
-    if data_type == "processed":
-        data_fields = {
-            "fields": ".*normalized.*annotated.*",
-            "file_filter": "txt"
-        }
-    elif data_type == "deg":
-        data_fields = {
-            "fields": ".*differential.*expression.*",
-            "file_filter": "expression.csv"
-        }
-    elif data_type == "viz-table":
-        data_fields = {
-            "file_filter": ".*visualization_output_table.csv"
-        }
+    if data_type in {"processed", "deg", "viz-table"}:
+        are_fields_dirty = (rargs.data_rargs["fields"] is not None)
+        is_file_filter_dirty = (rargs.data_rargs["file_filter"] != ".*")
+        if are_fields_dirty or is_file_filter_dirty:
+            error_mask = "'{}' already sets 'fields' and 'file_filter', {}"
+            raise GeneLabException(error_mask.format(
+                data_type, "cannot overwrite them with GET arguments"
+            ))
     else:
         raise GeneLabException("Unknown data alias: '{}'".format(data_type))
-    if transformation_type is None:
-        query_fields = {**data_fields, **rargs}
-    elif transformation_type == "melted":
-        query_fields = {**data_fields, **{"melted": "1"}, **rargs}
-    elif transformation_type == "with-factors":
-        query_fields = {**data_fields, **{"with_factors": "1"}, **rargs}
-    elif transformation_type == "descriptive":
-        query_fields = {**data_fields, **{"descriptive": "1"}, **rargs}
-    elif transformation_type == "gct":
-        if data_type == "processed":
-            return get_gct(accession, assay_name, {**data_fields, **rargs})
-        else:
+    if transform in {"melted", "descriptive"}:
+        for rarg in {"melted", "descriptive"}:
+            if rargs.data_rargs[rarg]:
+                error_mask = "'{}' already sets '{}', {}"
+                raise GeneLabException(error_mask.format(
+                    transform, rarg, "cannot overwrite it with GET arguments"
+                ))
+    elif transform == "gct":
+        if data_type != "processed":
             raise ValueError("GCT only available for processed data")
-    else:
+    elif transform is not None:
         error_mask = "Unknown transformation alias: '{}'"
-        raise GeneLabException(error_mask.format(transformation_type))
-    return get_data(accession, assay_name, rargs=query_fields)
+        raise GeneLabException(error_mask.format(transform))
+    modified_rargs = deepcopy(rargs)
+    if data_type == "processed":
+        modified_rargs.data_rargs["fields"] = ".*normalized.*annotated.*"
+        modified_rargs.data_rargs["file_filter"] = "txt"
+    elif data_type == "deg":
+        modified_rargs.data_rargs["fields"] = ".*differential.*expression.*"
+        modified_rargs.data_rargs["file_filter"] = "expression.csv"
+    elif data_type == "viz-table":
+        modified_rargs.data_rargs["file_filter"] = ".*vis.*_output_table.csv"
+    if transform == "gct":
+        return get_gct(accession, assay_name, modified_rargs)
+    else:
+        modified_rargs.data_rargs[transform] = True
+    return get_data(accession, assay_name, rargs=modified_rargs)
 
 
 @app.route("/<accession>/<assay_name>/data/<data_type>/", methods=["GET"])
 def get_data_plain_alias(accession, assay_name, data_type):
     """Alias 'processed', 'deg', and 'viz-table' endpoints"""
-    return get_data_alias_helper(accession, assay_name, data_type, request.args)
+    rargs = parse_rargs(request.args)
+    return get_data_alias_helper(accession, assay_name, data_type, rargs)
 
 
-@app.route("/<accession>/<assay_name>/data/<data_type>/<transformation_type>/", methods=["GET"])
-def get_data_transformed_alias(accession, assay_name, data_type, transformation_type):
+@app.route("/<accession>/<assay_name>/data/<data_type>/<transform>/", methods=["GET"])
+def get_data_transformed_alias(accession, assay_name, data_type, transform):
     """Alias 'melted', 'descriptive', and 'gct' endpoints"""
+    rargs = parse_rargs(request.args)
     return get_data_alias_helper(
-        accession, assay_name, data_type, request.args, transformation_type
+        accession, assay_name, data_type, rargs, transform
     )
