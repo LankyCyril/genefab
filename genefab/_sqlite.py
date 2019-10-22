@@ -1,5 +1,4 @@
 from genefab import GeneLabJSONException
-from os.path import join
 from os import remove, path
 from requests import get
 from requests.exceptions import InvalidSchema
@@ -9,24 +8,13 @@ from hashlib import sha512
 from pandas import read_csv, read_sql_query, DataFrame, Index, merge
 from pandas.io.sql import DatabaseError as PandasDatabaseError
 from tempfile import TemporaryDirectory
-from genefab._util import STORAGE_PREFIX, guess_format, DELIM_AS_IS
+from genefab._util import STORAGE_PREFIX, DELIM_AS_IS
+from genefab._util import guess_format, data_rargs_digest
 from re import sub, search, IGNORECASE
 
 
-def update_table(accession, assay_name, filemask, url, table_prefix, verbose=False, http_fallback=True):
-    """Check if table already in database, if not, download and store; return table name"""
-    db = connect(join(
-        STORAGE_PREFIX, accession + "-" + assay_name + ".sqlite3"
-    ))
-    filemask_hash = sha512(filemask.encode("utf-8")).hexdigest()
-    table_name = "{}/{}".format(table_prefix, filemask_hash)
-    query_mask = (
-        "SELECT count(name) FROM sqlite_master WHERE type='table' AND name='{}'"
-    )
-    cursor = db.execute(query_mask.format(table_name))
-    if cursor.fetchone()[0] > 0: # table exists
-        return table_name
-    # otherwise, table doesn't exist and we need to download data:
+def download_table(accession, assay_name, filemask, url, verbose=False, http_fallback=True):
+    """Download and interpret table file"""
     try:
         stream = get(url, stream=True)
     except InvalidSchema:
@@ -39,7 +27,8 @@ def update_table(accession, assay_name, filemask, url, table_prefix, verbose=Fal
     total_bytes = int(stream.headers.get("content-length", 0))
     with TemporaryDirectory() as tempdir:
         sep, compression = guess_format(filemask)
-        target_file = join(tempdir, filemask_hash)
+        filemask_hash = sha512(filemask.encode("utf-8")).hexdigest()
+        target_file = path.join(tempdir, filemask_hash)
         if compression:
             target_file = target_file + "." + compression
         with open(target_file, "wb") as output_handle:
@@ -50,10 +39,7 @@ def update_table(accession, assay_name, filemask, url, table_prefix, verbose=Fal
         if total_bytes != written_bytes:
             remove(target_file)
             raise URLError("Failed to download the correct number of bytes")
-        read_csv(target_file, sep=sep).to_sql(table_name, db)
-        db.commit()
-        db.close()
-    return table_name
+        return read_csv(target_file, sep=sep)
 
 
 def get_padj_filtered_repr_df(repr_df, any_below):
@@ -90,30 +76,23 @@ def melt_table_data(repr_df, melting):
         raise TypeError("cannot melt/describe with a non-dataframe object")
 
 
-def retrieve_formatted_table_data(accession, assay_name, table_name, data_rargs, melting):
+def format_table_data(repr_df, assay, data_rargs):
     """Format file data accoring to rargdict and melting"""
-    db = connect(path.join( # FIXME
-        STORAGE_PREFIX, accession + "-" + assay_name + ".sqlite3"
-    ))
-    query = "SELECT * FROM '{}'".format(table_name)
-    try:
-        repr_df = read_sql_query(query, db, index_col="index")
-        repr_df = repr_df.set_index(repr_df.columns[0])
-    except PandasDatabaseError:
-        raise PandasDatabaseError("Expected a table but none found")
     if data_rargs["name_delim"] != DELIM_AS_IS:
         conv_delim = lambda f: sub(r'[._-]', data_rargs["name_delim"], f)
         repr_df.columns = repr_df.columns.map(conv_delim)
     if data_rargs["any_below"] is not None: # FIXME MOVEME
         repr_df = get_padj_filtered_repr_df(repr_df, data_rargs["any_below"])
-    if melting is not False: # FIXME MOVEME
-        repr_df = melt_table_data(repr_df, melting=melting)
-    else: # FIXME MOVEME
+    if data_rargs["descriptive"]:
+        repr_df = melt_table_data(repr_df, melting=assay.annotation().T)
+    elif data_rargs["melted"]:
+        repr_df = melt_table_data(repr_df, melting=list(assay.annotation().T.columns))
+    else:
         repr_df = repr_df.reset_index()
     return repr_df
 
 
-def retrieve_table_data(assay, filemask, data_rargs, melting=False):
+def retrieve_table_data(assay, filemask, data_rargs):
     """Find file URL that matches filemask, redirect to download or interpret"""
     try:
         url = assay._get_file_url(filemask)
@@ -121,21 +100,18 @@ def retrieve_table_data(assay, filemask, data_rargs, melting=False):
         raise ValueError("multiple files match mask")
     if url is None:
         raise FileNotFoundError
-    table_name = update_table( # FIXME
-        assay.parent.accession, assay.name, filemask, url, assay.storage
+    repr_df = download_table(
+        assay.parent.accession, assay.name, filemask, url
     )
-    return retrieve_formatted_table_data(
-        assay.parent.accession, assay.name, table_name, data_rargs, melting
-    )
+    return format_table_data(repr_df, assay, data_rargs)
 
 
-def try_sqlite(accession, assay_name, url):
+def try_sqlite(accession, assay_name, data_rargs):
     """Try to load dataframe from DB_NAME"""
-    return None # FIXME
+    table_name = data_rargs_digest(data_rargs)
     db = connect(path.join(
         STORAGE_PREFIX, accession + "-" + assay_name + ".sqlite3"
     ))
-    table_name = "flaskbridge-" + sha512(url.encode("utf-8")).hexdigest()
     query = "SELECT * FROM '{}'".format(table_name)
     try:
         return read_sql_query(query, db, index_col="index")
@@ -143,10 +119,9 @@ def try_sqlite(accession, assay_name, url):
         return None
 
 
-def dump_to_sqlite(accession, assay_name, table_data, url):
+def dump_to_sqlite(accession, assay_name, data_rargs, table_data):
     """Save transformed dataframe to DB_NAME"""
-    return None # FIXME
-    table_name = "flaskbridge-" + sha512(url.encode("utf-8")).hexdigest()
+    table_name = data_rargs_digest(data_rargs)
     db = connect(path.join(
         STORAGE_PREFIX, accession + "-" + assay_name + ".sqlite3"
     ))

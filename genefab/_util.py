@@ -3,7 +3,8 @@ from copy import deepcopy
 from sys import stderr
 from urllib.request import urlopen
 from json import loads
-from re import search
+from re import search, sub
+from hashlib import sha512
 
 
 GENELAB_ROOT = "https://genelab-data.ndc.nasa.gov"
@@ -57,6 +58,17 @@ def parse_rargs(request_args):
                 else:
                     getattr(rargs, rarg_type)[rarg] = True
     return rargs
+
+
+def data_rargs_digest(data_rargs):
+    """Convert data_rargs to a string digest"""
+    raw_digest = []
+    for key, value in sorted(data_rargs.items()):
+        raw_digest.extend([key, str(value)])
+    raw_string_digest = "_".join(raw_digest)
+    string_digest = sub(r'[^0-9A-Za-z_]', "_", raw_string_digest)
+    hexdigest = sha512(raw_string_digest.encode("utf-8")).hexdigest()
+    return string_digest + "_" + hexdigest
 
 
 def get_json(url, verbose=False):

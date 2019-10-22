@@ -155,7 +155,7 @@ def get_data(accession, assay_name, rargs=None):
     assay, message, status = get_assay(accession, assay_name, rargs)
     if assay is None:
         return message, status
-    table_data = try_sqlite(accession, assay.name, request.url)
+    table_data = try_sqlite(accession, assay.name, rargs.data_rargs)
     if table_data is not None:
         return display_object(
             filter_table_data(table_data, rargs.data_filter_rargs),
@@ -179,16 +179,10 @@ def get_data(accession, assay_name, rargs=None):
     elif len(filtered_values) > 1:
         raise ValueError("multiple data files match search criteria")
     else:
-        if rargs.data_rargs["descriptive"]:
-            melting = assay.annotation().T
-        elif rargs.data_rargs["melted"]:
-            melting = list(assay.annotation().T.columns)
-        else:
-            melting = False
         table_data = retrieve_table_data(
-            assay, filtered_values.pop(), rargs.data_rargs, melting=melting
+            assay, filtered_values.pop(), rargs.data_rargs
         )
-    dump_to_sqlite(accession, assay.name, table_data, request.url)
+    dump_to_sqlite(accession, assay.name, rargs.data_rargs, table_data)
     if rargs.display_rargs["fmt"] == "raw":
         raise NotImplementedError("fmt=raw with SQLite3")
     elif rargs.display_rargs["fmt"] in {"tsv", "json"}:
@@ -205,8 +199,7 @@ def get_gct(accession, assay_name, rargs):
     assay, message, status = get_assay(accession, assay_name, rargs)
     if assay is None:
         return message, status
-    pdata_request_url = sub(r'/gct/$', "/", request.url)
-    processed_table_data = try_sqlite(accession, assay.name, pdata_request_url)
+    processed_table_data = try_sqlite(accession, assay.name, rargs.data_rargs)
     if processed_table_data is None:
         are_rargs_sane = (
             (rargs.display_rargs["fmt"] == "tsv") and
@@ -274,7 +267,7 @@ def get_data_alias_helper(accession, assay_name, data_type, rargs, transform=Non
         modified_rargs.data_rargs["file_filter"] = ".*vis.*_output_table.csv"
     if transform == "gct":
         return get_gct(accession, assay_name, modified_rargs)
-    else:
+    elif transform is not None:
         modified_rargs.data_rargs[transform] = True
     return get_data(accession, assay_name, rargs=modified_rargs)
 
