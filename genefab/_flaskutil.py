@@ -97,11 +97,11 @@ def display_object(obj, display_rargs, index="auto"):
         if display_rargs["header"]:
             obj = DataFrame(columns=obj.columns, index=["header"])
         if display_rargs["fmt"] == "tsv":
-            obj_repr = obj.to_csv(sep="\t", index=index, na_rep="")
+            obj_repr = obj.to_csv(sep="\t", index=index, na_rep="NA")
             return Response(obj_repr, mimetype="text/plain")
         elif display_rargs["fmt"] == "html":
             with option_context("display.max_colwidth", -1):
-                return obj.to_html(index=index, na_rep="", justify="left")
+                return obj.to_html(index=index, na_rep="NA", justify="left")
         elif display_rargs["fmt"] == "json":
             try:
                 obj_repr = obj.to_json(index=index, orient="index")
