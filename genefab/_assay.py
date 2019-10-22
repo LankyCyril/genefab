@@ -1,10 +1,11 @@
 from os.path import join
-from ._exceptions import GeneLabJSONException
-from ._exceptions import GeneLabException
+from genefab._exceptions import GeneLabJSONException
+from genefab._exceptions import GeneLabException
 from collections import defaultdict
 from pandas import concat, Series, Index, DataFrame, merge
 from re import search, fullmatch, IGNORECASE, sub
-from ._util import DELIM_AS_IS, to_cls
+from genefab._util import DELIM_AS_IS
+from genefab._display import to_cls
 
 ASSAY_CHARACTERISTICS = [
     "normalized annotated data file",

@@ -3,11 +3,11 @@ from sys import stderr
 from flask import Flask, request
 from genefab import GLDS, GeneLabJSONException, GeneLabException
 from pandas import DataFrame
-from genefab._flaskutil import parse_rargs, display_object
-from genefab._flaskbridge import get_assay
-from genefab._flaskbridge import subset_metadata, filter_metadata_cells
-from genefab._flaskbridge import retrieve_table_data, filter_table_data
-from genefab._flaskbridge import try_sqlite, dump_to_sqlite
+from genefab._display import display_object
+from genefab._util import parse_rargs
+from genefab._bridge import get_assay, subset_metadata, filter_metadata_cells
+from genefab._sqlite import retrieve_table_data, try_sqlite, dump_to_sqlite
+from genefab._bridge import filter_table_data
 from os import environ
 from re import sub
 from io import BytesIO
