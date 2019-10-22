@@ -55,8 +55,7 @@ else:
         from flask_cors import CORS
         CORS(app)
     except ModuleNotFoundError:
-        print("No module flask_cors (in FLASK_ENV==development)", file=stderr)
-        pass
+        print("Warning: No module flask_cors", file=stderr)
 
 
 @app.route("/favicon.<imgtype>")
