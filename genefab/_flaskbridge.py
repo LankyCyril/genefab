@@ -1,13 +1,12 @@
 from genefab import GLDS, GeneLabJSONException
 from genefab._util import update_table, DELIM_AS_IS, STORAGE_PREFIX
-from genefab._flaskutil import parse_rargs, display_object
+from genefab._flaskutil import display_object
 from re import sub, split, search, IGNORECASE
-from pandas import DataFrame, read_csv, Index, merge, read_sql_query
+from pandas import DataFrame, Index, merge, read_sql_query
 from csv import reader
 from operator import __lt__, __le__, __eq__, __ne__, __ge__, __gt__
 from sqlite3 import connect
 from hashlib import sha512
-from io import BytesIO
 from pandas.io.sql import DatabaseError as PandasDatabaseError
 from os import path
 
@@ -65,7 +64,7 @@ def filter_cells(subset, filename_filter):
     return filtered_values
 
 
-def melt_file_data(repr_df, melting):
+def melt_table_data(repr_df, melting):
     """Melt dataframe with the use of sample annotation"""
     foundry = repr_df.reset_index().copy()
     if isinstance(melting, (list, Index)):
@@ -135,33 +134,7 @@ def get_padj_filtered_repr_df(repr_df, any_below):
     return repr_df[indexer]
 
 
-def serve_formatted_file_data(local_filepath, rargdict, melting):
-    """Format file data accoring to rargdict and melting"""
-    if rargdict["header"] == "1":
-        read_kwargs = {"index_col": 0, "nrows": 1}
-    else:
-        read_kwargs = {"index_col": 0}
-    if local_filepath.endswith(".csv"):
-        repr_df = read_csv(local_filepath, **read_kwargs)
-    else:
-        repr_df = read_csv(local_filepath, sep="\t", **read_kwargs)
-    if rargdict["name_delim"] != DELIM_AS_IS:
-        convert_delim = lambda f: sub(r'[._-]', rargdict["name_delim"], f)
-        repr_df.columns = repr_df.columns.map(convert_delim)
-    if rargdict["any_below"] is not None:
-        repr_df = get_padj_filtered_repr_df(repr_df, rargdict["any_below"])
-    if rargdict["filter"] is not None:
-        repr_df = get_filtered_repr_df(repr_df, rargdict["filter"])
-    if melting is not False:
-        repr_df = melt_file_data(repr_df, melting=melting)
-    else:
-        repr_df = repr_df.reset_index()
-    if rargdict["header"] == "1":
-        repr_df = DataFrame(columns=repr_df.columns, index=["header"])
-    return display_object(repr_df, rargdict["fmt"], index="auto")
-
-
-def serve_formatted_table_data(accession, assay_name, table_name, rargs, melting):
+def retrieve_formatted_table_data(accession, assay_name, table_name, data_rargs, melting):
     """Format file data accoring to rargdict and melting"""
     db = connect(path.join( # FIXME
         STORAGE_PREFIX, accession + "-" + assay_name + ".sqlite3"
@@ -172,41 +145,35 @@ def serve_formatted_table_data(accession, assay_name, table_name, rargs, melting
         repr_df = repr_df.set_index(repr_df.columns[0])
     except PandasDatabaseError:
         raise PandasDatabaseError("Expected a table but none found")
-    if rargs.data_rargs["name_delim"] != DELIM_AS_IS:
-        conv_delim = lambda f: sub(r'[._-]', rargs.data_rargs["name_delim"], f)
+    if data_rargs["name_delim"] != DELIM_AS_IS:
+        conv_delim = lambda f: sub(r'[._-]', data_rargs["name_delim"], f)
         repr_df.columns = repr_df.columns.map(conv_delim)
-    if rargs.data_rargs["any_below"] is not None:
-        repr_df = get_padj_filtered_repr_df(
-            repr_df, rargs.data_rargs["any_below"]
-        )
-    if rargs.data_filter_rargs["filter"] is not None: # TODO MOVEME
-        repr_df = get_filtered_repr_df(
-            repr_df, rargs.data_filter_rargs["filter"]
-        )
-    if rargs.data_filter_rargs["sort_by"] is not None: # TODO MOVEME
-        if rargs.data_filter_rargs["sort_by"] in repr_df.columns:
+    if data_rargs["any_below"] is not None:
+        repr_df = get_padj_filtered_repr_df(repr_df, data_rargs["any_below"])
+    if melting is not False:
+        repr_df = melt_table_data(repr_df, melting=melting)
+    else:
+        repr_df = repr_df.reset_index()
+    return repr_df
+
+
+def filter_table_data(repr_df, data_filter_rargs):
+    """Filter dataframe"""
+    if data_filter_rargs["filter"] is not None:
+        repr_df = get_filtered_repr_df(repr_df, data_filter_rargs["filter"])
+    if data_filter_rargs["sort_by"] is not None:
+        if data_filter_rargs["sort_by"] in repr_df.columns:
             repr_df = repr_df.sort_values(
-                by=rargs.data_filter_rargs["sort_by"],
-                ascending=rargs.data_filter_rargs["ascending"]
+                by=data_filter_rargs["sort_by"],
+                ascending=data_filter_rargs["ascending"]
             )
         else:
             error_mask = "Unknown field (column) '{}'"
-            raise IndexError(error_mask.format(rargs.data_filter_rargs["sort_by"]))
-    if rargs.display_rargs["top"] is not None: # TODO MOVEME
-        if rargs.display_rargs["top"].isdigit() and int(rargs.display_rargs["top"]):
-            repr_df = repr_df[:int(rargs.display_rargs["top"])]
-        else:
-            raise ValueError("`top` must be a positive integer")
-    if melting is not False:
-        repr_df = melt_file_data(repr_df, melting=melting)
-    else:
-        repr_df = repr_df.reset_index()
-    if rargs.display_rargs["header"]: # TODO MOVEME
-        repr_df = DataFrame(columns=repr_df.columns, index=["header"])
-    return display_object(repr_df, rargs.display_rargs["fmt"], index="auto")
+            raise IndexError(error_mask.format(data_filter_rargs["sort_by"]))
+    return repr_df
 
 
-def serve_file_data(assay, filemask, rargs, melting=False):
+def retrieve_table_data(assay, filemask, data_rargs, melting=False):
     """Find file URL that matches filemask, redirect to download or interpret"""
     try:
         url = assay._get_file_url(filemask)
@@ -217,17 +184,12 @@ def serve_file_data(assay, filemask, rargs, melting=False):
     table_name = update_table( # FIXME
         assay.parent.accession, assay.name, filemask, url, assay.storage
     )
-    if rargs.display_rargs["fmt"] == "raw":
-        raise NotImplementedError("fmt=raw with SQLite3")
-    elif rargs.display_rargs["fmt"] in {"tsv", "json"}:
-        return serve_formatted_table_data(
-            assay.parent.accession, assay.name, table_name, rargs, melting
-        )
-    else:
-        raise NotImplementedError("fmt={}".format(rargs.display_rargs["fmt"]))
+    return retrieve_formatted_table_data(
+        assay.parent.accession, assay.name, table_name, data_rargs, melting
+    )
 
 
-def try_sqlite(accession, assay_name, url, rargs):
+def try_sqlite(accession, assay_name, url):
     """Try to load dataframe from DB_NAME"""
     return None # TODO FREEME FIXME
     db = connect(path.join(
@@ -236,22 +198,20 @@ def try_sqlite(accession, assay_name, url, rargs):
     table_name = "flaskbridge-" + sha512(url.encode("utf-8")).hexdigest()
     query = "SELECT * FROM '{}'".format(table_name)
     try:
-        repr_df = read_sql_query(query, db, index_col="index")
-        return display_object(repr_df, rargs.display_rargs["fmt"])
+        return read_sql_query(query, db, index_col="index")
     except PandasDatabaseError:
         return None
 
 
-def dump_to_sqlite(accession, assay_name, file_data, url):
+def dump_to_sqlite(accession, assay_name, table_data, url):
     """Save transformed dataframe to DB_NAME"""
     return None # TODO FREEME FIXME
     table_name = "flaskbridge-" + sha512(url.encode("utf-8")).hexdigest()
     db = connect(path.join(
         STORAGE_PREFIX, accession + "-" + assay_name + ".sqlite3"
     ))
-    bytedata = BytesIO(file_data.data)
     try:
-        read_csv(bytedata, sep="\t").to_sql(table_name, db)
+        table_data.to_sql(table_name, db)
     except ValueError:
         pass
     else:

@@ -5,7 +5,8 @@ from genefab import GLDS, GeneLabJSONException, GeneLabException
 from pandas import DataFrame
 from genefab._flaskutil import parse_rargs, display_object
 from genefab._flaskbridge import get_assay, subset_metadata, filter_cells
-from genefab._flaskbridge import serve_file_data, try_sqlite, dump_to_sqlite
+from genefab._flaskbridge import retrieve_table_data, filter_table_data
+from genefab._flaskbridge import try_sqlite, dump_to_sqlite
 from os import environ
 from re import sub
 from io import BytesIO
@@ -69,10 +70,10 @@ def glds_summary(accession):
     except GeneLabJSONException as e:
         raise FileNotFoundError(e)
     if rargs.display_rargs["fmt"] == "raw":
-        return display_object([glds._json], "json")
+        return display_object([glds._json], {"fmt": "json"})
     else:
         return display_object(
-            glds._summary_dataframe, rargs.display_rargs["fmt"]
+            glds._summary_dataframe, rargs.display_rargs
         )
 
 
@@ -84,7 +85,7 @@ def assay_metadata(accession, assay_name):
     if assay is None:
         return message, status
     subset, _ = subset_metadata(assay.metadata, rargs)
-    return display_object(subset, rargs.display_rargs["fmt"], index=True)
+    return display_object(subset, rargs.display_rargs, index=True)
 
 
 @app.route("/<accession>/<assay_name>/factors/", methods=["GET"])
@@ -106,10 +107,10 @@ def assay_factors(accession, assay_name):
                     cls=rargs.non_data_rargs["cls"],
                     continuous=rargs.non_data_rargs["continuous"]
                 )
-                return display_object(obj, "raw")
+                return display_object(obj, {"fmt": "raw"})
         else:
             return display_object(
-                assay.factors(), rargs.display_rargs["fmt"], index=True
+                assay.factors(), rargs.display_rargs, index=True
             )
 
 
@@ -134,14 +135,14 @@ def assay_annotation(accession, assay_name):
                     cls=rargs.non_data_rargs["cls"],
                     continuous=rargs.non_data_rargs["continuous"]
                 )
-                return display_object(annotation, "raw")
+                return display_object(annotation, {"fmt": "raw"})
         else:
             annotation = assay.annotation(
                 differential_annotation=rargs.non_data_rargs["diff"],
                 named_only=rargs.non_data_rargs["named_only"]
             )
             return display_object(
-                annotation, rargs.display_rargs["fmt"], index=True
+                annotation, rargs.display_rargs, index=True
             )
 
 
@@ -153,9 +154,12 @@ def get_data(accession, assay_name, rargs=None):
     assay, message, status = get_assay(accession, assay_name, rargs)
     if assay is None:
         return message, status
-    file_data = try_sqlite(accession, assay.name, request.url, rargs)
-    if file_data is not None:
-        return file_data
+    table_data = try_sqlite(accession, assay.name, request.url)
+    if table_data is not None:
+        return display_object(
+            filter_table_data(table_data, rargs.data_filter_rargs),
+            rargs.display_rargs, index="auto"
+        )
     subset, is_subset = subset_metadata(assay.metadata, rargs)
     if not is_subset: # no specific cells selected
         if "file_filter" not in rargs.data_rargs: # no filenames selected either
@@ -171,20 +175,26 @@ def get_data(accession, assay_name, rargs=None):
         raise FileNotFoundError("no data")
     elif len(filtered_values) > 1:
         raise ValueError("multiple data files match search criteria")
-    else: # FIXME
-        fv = filtered_values.pop()
+    else:
         if rargs.data_rargs["descriptive"]:
-            file_data = serve_file_data(
-                assay, fv, rargs, melting=assay.annotation().T
-            )
+            melting = assay.annotation().T
         elif rargs.data_rargs["melted"]:
-            file_data = serve_file_data(
-                assay, fv, rargs, melting=list(assay.annotation().T.columns)
-            )
+            melting = list(assay.annotation().T.columns)
         else:
-            file_data = serve_file_data(assay, fv, rargs)
-    dump_to_sqlite(accession, assay.name, file_data, request.url)
-    return file_data
+            melting = False
+        table_data = retrieve_table_data(
+            assay, filtered_values.pop(), rargs.data_rargs, melting=melting
+        )
+    dump_to_sqlite(accession, assay.name, table_data, request.url)
+    if rargs.display_rargs["fmt"] == "raw":
+        raise NotImplementedError("fmt=raw with SQLite3")
+    elif rargs.display_rargs["fmt"] in {"tsv", "json"}:
+        return display_object(
+            filter_table_data(table_data, rargs.data_filter_rargs),
+            rargs.display_rargs, index="auto"
+        )
+    else:
+        raise NotImplementedError("fmt={}".format(rargs.display_rargs["fmt"]))
 
 
 def get_gct(accession, assay_name, rargs):
@@ -193,10 +203,8 @@ def get_gct(accession, assay_name, rargs):
     if assay is None:
         return message, status
     pdata_request_url = sub(r'/gct/$', "/", request.url)
-    processed_file_data = try_sqlite(
-        accession, assay.name, pdata_request_url, rargs
-    )
-    if processed_file_data is None:
+    processed_table_data = try_sqlite(accession, assay.name, pdata_request_url)
+    if processed_table_data is None:
         are_rargs_sane = (
             (rargs.display_rargs["fmt"] == "tsv") and
             (rargs.display_rargs["header"] == False) and
@@ -208,8 +216,8 @@ def get_gct(accession, assay_name, rargs):
                 "None of the 'fmt', 'header', 'melted', 'descriptive' "
                 "arguments make sense with the GCT format"
             )
-        processed_file_data = get_data(accession, assay.name, rargs=rargs)
-    pdata_bytes = processed_file_data.data
+        processed_table_data = get_data(accession, assay.name, rargs=rargs)
+    pdata_bytes = processed_table_data.data
     converted_lines, nrows, ncols = [], None, None
     for byteline in map(bytes.strip, BytesIO(pdata_bytes)):
         if nrows is None:
@@ -223,8 +231,8 @@ def get_gct(accession, assay_name, rargs):
             )
             nrows += 1
     gct_header = "#1.2\n{}\t{}\n".format(nrows, ncols)
-    file_data = gct_header + "\n".join(converted_lines)
-    return display_object(file_data, fmt="raw")
+    gct_data = gct_header + "\n".join(converted_lines)
+    return display_object(gct_data, {"fmt": "raw"})
 
 
 def get_data_alias_helper(accession, assay_name, data_type, rargs, transform=None):

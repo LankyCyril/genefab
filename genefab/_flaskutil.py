@@ -13,7 +13,7 @@ DEFAULT_RARGS = Namespace(
         "index": None,
         "file_filter": ".*",
         "name_delim": DELIM_DEFAULT,
-        "melted": False,
+        "melted": False, # TODO: 'descriptive' conflictable
         "descriptive": False,
         "any_below": None,
     },
@@ -23,7 +23,7 @@ DEFAULT_RARGS = Namespace(
         "ascending": True,
     },
     display_rargs = {
-        "fmt": "tsv",
+        "fmt": "tsv", # TODO: 'raw' conflictable
         "header": False,
         "top": None,
         "cols": None,
@@ -73,29 +73,29 @@ def to_dataframe(obj):
         return DataFrame(columns=["value"], data=obj)
 
 
-def display_object(obj, fmt, index="auto"):
+def display_object(obj, display_rargs, index="auto"):
     """Select appropriate converter and mimetype for fmt"""
     if isinstance(obj, (dict, tuple, list)):
-        if fmt == "json":
+        if display_rargs["fmt"] == "json":
             return Response(dumps(obj, cls=SetEnc), mimetype="text/json")
         else:
             obj, index = to_dataframe(obj), False
     if index == "auto":
-        index = (fmt == "json")
+        index = (display_rargs["fmt"] == "json")
     if isinstance(obj, DataFrame):
-        if fmt == "list":
+        if display_rargs["fmt"] == "list":
             if obj.shape == (1, 1):
                 obj_repr = sub(r'\s*,\s*', "\n", str(obj.iloc[0, 0]))
                 return Response(obj_repr, mimetype="text/plain")
             else:
                 raise ValueError("multiple cells selected")
-        elif fmt == "tsv":
+        elif display_rargs["fmt"] == "tsv":
             obj_repr = obj.to_csv(sep="\t", index=index, na_rep="")
             return Response(obj_repr, mimetype="text/plain")
-        elif fmt == "html":
+        elif display_rargs["fmt"] == "html":
             with option_context("display.max_colwidth", -1):
                 return obj.to_html(index=index, na_rep="", justify="left")
-        elif fmt == "json":
+        elif display_rargs["fmt"] == "json":
             try:
                 obj_repr = obj.to_json(index=index, orient="index")
                 return Response(obj_repr, mimetype="text/json")
@@ -104,7 +104,14 @@ def display_object(obj, fmt, index="auto"):
                 return Response(obj_repr, mimetype="text/json")
         else:
             raise ValueError("wrong extension or type?")
-    elif fmt == "raw":
+        if display_rargs["top"] is not None:
+            if display_rargs["top"].isdigit() and int(display_rargs["top"]):
+                obj = obj[:int(display_rargs["top"])]
+            else:
+                raise ValueError("`top` must be a positive integer")
+        if display_rargs["header"]:
+            obj = DataFrame(columns=obj.columns, index=["header"])
+    elif display_rargs["fmt"] == "raw":
         return Response(obj, mimetype="application")
     else:
         return NotImplementedError(
