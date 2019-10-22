@@ -1,11 +1,11 @@
 from sys import stderr
 from re import search, IGNORECASE
 from urllib.parse import quote_plus
-from ._util import get_json
-from ._util import FFIELD_ALIASES, FFIELD_VALUES, API_ROOT, GENELAB_ROOT
-from ._util import DELIM_DEFAULT, STORAGE_PREFIX
-from ._exceptions import GeneLabJSONException
-from ._assay import AssayDispatcher
+from genefab._util import get_json
+from genefab._util import FFIELD_ALIASES, FFIELD_VALUES, API_ROOT, GENELAB_ROOT
+from genefab._util import DELIM_DEFAULT, STORAGE_PREFIX
+from genefab._exceptions import GeneLabJSONException
+from genefab._assay import AssayDispatcher
 from pandas import DataFrame, concat
 from os.path import join
 
@@ -13,7 +13,6 @@ from os.path import join
 class GeneLabDataSet():
     """Stores GLDS metadata associated with an accession number"""
     accession, assays, storage = None, None, None
-    _file_urls, _file_dates = None, None
     verbose = False
 
     def __init__(self, accession, verbose=False, storage_prefix=STORAGE_PREFIX, index_by="Sample Name", name_delim=DELIM_DEFAULT):
@@ -45,8 +44,8 @@ class GeneLabDataSet():
         self.assays = AssayDispatcher(
             parent=self, json=self._info["assays"], storage_prefix=self.storage,
             name_delim=name_delim, index_by=index_by,
-            glds_file_urls=self._get_file_urls(),
-            glds_file_dates=self._get_file_dates()
+            glds_file_urls=self.get_files_info("urls"),
+            glds_file_dates=self.get_files_info("dates")
         )
 
     @property
@@ -55,22 +54,23 @@ class GeneLabDataSet():
         return [fi["factor"] for fi in self.description["factors"]]
 
     @property
-    def _summary_dataframe(self):
+    def summary_dataframe(self):
         """List factors, assay names and types"""
-        assays_df = self.assays._summary_dataframe.copy()
+        assays_df = self.assays.summary_dataframe.copy()
         assays_df["type"] = "assay"
         factors_df = DataFrame(
             columns=["type", "name", "factors"],
-            data=[["dataset", self.accession, factor] for factor in self.factors]
+            data=[
+                ["dataset", self.accession, factor]
+                for factor in self.factors
+            ]
         )
         return concat([factors_df, assays_df], axis=0, sort=False)
 
-    def _get_file_urls(self, force_reload=False):
+    def get_files_info(self, kind="urls"):
         """Get filenames and associated URLs"""
         if self.accession is None:
             raise ValueError("Uninitialized GLDS instance")
-        elif (not force_reload) and (self._file_urls is not None):
-            return self._file_urls
         else:
             getter_url = "{}/data/glds/files/{}"
             acc_nr = search(r'\d+$', self.accession).group()
@@ -81,32 +81,15 @@ class GeneLabDataSet():
                 filedata = files_json["studies"][self.accession]["study_files"]
             except KeyError:
                 raise GeneLabJSONException("Malformed JSON")
-            self._file_urls = {
-                fd["file_name"]: GENELAB_ROOT+fd["remote_url"]
-                for fd in filedata
-            }
-            return self._file_urls
-
-    def _get_file_dates(self, force_reload=False):
-        """Get filenames and creation dates"""
-        if self.accession is None:
-            raise ValueError("Uninitialized GLDS instance")
-        elif (not force_reload) and (self._file_dates is not None):
-            return self._file_dates
-        else:
-            getter_url = "{}/data/glds/files/{}"
-            acc_nr = search(r'\d+$', self.accession).group()
-            files_json = get_json(
-                getter_url.format(API_ROOT, acc_nr), self.verbose
-            )
-            try:
-                filedata = files_json["studies"][self.accession]["study_files"]
-            except KeyError:
-                raise GeneLabJSONException("Malformed JSON")
-            self._file_dates = {
-                fd["file_name"]: fd["date_created"] for fd in filedata
-            }
-            return self._file_dates
+            if kind == "urls":
+                return {
+                    fd["file_name"]: GENELAB_ROOT+fd["remote_url"]
+                    for fd in filedata
+                }
+            elif kind == "dates":
+                return {fd["file_name"]: fd["date_created"] for fd in filedata}
+            else:
+                raise ValueError("Unrecognized parameter: '{}'".format(kind))
 
 
 def get_ffield_matches(verbose=False, **ffield_kwargs):

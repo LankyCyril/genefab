@@ -318,7 +318,7 @@ class AssayDispatcher(dict):
             )
 
     @property
-    def _summary_dataframe(self):
+    def summary_dataframe(self):
         """List assay names and types"""
         repr_rows = []
         for assay_name, assay in self.items():

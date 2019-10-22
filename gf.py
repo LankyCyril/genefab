@@ -74,7 +74,7 @@ def glds_summary(accession):
         return display_object([glds._json], {"fmt": "json"})
     else:
         return display_object(
-            glds._summary_dataframe, rargs.display_rargs
+            glds.summary_dataframe, rargs.display_rargs
         )
 
 
