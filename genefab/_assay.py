@@ -17,23 +17,6 @@ ASSAY_PROTOCOL_LIST = [
 ]
 
 
-class MetadataRow():
-    """Implements a slice of assay metadata for one sample, Series-like"""
-
-    def __init__(self, parent, sample, raw_row):
-        """Inherit from parent(s)"""
-        self.parent = parent
-        self.sample = sample
-        self.raw_row = raw_row.copy()
-
-    def __getitem__(self, key):
-        """Reuse parent methods"""
-        if isinstance(key, str):
-            return self.parent.metadata.loc[self.sample, [key]].iloc[0]
-        else:
-            return self.parent.metadata.loc[self.sample, key]
-
-
 class AssayMetadataLocator():
     """Emulate behavior of Pandas `.loc` for class AssayMetadata()"""
 
@@ -131,11 +114,6 @@ class AssayMetadata():
                 return DataFrame()
         else:
             raise IndexError("AssayMetadata: column indexer must be list-like")
-
-    def iterrows(self):
-        """Iterate over metadata slices for each sample"""
-        for sample, raw_row in self.parent.raw_metadata.iterrows():
-            yield sample, MetadataRow(self.parent, sample, raw_row)
 
     @property
     def index(self):
