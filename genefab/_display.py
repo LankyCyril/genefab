@@ -25,6 +25,7 @@ def to_dataframe(obj):
 
 
 def display_dataframe(obj, display_rargs, index):
+    """Select appropriate converter and mimetype for fmt with DataFrame"""
     if display_rargs["fmt"] == "list":
         if obj.shape == (1, 1):
             obj_repr = sub(r'\s*,\s*', "\n", str(obj.iloc[0, 0]))

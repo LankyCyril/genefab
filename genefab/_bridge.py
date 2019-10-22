@@ -86,7 +86,7 @@ def get_filtered_repr_df(repr_df, value_filter_raw):
         except TypeError:
             emsk = "Invalid comparison (TypeError): '{}' is `{}` and {} is `{}`"
             raise TypeError(emsk.format(
-                field, repr_df[field].dtype, value, type(value)
+                field, repr_df[field].dtype, value, type(value).__name__
             ))
         if indexer is None:
             indexer = field_indexer
