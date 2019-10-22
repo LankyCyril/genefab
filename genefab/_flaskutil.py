@@ -24,7 +24,7 @@ DEFAULT_RARGS = Namespace(
     },
     display_rargs = {
         "fmt": "tsv", # TODO: 'raw' conflictable
-        "header": False,
+        "header": False, # TODO: 'top' conflictable
         "top": None,
         "cols": None,
         "excludecols": None,
