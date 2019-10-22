@@ -108,8 +108,10 @@ def get_filtered_repr_df(repr_df, value_filter_raw):
         try:
             field_indexer = compare(repr_df[field], value)
         except TypeError:
-            emsk = "Invalid comparison (TypeError): {} {} {}"
-            raise TypeError(emsk.format(field, comparison, value))
+            emsk = "Invalid comparison (TypeError): '{}' is `{}` and {} is `{}`"
+            raise TypeError(emsk.format(
+                field, repr_df[field].dtype, value, type(value)
+            ))
         if indexer is None:
             indexer = field_indexer
         else:
@@ -161,14 +163,14 @@ def filter_table_data(repr_df, data_filter_rargs):
     if data_filter_rargs["filter"] is not None:
         repr_df = get_filtered_repr_df(repr_df, data_filter_rargs["filter"])
     if data_filter_rargs["sort_by"] is not None:
-        if data_filter_rargs["sort_by"] in repr_df.columns:
+        sort_by = sub(r'(^\')|(\'$)', "", data_filter_rargs["sort_by"])
+        if sort_by in repr_df.columns:
             repr_df = repr_df.sort_values(
-                by=data_filter_rargs["sort_by"],
-                ascending=data_filter_rargs["ascending"]
+                by=sort_by, ascending=data_filter_rargs["ascending"]
             )
         else:
             error_mask = "Unknown field (column) '{}'"
-            raise IndexError(error_mask.format(data_filter_rargs["sort_by"]))
+            raise IndexError(error_mask.format(sort_by))
     return repr_df
 
 
