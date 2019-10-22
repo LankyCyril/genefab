@@ -53,8 +53,8 @@ def subset_metadata(metadata, rargs):
     return repr_df, is_subset
 
 
-def filter_cells(subset, filename_filter):
-    """Filter values in cells based on filename filter"""
+def filter_metadata_cells(subset, filename_filter):
+    """Filter values in metadata cells based on filename filter"""
     filtered_values = set()
     for cell in map(str, subset.values.flatten()):
         filenames = split(r'[,\s]+', cell)

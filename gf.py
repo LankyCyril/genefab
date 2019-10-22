@@ -4,7 +4,8 @@ from flask import Flask, request
 from genefab import GLDS, GeneLabJSONException, GeneLabException
 from pandas import DataFrame
 from genefab._flaskutil import parse_rargs, display_object
-from genefab._flaskbridge import get_assay, subset_metadata, filter_cells
+from genefab._flaskbridge import get_assay
+from genefab._flaskbridge import subset_metadata, filter_metadata_cells
 from genefab._flaskbridge import retrieve_table_data, filter_table_data
 from genefab._flaskbridge import try_sqlite, dump_to_sqlite
 from os import environ
@@ -165,12 +166,14 @@ def get_data(accession, assay_name, rargs=None):
         if "file_filter" not in rargs.data_rargs: # no filenames selected either
             raise ValueError("no entries selected")
         else: # filenames selected, should match just one
-            filtered_values = filter_cells(
+            filtered_values = filter_metadata_cells(
                 DataFrame(assay.glds_file_urls.keys()),
                 rargs.data_rargs["file_filter"]
             )
     else:
-        filtered_values = filter_cells(subset, rargs.data_rargs["file_filter"])
+        filtered_values = filter_metadata_cells(
+            subset, rargs.data_rargs["file_filter"]
+        )
     if len(filtered_values) == 0:
         raise FileNotFoundError("no data")
     elif len(filtered_values) > 1:
