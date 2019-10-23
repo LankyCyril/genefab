@@ -166,12 +166,18 @@ def get_data(accession, assay_name, rargs=None):
         raise FileNotFoundError("no data")
     elif len(filtered_values) > 1:
         raise ValueError("multiple data files match search criteria")
-    table_data = try_sqlite(accession, assay.name, rargs.data_rargs)
+    else:
+        filename = filtered_values.pop()
+    table_data = try_sqlite(
+        accession, assay.name, rargs.data_rargs,
+        expect_date=assay.glds_file_dates.get(filename, -1)
+    )
     if table_data is None:
-        table_data = retrieve_table_data(
-            assay, filtered_values.pop(), rargs.data_rargs
+        table_data = retrieve_table_data(assay, filename, rargs.data_rargs)
+        dump_to_sqlite(
+            accession, assay.name, rargs.data_rargs, table_data,
+            set_date=assay.glds_file_dates.get(filename, -1)
         )
-        dump_to_sqlite(accession, assay.name, rargs.data_rargs, table_data)
     if rargs.display_rargs["fmt"] == "raw":
         raise NotImplementedError("fmt=raw with SQLite3")
     elif rargs.display_rargs["fmt"] in {"tsv", "json"}:

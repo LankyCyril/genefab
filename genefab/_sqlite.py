@@ -3,7 +3,8 @@ from os import remove, path
 from requests import get
 from requests.exceptions import InvalidSchema
 from urllib.error import URLError
-from sqlite3 import connect
+from contextlib import closing
+from sqlite3 import connect, OperationalError
 from hashlib import sha512
 from pandas import read_csv, read_sql_query, DataFrame, Index, merge
 from pandas.io.sql import DatabaseError as PandasDatabaseError
@@ -113,29 +114,68 @@ def retrieve_table_data(assay, filemask, data_rargs):
     return format_table_data(repr_df, assay, data_rargs)
 
 
-def try_sqlite(accession, assay_name, data_rargs):
+def try_sqlite(accession, assay_name, data_rargs, expect_date):
     """Try to load dataframe from DB_NAME"""
     table_name = data_rargs_digest(data_rargs)
-    db = connect(path.join(
+    db_name = path.join(
         STORAGE_PREFIX, accession + "-" + assay_name + ".sqlite3"
-    ))
-    query = "SELECT * FROM '{}'".format(table_name)
-    try:
-        return read_sql_query(query, db, index_col="index")
-    except PandasDatabaseError:
+    )
+    with closing(connect(db_name)) as db:
+        date_query_mask = "SELECT date FROM 'table_dates' WHERE name = '{}'"
+        date_query = date_query_mask.format(table_name)
+        try:
+            stored_dates = db.cursor().execute(date_query).fetchall()
+        except OperationalError:
+            stored_dates = []
+        is_stored_date_expected = (
+            isinstance(stored_dates, list) and (len(stored_dates) == 1) and
+            isinstance(stored_dates[0], tuple) and (len(stored_dates[0]) == 1)
+            and (stored_dates[0][0] == expect_date)
+        )
+        if is_stored_date_expected:
+            query = "SELECT * FROM '{}'".format(table_name)
+            try:
+                return read_sql_query(query, db, index_col="index")
+            except PandasDatabaseError:
+                pass
+        query = "DELETE FROM 'table_dates' WHERE name = '{}'".format(table_name)
+        try:
+            db.cursor().execute(query)
+            db.commit()
+        except OperationalError:
+            pass
+        db.cursor().execute("DROP TABLE IF EXISTS '{}'".format(table_name))
+        db.commit()
         return None
 
 
-def dump_to_sqlite(accession, assay_name, data_rargs, table_data):
+def dump_to_sqlite(accession, assay_name, data_rargs, table_data, set_date):
     """Save transformed dataframe to DB_NAME"""
     table_name = data_rargs_digest(data_rargs)
-    db = connect(path.join(
+    db_name = path.join(
         STORAGE_PREFIX, accession + "-" + assay_name + ".sqlite3"
-    ))
-    try:
-        table_data.to_sql(table_name, db)
-    except ValueError:
-        pass
-    else:
+    )
+    with closing(connect(db_name)) as db:
+        db.cursor().execute("DROP TABLE IF EXISTS '{}'".format(table_name))
         db.commit()
-    db.close()
+        table_data.to_sql(table_name, db)
+        db.commit()
+        test_query_mask = "SELECT date FROM 'table_dates' WHERE name = '{}'"
+        test_query = test_query_mask.format(table_name)
+        try:
+            date_test = db.cursor().execute(test_query).fetchall()
+        except OperationalError:
+            new_date_table = DataFrame(
+                data=[[table_name, set_date]],
+                index=[0], columns=["name", "date"]
+            )
+            new_date_table.to_sql("table_dates", db, index=False)
+        else:
+            if len(date_test):
+                qmask = "UPDATE 'table_dates' SET date = {} WHERE name = '{}'"
+                query = qmask.format(set_date, table_name)
+            else:
+                qmask = "INSERT INTO 'table_dates' (name, date) VALUES ('{}', {})"
+                query = qmask.format(table_name, set_date)
+            db.cursor().execute(query)
+        db.commit()
