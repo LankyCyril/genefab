@@ -10,8 +10,6 @@ from genefab._bridge import get_assay, subset_metadata, filter_metadata_cells
 from genefab._sqlite import retrieve_table_data, try_sqlite, dump_to_sqlite
 from genefab._bridge import filter_table_data
 from os import environ
-from re import sub
-from io import BytesIO
 from copy import deepcopy
 
 
@@ -201,8 +199,8 @@ def get_gct(accession, assay_name, rargs):
     assay, message, status = get_assay(accession, assay_name, rargs)
     if assay is None:
         return message, status
-    processed_table_data = try_sqlite(accession, assay.name, rargs.data_rargs)
-    if processed_table_data is None:
+    pdata = try_sqlite(accession, assay.name, rargs.data_rargs)
+    if pdata is None:
         are_rargs_sane = (
             (rargs.display_rargs["fmt"] == "tsv") and
             (rargs.display_rargs["header"] == False) and
@@ -214,22 +212,11 @@ def get_gct(accession, assay_name, rargs):
                 "None of the 'fmt', 'header', 'melted', 'descriptive' "
                 "arguments make sense with the GCT format"
             )
-        processed_table_data = get_data(accession, assay.name, rargs=rargs)
-    pdata_bytes = processed_table_data.data
-    converted_lines, nrows, ncols = [], None, None
-    for byteline in map(bytes.strip, BytesIO(pdata_bytes)):
-        if nrows is None:
-            converted_lines.append(
-                sub(br'^[^\t]+', b'Name\tDescription', byteline).decode()
-            )
-            nrows, ncols = 0, byteline.count(b'\t')
-        elif byteline:
-            converted_lines.append(
-                sub(br'^([^\t]+)', br'\1\t\1', byteline).decode()
-            )
-            nrows += 1
-    gct_header = "#1.2\n{}\t{}\n".format(nrows, ncols)
-    gct_data = gct_header + "\n".join(converted_lines)
+        pdata = get_data(accession, assay.name, rargs=rargs)
+    gct_header = "#1.2\n{}\t{}\n".format(*pdata.shape)
+    pdata.insert(loc=0, column="Description", value=pdata.index)
+    pdata.index.name = "Name"
+    gct_data = gct_header + pdata.to_csv(sep="\t", index=True)
     return display_object(gct_data, {"fmt": "raw"})
 
 
