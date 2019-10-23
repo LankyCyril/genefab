@@ -1,12 +1,11 @@
 from os.path import join
-from ._exceptions import GeneLabJSONException, GeneLabFileException
-from ._exceptions import GeneLabException
+from genefab._exceptions import GeneLabJSONException
+from genefab._exceptions import GeneLabException
 from collections import defaultdict
-from pandas import concat, Series, Index, DataFrame, read_csv, merge
-from re import search, fullmatch, split, IGNORECASE, sub
-from numpy import nan
-from ._util import fetch_file, DELIM_AS_IS, to_cls
-from copy import deepcopy
+from pandas import concat, Series, Index, DataFrame, merge
+from re import search, fullmatch, IGNORECASE, sub
+from genefab._util import DELIM_AS_IS
+from genefab._display import to_cls
 
 ASSAY_CHARACTERISTICS = [
     "normalized annotated data file",
@@ -17,32 +16,6 @@ ASSAY_PROTOCOL_LIST = [
     "genelab microarray data processing protocol",
     "genelab rnaseq data processing protocol"
 ]
-
-
-class MetadataRow():
-    """Implements a slice of assay metadata for one sample, Series-like"""
-
-    def __init__(self, parent, sample, raw_row):
-        """Inherit from parent(s)"""
-        self.parent = parent
-        self.sample = sample
-        self.raw_row = raw_row.copy()
-
-    def __getitem__(self, key):
-        """Reuse parent methods"""
-        if isinstance(key, str):
-            return self.parent.metadata.loc[self.sample, [key]].iloc[0]
-        else:
-            return self.parent.metadata.loc[self.sample, key]
-
-    def __repr__(self):
-        """Short description of fields and samples"""
-        return "\n".join([
-            "index: " + self.sample,
-            "fields: [" + ", ".join(
-                repr(k) for k in self.parent._fields.keys()
-            ) + "]"
-        ])
 
 
 class AssayMetadataLocator():
@@ -119,10 +92,6 @@ class AssayMetadata():
         as_frame.columns = multiindex_df.set_index(multicols).index
         return as_frame.sort_index(by="field", axis="columns")
 
-    def __repr__(self):
-        """Use the repr of the dataframe form"""
-        return repr(self.to_frame())
-
     def __getitem__(self, patterns):
         """Get metadata by field title (rather than internal field id)"""
         if isinstance(patterns, DataFrame) and (patterns.shape[1] == 1):
@@ -147,11 +116,6 @@ class AssayMetadata():
         else:
             raise IndexError("AssayMetadata: column indexer must be list-like")
 
-    def iterrows(self):
-        """Iterate over metadata slices for each sample"""
-        for sample, raw_row in self.parent.raw_metadata.iterrows():
-            yield sample, MetadataRow(self.parent, sample, raw_row)
-
     @property
     def index(self):
         """List of samples"""
@@ -172,15 +136,16 @@ class Assay():
     """Stores individual assay information and metadata in raw form"""
     name = None
     _fields, raw_metadata, metadata = None, None, None
-    parent, glds_file_urls = None, None
+    parent, glds_file_urls, glds_file_dates = None, None, None
     storage = None
     _normalized_data, _processed_data = None, None
     _indexed_by, _name_delim, _field_indexed_by = None, True, None
 
-    def __init__(self, parent, name, json, glds_file_urls, storage_prefix, index_by, name_delim):
+    def __init__(self, parent, name, json, glds_file_urls, glds_file_dates, storage_prefix, index_by, name_delim):
         """Parse JSON into assay metadata"""
         self.parent, self.name, self._json = parent, name, json
         self.glds_file_urls = glds_file_urls
+        self.glds_file_dates = glds_file_dates
         self.storage = join(storage_prefix, name)
         self._raw, self._header = self._json["raw"], self._json["header"]
         # populate and freeze self._fields (this can be refactored...):
@@ -209,16 +174,6 @@ class Assay():
         del self._fields[self._indexed_by]
         # initialize indexing functions:
         self.metadata = AssayMetadata(self)
-
-    def __repr__(self):
-        """Condensed representation"""
-        return "\n".join([
-            "name: " + self.name,
-            "samples: [" + ", ".join(
-                repr(ix) for ix in self.raw_metadata.index
-            ) + "]",
-            "factor values: " + repr(self.factor_values)
-        ])
 
     def _match_field_titles(self, pattern, flags=IGNORECASE, method=search):
         """Find fields matching pattern"""
@@ -326,35 +281,6 @@ class Assay():
         else:
             return factors_dataframe
 
-    @property
-    def has_arrays(self):
-        return "Array Design REF" in self._fields
-
-    @property
-    def has_normalized_data(self):
-        return len(self._match_field_titles("normalized data files")) > 0
-
-    @property
-    def has_processed_data(self):
-        return (
-            len(self._match_field_titles("normalized annotated data files")) > 0
-        )
-
-    # alias:
-    @property
-    def has_normalized_annotated_data(self):
-        return self.has_processed_data
-
-    @property
-    def available_file_types(self):
-        """List file types referenced in metadata"""
-        file_types = set()
-        for title in self._match_field_titles(r'\bfile\b'):
-            available_files = self.metadata[[title]].values.flatten()
-            if not set(available_files) <= {"", None, nan}:
-                file_types.add(title)
-        return file_types
-
     def _get_file_url(self, filemask):
         """Get URL of file defined by file mask (such as *SRR1781971_*)"""
         regex_filemask = filemask.split("/")[0].replace("*", ".*")
@@ -369,132 +295,11 @@ class Assay():
         else:
             return self.glds_file_urls[matching_names.pop()]
 
-    def _translate_data_sample_names(self, data, data_columns):
-        """Convert data header to match metadata index"""
-        field_from = self._get_unique_field_from_title(data_columns)
-        field_to = self._field_indexed_by
-        column_from, column_to = (
-            self.raw_metadata.reset_index()[field_from],
-            self.raw_metadata.reset_index()[field_to]
-        )
-        if len(column_from) == len(set(column_from)) == len(set(column_to)):
-            column_translator = dict(zip(column_from, column_to))
-        else:
-            raise IndexError("Cannot reindex '{}' to ambiguous '{}'".format(
-                self._indexed_by, data_columns
-            ))
-        translated_data = data.copy()
-        translated_columns = []
-        for column in data.columns:
-            matching_keys = {
-                k for k in column_translator.keys() if search(k, column)
-            }
-            if len(matching_keys) == 1:
-                translated_columns.append(
-                    column_translator[matching_keys.pop()]
-                )
-            else:
-                raise IndexError("Cannot reindex '{}' to ambiguous '{}'".format(
-                    self._indexed_by, data_columns
-                ))
-        translated_data.columns = Index(
-            translated_columns, name=data.columns.name
-        )
-        return translated_data
-
-    def _read_data_from(self, field_title, blacklist_regex, force_redownload, translate_sample_names, data_columns, sep="\t"):
-        """Download (if necessary) and parse data contained in a single target file linked to by target field"""
-        meta_files = self.metadata[[field_title]]
-        if len(meta_files):
-            filenames = set.union(*(
-                set(split(r'\s*,\s*', e)) for e in meta_files.values.flatten()
-            ))
-            target_filenames = {
-                fn for fn in filenames if not search(blacklist_regex, fn)
-            }
-            if len(target_filenames) == 0:
-                raise GeneLabFileException(
-                    "No suitable normalized annotated data files found"
-                )
-            elif len(target_filenames) > 1:
-                raise GeneLabFileException(
-                    "Multiple normalized annotated data files found"
-                )
-            else:
-                filename = target_filenames.pop()
-                url = self._get_file_url(filename)
-                fetch_file(filename, url, self.storage, update=force_redownload)
-                csv = join(self.storage, filename)
-                data = read_csv(csv, sep=sep, index_col=0)
-                data.columns.name = self._indexed_by
-                if translate_sample_names:
-                    data = self._translate_data_sample_names(data, data_columns)
-                if self._name_delim != DELIM_AS_IS:
-                    data.columns = data.columns.map(
-                        lambda f: sub(r'[._-]', self._name_delim, f)
-                    )
-                return data
-        else:
-            return None
-
-    def get_normalized_data(self, force_redownload=False, translate_sample_names=False, data_columns="sample name"):
-        """Get normalized data from file(s) listed under 'normalized data files'"""
-        self._normalized_data = self._read_data_from(
-            ".*normalized data files.*",
-            blacklist_regex=r'\.rda(ta)?(\.gz)?$',
-            force_redownload=force_redownload,
-            translate_sample_names=translate_sample_names,
-            data_columns=data_columns
-        )
-        return self._normalized_data
-
-    @property
-    def normalized_data(self):
-        if self._normalized_data is None:
-            return self.get_normalized_data()
-        else:
-            return self._normalized_data
-
-    def get_processed_data(self, force_redownload=False, translate_sample_names=False, data_columns="sample name"):
-        """Get processed data from file(s) listed under 'normalized annotated data files'"""
-        self._processed_data = self._read_data_from(
-            ".*normalized annotated data files.*",
-            blacklist_regex=r'\.rda(ta)?(\.gz)?$',
-            force_redownload=force_redownload,
-            translate_sample_names=translate_sample_names,
-            data_columns=data_columns
-        )
-        return self._processed_data
-
-    @property
-    def processed_data(self):
-        if self._processed_data is None:
-            return self.get_processed_data()
-        else:
-            return self._processed_data
-
-    @property
-    def gct(self):
-        pdata = self.processed_data.copy()
-        pdata.insert(loc=0, column="Description", value=pdata.index)
-        pdata.insert(loc=0, column="Name", value=pdata.index)
-        gct_header = "#1.2\n{}\t{}\n".format(pdata.shape[0], pdata.shape[1]-2)
-        return gct_header + pdata.to_csv(sep="\t", index=False)
-
-    # alias:
-    def get_normalized_annotated_data(self, force_redownload=False):
-        return self.get_processed_data(force_redownload=force_redownload)
-
-    # alias:
-    @property
-    def normalized_annotated_data(self):
-        return self.processed_data
-
 
 class AssayDispatcher(dict):
     """Contains Assay objects, indexable by name or by attributes"""
 
-    def __init__(self, parent, json, glds_file_urls, storage_prefix, index_by, name_delim):
+    def __init__(self, parent, json, glds_file_urls, glds_file_dates, storage_prefix, index_by, name_delim):
         """Populate dictionary of assay_name -> Assay()"""
         try:
             for assay_name, assay_json in json.items():
@@ -503,7 +308,8 @@ class AssayDispatcher(dict):
                     Assay(
                         parent, assay_name, assay_json, index_by=index_by,
                         name_delim=name_delim, storage_prefix=storage_prefix,
-                        glds_file_urls=glds_file_urls
+                        glds_file_urls=glds_file_urls,
+                        glds_file_dates=glds_file_dates
                     )
                 )
         except KeyError:
@@ -512,7 +318,7 @@ class AssayDispatcher(dict):
             )
 
     @property
-    def _summary_dataframe(self):
+    def summary_dataframe(self):
         """List assay names and types"""
         repr_rows = []
         for assay_name, assay in self.items():
@@ -542,29 +348,3 @@ class AssayDispatcher(dict):
             )
         )
         return repr_dataframe.copy()
-
-    def __repr__(self):
-        return (
-            "Dictionary of {} assays;\n".format(len(self.keys())) +
-            "Subsettable with .choose() by following properties:\n" +
-            repr(self._summary_dataframe.T)
-        )
-
-    def choose(self, factors=None, material_type=None, has_arrays=None, has_normalized_data=None, has_processed_data=None):
-        """Subset AssayDispatcher by properties"""
-        rd = self._summary_dataframe
-        subsetter = (rd["has_arrays"]!=2) # always true
-        if factors is not None:
-            subsetter &= (rd["factors"]==factors)
-        if has_arrays is not None:
-            subsetter &= (rd["has_arrays"]==has_arrays)
-        if has_normalized_data is not None:
-            subsetter &= (rd["has_normalized_data"]==has_normalized_data)
-        if has_processed_data is not None:
-            subsetter &= (rd["has_processed_data"]==has_processed_data)
-        chosen_names = set(rd[subsetter].index)
-        chosen_subset = deepcopy(self)
-        for name in self.keys():
-            if name not in chosen_names:
-                del chosen_subset[name]
-        return chosen_subset

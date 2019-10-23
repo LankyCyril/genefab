@@ -6,3 +6,6 @@ class GeneLabJSONException(GeneLabException):
 
 class GeneLabFileException(GeneLabException):
     pass
+
+class GeneLabDataManagerException(GeneLabException):
+    pass
