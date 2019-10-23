@@ -149,12 +149,6 @@ def get_data(accession, assay_name, rargs=None):
     assay, message, status = get_assay(accession, assay_name, rargs)
     if assay is None:
         return message, status
-    table_data = try_sqlite(accession, assay.name, rargs.data_rargs)
-    if table_data is not None:
-        return display_object(
-            filter_table_data(table_data, rargs.data_filter_rargs),
-            rargs.display_rargs, index="auto"
-        )
     subset, is_subset = subset_metadata(assay.metadata, rargs)
     if not is_subset: # no specific cells selected
         if "file_filter" not in rargs.data_rargs: # no filenames selected either
@@ -172,11 +166,12 @@ def get_data(accession, assay_name, rargs=None):
         raise FileNotFoundError("no data")
     elif len(filtered_values) > 1:
         raise ValueError("multiple data files match search criteria")
-    else:
+    table_data = try_sqlite(accession, assay.name, rargs.data_rargs)
+    if table_data is None:
         table_data = retrieve_table_data(
             assay, filtered_values.pop(), rargs.data_rargs
         )
-    dump_to_sqlite(accession, assay.name, rargs.data_rargs, table_data)
+        dump_to_sqlite(accession, assay.name, rargs.data_rargs, table_data)
     if rargs.display_rargs["fmt"] == "raw":
         raise NotImplementedError("fmt=raw with SQLite3")
     elif rargs.display_rargs["fmt"] in {"tsv", "json"}:
@@ -208,9 +203,9 @@ def get_gct(accession, assay_name, rargs):
             )
         pdata = get_data(accession, assay.name, rargs=rargs)
     gct_header = "#1.2\n{}\t{}\n".format(*pdata.shape)
-    pdata.insert(loc=0, column="Description", value=pdata.index)
-    pdata.index.name = "Name"
-    gct_data = gct_header + pdata.to_csv(sep="\t", index=True)
+    pdata.columns = ["Description"] + list(pdata.columns)[1:]
+    pdata.insert(loc=0, column="Name", value=pdata["Description"])
+    gct_data = gct_header + pdata.to_csv(sep="\t", index=False)
     return display_object(gct_data, {"fmt": "raw"})
 
 

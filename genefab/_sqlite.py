@@ -65,7 +65,7 @@ def melt_table_data(repr_df, melting):
     foundry = repr_df.reset_index().copy()
     if isinstance(melting, (list, Index)):
         id_vars = [c for c in foundry.columns if c not in melting]
-        return foundry.melt(
+        melted_data = foundry.melt(
             id_vars=id_vars, value_vars=melting, var_name="Sample Name"
         )
     elif isinstance(melting, DataFrame):
@@ -73,9 +73,13 @@ def melt_table_data(repr_df, melting):
         foundry = foundry.melt(
             id_vars=id_vars, value_vars=melting, var_name="Sample Name"
         )
-        return merge(melting.T.reset_index(), foundry, how="outer")
+        melted_data = merge(melting.T.reset_index(), foundry, how="outer")
     else:
         raise TypeError("cannot melt/describe with a non-dataframe object")
+    if "index" in melted_data.columns:
+        return melted_data.drop(columns=["index"])
+    else:
+        return melted_data
 
 
 def format_table_data(repr_df, assay, data_rargs):
@@ -83,14 +87,15 @@ def format_table_data(repr_df, assay, data_rargs):
     if data_rargs["name_delim"] != DELIM_AS_IS:
         conv_delim = lambda f: sub(r'[._-]', data_rargs["name_delim"], f)
         repr_df.columns = repr_df.columns.map(conv_delim)
-    if data_rargs["any_below"] is not None: # FIXME MOVEME
+    if data_rargs["any_below"] is not None:
         repr_df = get_padj_filtered_repr_df(repr_df, data_rargs["any_below"])
     if data_rargs["descriptive"]:
         repr_df = melt_table_data(repr_df, melting=assay.annotation().T)
     elif data_rargs["melted"]:
-        repr_df = melt_table_data(repr_df, melting=list(assay.annotation().T.columns))
-    else:
-        repr_df = repr_df.reset_index()
+        repr_df = melt_table_data(
+            repr_df,
+            melting=list(assay.annotation().T.columns)
+        )
     return repr_df
 
 
