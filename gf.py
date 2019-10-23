@@ -48,12 +48,6 @@ def exception_catcher(e):
 
 if environ.get("FLASK_ENV", None) not in FLASK_DEBUG_MARKERS:
     exception_catcher = app.errorhandler(Exception)(exception_catcher)
-else:
-    try:
-        from flask_cors import CORS
-        CORS(app)
-    except ModuleNotFoundError:
-        print("Warning: No module flask_cors", file=stderr)
 
 
 @app.route("/favicon.<imgtype>")
