@@ -5,6 +5,7 @@ from urllib.request import urlopen
 from json import loads
 from re import search, sub
 from hashlib import sha512
+from datetime import datetime
 
 
 GENELAB_ROOT = "https://genelab-data.ndc.nasa.gov"
@@ -92,6 +93,18 @@ def guess_format(filemask):
     else:
         sep = "\t"
     return sep, compression
+
+
+def date2stamp(strdate):
+    """Convert date like 'Fri Oct 11 22:02:48 EDT 2019' to timestamp"""
+    if strdate:
+        try:
+            dt = datetime.strptime(strdate, "%a %b %d %H:%M:%S %Z %Y")
+        except ValueError:
+            return -1
+        return int(dt.timestamp())
+    else:
+        return -1
 
 
 FFIELD_VALUES = {
