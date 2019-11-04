@@ -95,16 +95,20 @@ def guess_format(filemask):
     return sep, compression
 
 
-def date2stamp(strdate):
+def date2stamp(fd, key="date_modified", fallback_key="date_created", fallback_value=-1):
     """Convert date like 'Fri Oct 11 22:02:48 EDT 2019' to timestamp"""
-    if strdate:
+    strdate = fd.get(key)
+    if strdate is None:
+        strdate = fd.get(fallback_key)
+    if strdate is None:
+        return fallback_value
+    else:
         try:
             dt = datetime.strptime(strdate, "%a %b %d %H:%M:%S %Z %Y")
         except ValueError:
-            return -1
-        return int(dt.timestamp())
-    else:
-        return -1
+            return fallback_value
+        else:
+            return int(dt.timestamp())
 
 
 FFIELD_VALUES = {

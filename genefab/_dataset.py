@@ -88,10 +88,7 @@ class GeneLabDataSet():
             filedata = get_json(
                 getter_url.format(API_ROOT, self.internal_id), self.verbose
             )
-            return {
-                fd["file_name"]: date2stamp(fd.get("date_modified"))
-                for fd in filedata
-            }
+            return {fd["file_name"]: date2stamp(fd) for fd in filedata}
         else:
             raise ValueError("Unrecognized parameter: '{}'".format(kind))
 
