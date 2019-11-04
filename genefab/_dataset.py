@@ -1,7 +1,7 @@
 from sys import stderr
 from re import search, IGNORECASE
 from urllib.parse import quote_plus
-from genefab._util import get_json
+from genefab._util import get_json, date2stamp
 from genefab._util import FFIELD_ALIASES, FFIELD_VALUES, API_ROOT, GENELAB_ROOT
 from genefab._util import DELIM_DEFAULT, STORAGE_PREFIX
 from genefab._exceptions import GeneLabJSONException
@@ -38,14 +38,12 @@ class GeneLabDataSet():
             for field in "description", "samples", "ontologies", "organisms":
                 setattr(self, field, self._info[field])
         except KeyError:
-            raise GeneLabJSONException(
-                "Malformed JSON ({})".format(self.accession)
-            )
+            error_message = "Malformed JSON ({})".format(self.accession)
+            raise GeneLabJSONException(error_message)
         self.assays = AssayDispatcher(
             parent=self, json=self._info["assays"], storage_prefix=self.storage,
-            name_delim=name_delim, index_by=index_by,
-            glds_file_urls=self.get_files_info("urls"),
-            glds_file_dates=self.get_files_info("dates")
+            name_delim=name_delim, glds_file_urls=self.get_files_info("urls"),
+            index_by=index_by, glds_file_dates=self.get_files_info("dates")
         )
 
     @property
@@ -71,7 +69,7 @@ class GeneLabDataSet():
         """Get filenames and associated URLs"""
         if self.accession is None:
             raise ValueError("Uninitialized GLDS instance")
-        else:
+        elif kind == "urls":
             getter_url = "{}/data/glds/files/{}"
             acc_nr = search(r'\d+$', self.accession).group()
             files_json = get_json(
@@ -81,15 +79,18 @@ class GeneLabDataSet():
                 filedata = files_json["studies"][self.accession]["study_files"]
             except KeyError:
                 raise GeneLabJSONException("Malformed JSON")
-            if kind == "urls":
-                return {
-                    fd["file_name"]: GENELAB_ROOT+fd["remote_url"]
-                    for fd in filedata
-                }
-            elif kind == "dates":
-                return {fd["file_name"]: fd["date_created"] for fd in filedata}
-            else:
-                raise ValueError("Unrecognized parameter: '{}'".format(kind))
+            return {
+                fd["file_name"]: GENELAB_ROOT+fd["remote_url"]
+                for fd in filedata
+            }
+        elif kind == "dates":
+            getter_url = "{}/data/study/filelistings/{}"
+            filedata = get_json(
+                getter_url.format(API_ROOT, self.internal_id), self.verbose
+            )
+            return {fd["file_name"]: date2stamp(fd) for fd in filedata}
+        else:
+            raise ValueError("Unrecognized parameter: '{}'".format(kind))
 
 
 def get_ffield_matches(verbose=False, **ffield_kwargs):
