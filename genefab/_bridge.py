@@ -1,6 +1,5 @@
 from genefab import GLDS, GeneLabJSONException
 from re import sub, split, search
-from csv import reader
 from operator import __lt__, __le__, __eq__, __ne__, __ge__, __gt__
 
 
@@ -57,12 +56,16 @@ def filter_metadata_cells(subset, filename_filter):
     return filtered_values
 
 
-def get_filtered_repr_df(repr_df, value_filter_raw):
+def get_filtered_repr_df(repr_df, field_filters_raw):
     """Interpret the filter request argument and subset the repr dataframe"""
-    value_filter = sub(r'(^\')|(\'$)', "", value_filter_raw)
+    if not isinstance(field_filters_raw, (list, tuple, set)):
+        field_filters = [field_filters_raw]
+    else:
+        field_filters = field_filters_raw
     indexer = None
-    for field_filter in next(reader([value_filter])):
-        match = search(r'(^[^<>=]+)([<>=]+)(.+)$', field_filter)
+    for field_filter in field_filters:
+        field_filter_stripped = sub(r'(^\')|(\'$)', "", field_filter)
+        match = search(r'(^[^<>=]+)([<>=]+)(.+)$', field_filter_stripped)
         if not match:
             raise ValueError("Malformed `filter`")
         field, comparison, value = match.groups()
