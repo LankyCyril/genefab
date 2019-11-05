@@ -34,8 +34,8 @@ DEFAULT_RARGS = Namespace(
         "fmt": "tsv", # TODO: 'raw' conflictable
         "header": False, # TODO: 'top' conflictable
         "top": None,
-        "cols": None,
-        "excludecols": None,
+        "showcols": None,
+        "hidecols": None,
     },
     non_data_rargs = {
         "diff": True,
