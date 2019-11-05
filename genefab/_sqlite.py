@@ -11,6 +11,7 @@ from pandas.io.sql import DatabaseError as PandasDatabaseError
 from tempfile import TemporaryDirectory
 from genefab._util import STORAGE_PREFIX, DELIM_AS_IS
 from genefab._util import guess_format, data_rargs_digest
+from genefab._display import fix_cols
 from re import sub, search, IGNORECASE
 
 
@@ -59,16 +60,6 @@ def get_padj_filtered_repr_df(repr_df, any_below):
         else:
             indexer |= (repr_df[field] < cutoff)
     return repr_df[indexer]
-
-
-def fix_cols(repr_df, cols_to_fix={"Unnamed: 0": "Sample Name"}):
-    """Fix columns arising from different conventions in CSVs (unnamed column instead of 'Sample Name')"""
-    renamer = {}
-    for bad_col in repr_df.columns:
-        if bad_col in cols_to_fix:
-            if cols_to_fix[bad_col] not in repr_df.columns:
-                renamer[bad_col] = cols_to_fix[bad_col]
-    return repr_df.rename(columns=renamer)
 
 
 def melt_table_data(repr_df, melting, cols_to_fix={"Unnamed: 0": "Sample Name"}):

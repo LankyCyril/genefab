@@ -251,7 +251,7 @@ def get_data_alias_helper(accession, assay_name, data_type, rargs, transform=Non
         modified_rargs.data_rargs["file_filter"] = ".*vis.*_output_table.csv"
     elif data_type == "pca":
         if transform == "melted":
-            raise GeneLabException("'melted' is useless for 'pca'")
+            transform = None
         modified_rargs.data_rargs["file_filter"] = ".*vis.*_PCA_table.csv"
     if transform == "gct":
         return get_gct(accession, assay_name, modified_rargs)
