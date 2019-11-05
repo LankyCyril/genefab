@@ -34,6 +34,23 @@ def fix_cols(repr_df, cols_to_fix={"Unnamed: 0": "Sample Name"}):
     return repr_df.rename(columns=renamer)
 
 
+def show_or_hide_cols(repr_df, show=None, hide=None):
+    """Show or hide specific columns in the dataframe"""
+    if show is None:
+        show_set = set(repr_df.columns)
+    else:
+        show_set = set(show.split(","))
+    if hide is None:
+        hide_set = set()
+    else:
+        hide_set = set(hide.split(","))
+    display_set = show_set - hide_set
+    columns_passed = [
+        c for c in repr_df.columns if c in display_set
+    ]
+    return repr_df[columns_passed]
+
+
 def display_dataframe(obj, display_rargs, index, cols_to_fix={"Unnamed: 0": "Sample Name"}):
     """Select appropriate converter and mimetype for fmt with DataFrame"""
     if cols_to_fix:
@@ -44,6 +61,9 @@ def display_dataframe(obj, display_rargs, index, cols_to_fix={"Unnamed: 0": "Sam
             return Response(obj_repr, mimetype="text/plain")
         else:
             raise ValueError("multiple cells selected")
+    obj = show_or_hide_cols(
+        obj, show=display_rargs["showcols"], hide=display_rargs["hidecols"]
+    )
     if display_rargs["top"] is not None:
         if display_rargs["top"].isdigit() and int(display_rargs["top"]):
             obj = obj[:int(display_rargs["top"])]
