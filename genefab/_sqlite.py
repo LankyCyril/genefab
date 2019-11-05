@@ -11,6 +11,7 @@ from pandas.io.sql import DatabaseError as PandasDatabaseError
 from tempfile import TemporaryDirectory
 from genefab._util import STORAGE_PREFIX, DELIM_AS_IS
 from genefab._util import guess_format, data_rargs_digest
+from genefab._display import fix_cols
 from re import sub, search, IGNORECASE
 
 
@@ -61,8 +62,10 @@ def get_padj_filtered_repr_df(repr_df, any_below):
     return repr_df[indexer]
 
 
-def melt_table_data(repr_df, melting):
+def melt_table_data(repr_df, melting, cols_to_fix={"Unnamed: 0": "Sample Name"}):
     """Melt dataframe with the use of sample annotation"""
+    if cols_to_fix:
+        repr_df = fix_cols(repr_df, cols_to_fix)
     foundry = repr_df.reset_index().copy()
     if isinstance(melting, (list, Index)):
         id_vars = [c for c in foundry.columns if c not in melting]
@@ -70,11 +73,16 @@ def melt_table_data(repr_df, melting):
             id_vars=id_vars, value_vars=melting, var_name="Sample Name"
         )
     elif isinstance(melting, DataFrame):
-        id_vars = [c for c in foundry.columns if c not in melting.columns]
-        foundry = foundry.melt(
-            id_vars=id_vars, value_vars=melting, var_name="Sample Name"
-        )
-        melted_data = merge(melting.T.reset_index(), foundry, how="outer")
+        try:
+            id_vars = [c for c in foundry.columns if c not in melting.columns]
+            foundry = foundry.melt(
+                id_vars=id_vars, value_vars=melting, var_name="Sample Name"
+            )
+            melted_data = merge(melting.T.reset_index(), foundry, how="outer")
+        except KeyError:
+            melted_data = merge(
+                melting.T.reset_index(), foundry, how="outer", on="Sample Name"
+            )
     else:
         raise TypeError("cannot melt/describe with a non-dataframe object")
     if "index" in melted_data.columns:

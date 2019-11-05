@@ -24,8 +24,20 @@ def to_dataframe(obj):
         return DataFrame(columns=["value"], data=obj)
 
 
-def display_dataframe(obj, display_rargs, index):
+def fix_cols(repr_df, cols_to_fix={"Unnamed: 0": "Sample Name"}):
+    """Fix columns arising from different conventions in CSVs (unnamed column instead of 'Sample Name')"""
+    renamer = {}
+    for bad_col in repr_df.columns:
+        if bad_col in cols_to_fix:
+            if cols_to_fix[bad_col] not in repr_df.columns:
+                renamer[bad_col] = cols_to_fix[bad_col]
+    return repr_df.rename(columns=renamer)
+
+
+def display_dataframe(obj, display_rargs, index, cols_to_fix={"Unnamed: 0": "Sample Name"}):
     """Select appropriate converter and mimetype for fmt with DataFrame"""
+    if cols_to_fix:
+        obj = fix_cols(obj, cols_to_fix)
     if display_rargs["fmt"] == "list":
         if obj.shape == (1, 1):
             obj_repr = sub(r'\s*,\s*', "\n", str(obj.iloc[0, 0]))
@@ -56,7 +68,7 @@ def display_dataframe(obj, display_rargs, index):
         raise ValueError("wrong extension or type?")
 
 
-def display_object(obj, display_rargs, index="auto"):
+def display_object(obj, display_rargs, index="auto", cols_to_fix={"Unnamed: 0": "Sample Name"}):
     """Select appropriate converter and mimetype for fmt"""
     if isinstance(obj, (dict, tuple, list)):
         if display_rargs["fmt"] == "json":
@@ -66,7 +78,9 @@ def display_object(obj, display_rargs, index="auto"):
     if index == "auto":
         index = (display_rargs["fmt"] == "json")
     if isinstance(obj, DataFrame):
-        return display_dataframe(obj, display_rargs, index=index)
+        return display_dataframe(
+            obj, display_rargs, index=index, cols_to_fix=cols_to_fix
+        )
     elif display_rargs["fmt"] == "raw":
         return Response(obj, mimetype="application")
     else:
