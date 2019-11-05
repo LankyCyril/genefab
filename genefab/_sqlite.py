@@ -61,8 +61,20 @@ def get_padj_filtered_repr_df(repr_df, any_below):
     return repr_df[indexer]
 
 
-def melt_table_data(repr_df, melting):
+def fix_cols(repr_df, cols_to_fix={"Unnamed: 0": "Sample Name"}):
+    """Fix columns arising from different conventions in CSVs (unnamed column instead of 'Sample Name')"""
+    renamer = {}
+    for bad_col in repr_df.columns:
+        if bad_col in cols_to_fix:
+            if cols_to_fix[bad_col] not in repr_df.columns:
+                renamer[bad_col] = cols_to_fix[bad_col]
+    return repr_df.rename(columns=renamer)
+
+
+def melt_table_data(repr_df, melting, cols_to_fix={"Unnamed: 0": "Sample Name"}):
     """Melt dataframe with the use of sample annotation"""
+    if cols_to_fix:
+        repr_df = fix_cols(repr_df, cols_to_fix)
     foundry = repr_df.reset_index().copy()
     if isinstance(melting, (list, Index)):
         id_vars = [c for c in foundry.columns if c not in melting]
@@ -70,11 +82,16 @@ def melt_table_data(repr_df, melting):
             id_vars=id_vars, value_vars=melting, var_name="Sample Name"
         )
     elif isinstance(melting, DataFrame):
-        id_vars = [c for c in foundry.columns if c not in melting.columns]
-        foundry = foundry.melt(
-            id_vars=id_vars, value_vars=melting, var_name="Sample Name"
-        )
-        melted_data = merge(melting.T.reset_index(), foundry, how="outer")
+        try:
+            id_vars = [c for c in foundry.columns if c not in melting.columns]
+            foundry = foundry.melt(
+                id_vars=id_vars, value_vars=melting, var_name="Sample Name"
+            )
+            melted_data = merge(melting.T.reset_index(), foundry, how="outer")
+        except KeyError:
+            melted_data = merge(
+                melting.T.reset_index(), foundry, how="outer", on="Sample Name"
+            )
     else:
         raise TypeError("cannot melt/describe with a non-dataframe object")
     if "index" in melted_data.columns:
