@@ -49,7 +49,8 @@ and controlled with `&continuous=` if necessary.
 Possible values for `data_type`:  
 "processed" returns normalized and annotated counts/array files;  
 "deg" returns the analysis table for differentially expressed genes;  
-"viz-table" returns the expanded analysis table.
+"viz-table" returns the expanded analysis table;  
+"pca" returns the results of the principal component analysis.
 
 Possible values for `transform`:  
 "gct" (only for "processed") returns processed data in GCT format;  
@@ -64,6 +65,9 @@ information from **/annotation/**.
 
 **header**: "0" or "1" (boolean)  
 *when set to "1", only outputs the header of the table*.
+
+**showcols**, **hidecols**: 'colname1,colname2,colname3'  
+*only show / hide the specified columns*.
 
 **top**: positive integer value  
 *only print the first `top` rows of the table*.
