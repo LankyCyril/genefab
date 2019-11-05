@@ -66,8 +66,10 @@ information from **/annotation/**.
 **header**: "0" or "1" (boolean)  
 *when set to "1", only outputs the header of the table*.
 
-**showcols**, **hidecols**: 'colname1,colname2,colname3'  
-*only show / hide the specified columns*.
+**showcol**, **hidecol**: 'column_name'  
+*only show / hide the specified columns*  
+Bcoth showcol and hidecol can be specified multiple times. If showcol is not
+present, it is presumed to be set to all column values (show all).
 
 **top**: positive integer value  
 *only print the first `top` rows of the table*.

@@ -39,11 +39,11 @@ def show_or_hide_cols(repr_df, show=None, hide=None):
     if show is None:
         show_set = set(repr_df.columns)
     else:
-        show_set = set(show.split(","))
+        show_set = set(show)
     if hide is None:
         hide_set = set()
     else:
-        hide_set = set(hide.split(","))
+        hide_set = set(hide)
     display_set = show_set - hide_set
     columns_passed = [
         c for c in repr_df.columns if c in display_set
@@ -62,7 +62,7 @@ def display_dataframe(obj, display_rargs, index, cols_to_fix={"Unnamed: 0": "Sam
         else:
             raise ValueError("multiple cells selected")
     obj = show_or_hide_cols(
-        obj, show=display_rargs["showcols"], hide=display_rargs["hidecols"]
+        obj, show=display_rargs["showcol"], hide=display_rargs["hidecol"]
     )
     if display_rargs["top"] is not None:
         if display_rargs["top"].isdigit() and int(display_rargs["top"]):

@@ -34,8 +34,8 @@ DEFAULT_RARGS = Namespace(
         "fmt": "tsv", # TODO: 'raw' conflictable
         "header": False, # TODO: 'top' conflictable
         "top": None,
-        "showcols": None,
-        "hidecols": None,
+        "showcol": None,
+        "hidecol": None,
     },
     non_data_rargs = {
         "diff": True,
@@ -53,7 +53,10 @@ def parse_rargs(request_args):
         for rarg, rarg_default_value in rargs_of_type.items():
             if rarg in request_args:
                 if not isinstance(rarg_default_value, bool):
-                    getattr(rargs, rarg_type)[rarg] = request_args[rarg]
+                    if len(request_args.getlist(rarg)) == 1:
+                        getattr(rargs, rarg_type)[rarg] = request_args[rarg]
+                    else:
+                        getattr(rargs, rarg_type)[rarg] = request_args.getlist(rarg)
                 elif request_args[rarg] == "0":
                     getattr(rargs, rarg_type)[rarg] = False
                 else:
