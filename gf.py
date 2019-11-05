@@ -217,7 +217,7 @@ def get_gct(accession, assay_name, rargs):
 
 def get_data_alias_helper(accession, assay_name, data_type, rargs, transform=None):
     """Dispatch data for URL aliases"""
-    if data_type in {"processed", "deg", "viz-table"}:
+    if data_type in {"processed", "deg", "viz-table", "pca"}:
         are_fields_dirty = (rargs.data_rargs["fields"] is not None)
         is_file_filter_dirty = (rargs.data_rargs["file_filter"] != ".*")
         if are_fields_dirty or is_file_filter_dirty:
@@ -249,6 +249,8 @@ def get_data_alias_helper(accession, assay_name, data_type, rargs, transform=Non
         modified_rargs.data_rargs["file_filter"] = "expression.csv"
     elif data_type == "viz-table":
         modified_rargs.data_rargs["file_filter"] = ".*vis.*_output_table.csv"
+    elif data_type == "pca":
+        modified_rargs.data_rargs["file_filter"] = ".*vis.*_PCA_table.csv"
     if transform == "gct":
         return get_gct(accession, assay_name, modified_rargs)
     elif transform is not None:
