@@ -43,7 +43,7 @@
                     <tt>{url_root}</tt> <tt>/</tt>
                     <a style='background:#eedd55;' href='#dataset_accession'>dataset_accession</a> /
                     <a style='background:#55dd55;' href='#assay_name'>assay_name</a> /
-                    <a style='background:#dd5555;'>data_category</a> /
+                    <a style='background:#dd5555;' href='#data_category'>data_category</a> /
                     <a style='background:#aaaaff;'>data_type</a> /
                     <a style='background:#ff88ff;'>transform</a> /?
                     <a style='background:#cccccc;'>[get_args]</a>
@@ -63,7 +63,7 @@
             <h3>{url_root}/<a style='background:#eedd55' name='dataset_accession'>dataset_accession</a></h3>
                 <b>Field</b>: <tt>dataset_accession</tt><br>
                 <b>Type</b>: string<br>
-                <b>Regex</b>: <code>GLDS-[0-9]+</code><br>
+                <b>Regex</b>: <tt>GLDS-[0-9]+</tt><br>
                 <b>Description</b>: Returns information about the dataset and
                     the assays it contains.<br>
                     Columns: resource type, name, factors associated with it,
@@ -80,6 +80,20 @@
                     (<tt>internal_field</tt>).<br>
                     The row names of the metadata table correspond to sample
                     names in the assay.<br>
+                <b>Example</b>:
+                <a href='{url_root}/GLDS-4/assay/?fmt=html'>{url_root}/<span style='background:#eedd55'>GLDS-4</span>/<span style='background:#55dd55'>assay</span>/?<span style='background:#cccccc'>fmt=html</span></a><br>
+            <h3>{url_root}/<a style='background:#eedd55'>dataset_accession</a>/<a style='background:#55dd55'>assay_name</a>/<a style='background:#dd5555' name='data_category'>data_category</a></h3>
+                <b>Field</b>: <tt>data_category</tt><br>
+                <b>Type</b>: string<br>
+                <b>Regex</b>: <tt>annotation|factors|data</tt><br>
+                <b>Description</b>: Returns assay data.<br>
+                    <u>annotation</u> and <u>factors</u> can be requested
+                    directly;<br>
+                    <u>data</u> requires either <a style='background:#cccccc'
+                    href='#data_rargs'>GET data arguments</a> or specifying <a
+                    style='background:#aaaaff' href='#data_type'>data_type</a>
+                    and/or <a style='background:#ff88ff'
+                    href='#transform'>transform</a>.<br>
                 <b>Example</b>:
                 <a href='{url_root}/GLDS-4/assay/?fmt=html'>{url_root}/<span style='background:#eedd55'>GLDS-4</span>/<span style='background:#55dd55'>assay</span>/?<span style='background:#cccccc'>fmt=html</span></a><br>
     </body>
