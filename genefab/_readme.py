@@ -65,29 +65,32 @@ html = """
                 <b>Field</b>: <tt>dataset_accession</tt><br>
                 <b>Type</b>: string<br>
                 <b>Regex</b>: <tt>GLDS-[0-9]+</tt><br>
-                <b>Description</b>: Returns information about the dataset and
-                    the assays it contains.<br>
+                <b>Description</b>:<br>
+                    Returns information about the dataset and the assays it
+                    contains.<br>
                     Columns: resource type, name, factors associated with it,
                     file types available, protocols used.<br>
-                <b>Example</b>:
+                <b>Examples</b>:<br>
                 <a href='{url_root}/GLDS-111/?fmt=html'>{url_root}/<span style='background:#eedd55'>GLDS-111</span>/?<span style='background:#cccccc'>fmt=html</span></a>
             <h3>{url_root}/<a style='background:#eedd55'>dataset_accession</a>/<a style='background:#55dd55' name='assay_name'>assay_name</a></h3>
                 <b>Field</b>: <tt>assay_name</tt><br>
                 <b>Type</b>: string<br>
                 <b>Wildcard</b>: assay <i>(only works if the dataset contains a single assay)</i><br>
-                <b>Description</b>: Returns assay metadata.<br>
+                <b>Description</b>:<br>
+                    Returns assay metadata.<br>
                     The header of the metadata represents human-readable field
                     names (<tt>field</tt>) and internally used field names
                     (<tt>internal_field</tt>).<br>
                     The row names of the metadata table correspond to sample
                     names in the assay.<br>
-                <b>Example</b>:
+                <b>Examples</b>:<br>
                 <a href='{url_root}/GLDS-4/assay/?fmt=html'>{url_root}/<span style='background:#eedd55'>GLDS-4</span>/<span style='background:#55dd55'>assay</span>/?<span style='background:#cccccc'>fmt=html</span></a><br>
             <h3>{url_root}/<a style='background:#eedd55'>dataset_accession</a>/<a style='background:#55dd55'>assay_name</a>/<a style='background:#dd5555' name='data_category'>data_category</a></h3>
                 <b>Field</b>: <tt>data_category</tt><br>
                 <b>Type</b>: string<br>
                 <b>Regex</b>: <tt>annotation|factors|data</tt><br>
-                <b>Description</b>: Returns assay data.<br>
+                <b>Description</b>:<br>
+                    Returns assay data.<br>
                     <u>annotation</u> and <u>factors</u> can be requested
                     directly;<br>
                     <u>data</u> requires either <a style='background:#cccccc'
@@ -95,7 +98,7 @@ html = """
                     style='background:#aaaaff' href='#data_type'>data_type</a>
                     and/or <a style='background:#ff88ff'
                     href='#transform'>transform</a>.<br>
-                <b>Example</b>:
+                <b>Examples</b>:<br>
                 <a href='{url_root}/GLDS-4/assay/?fmt=html'>{url_root}/<span style='background:#eedd55'>GLDS-4</span>/<span style='background:#55dd55'>assay</span>/?<span style='background:#cccccc'>fmt=html</span></a><br>
     </body>
 </html>
