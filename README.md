@@ -68,7 +68,7 @@ information from **/annotation/**.
 
 **showcol**, **hidecol**: 'column_name'  
 *only show / hide the specified columns*  
-Bcoth showcol and hidecol can be specified multiple times. If showcol is not
+Both showcol and hidecol can be specified multiple times. If showcol is not
 present, it is presumed to be set to all column values (show all).
 
 **top**: positive integer value  
@@ -85,9 +85,12 @@ present, it is presumed to be set to all column values (show all).
 
 **filter**: 'column_name<value' (supported comparison operators are `<`, `<=`,
 `>=`, `>`, `==`, `!=`);  
-Multiple comparisons can be supplied (delimited by commas). The entire string
-of comparisons has to be enclosed in single quotes. Values can be strings,
-integers, floats, or booleans (capitalized as True/False).  
+The comparison must be enclosed in single quotes, for example:  
+`filter='Adj-p-value-(Space Flight)v(Ground Control)<.05'`.  
+filter can be specified multiple times, and all comparisons will be carried
+out (with a logical AND between all comparisons).  
+Values can be strings, integers, floats, or booleans
+(capitalized as True/False).  
 *only print the rows that pass the comparison*.
 
 **any_below**: float value between 0 and 1 (supported only for **deg** and

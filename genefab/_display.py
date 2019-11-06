@@ -38,12 +38,16 @@ def show_or_hide_cols(repr_df, show=None, hide=None):
     """Show or hide specific columns in the dataframe"""
     if show is None:
         show_set = set(repr_df.columns)
-    else:
+    elif isinstance(show, (list, tuple, set)):
         show_set = set(show)
+    else:
+        show_set = {show}
     if hide is None:
         hide_set = set()
-    else:
+    elif isinstance(hide, (list, tuple, set)):
         hide_set = set(hide)
+    else:
+        hide_set = {hide}
     display_set = show_set - hide_set
     columns_passed = [
         c for c in repr_df.columns if c in display_set
