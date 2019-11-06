@@ -92,14 +92,16 @@ html = """
                 <b>Description</b>:<br>
                     Returns assay data.<br>
                     <u>annotation</u> and <u>factors</u> can be requested
-                    directly;<br>
+                    directly or together with <a style='background:#cccccc'
+                    href='#cls_rargs'>annotation/factor-specific GET
+                    arguments</a>;<br>
                     <u>data</u> requires either <a style='background:#cccccc'
                     href='#data_rargs'>GET data arguments</a> or specifying <a
                     style='background:#aaaaff' href='#data_type'>data_type</a>
                     and/or <a style='background:#ff88ff'
                     href='#transform'>transform</a>.<br>
                 <b>Examples</b>:<br>
-                <a href='{url_root}/GLDS-4/assay/?fmt=html'>{url_root}/<span style='background:#eedd55'>GLDS-4</span>/<span style='background:#55dd55'>assay</span>/?<span style='background:#cccccc'>fmt=html</span></a><br>
+                <a href='{url_root}/GLDS-42/assay/factors/?cls=Factor%20Value:%20Spaceflight'>{url_root}/<span style='background:#eedd55'>GLDS-42</span>/<span style='background:#55dd55'>assay</span>/<span style='background:#dd5555'>factors</span>/?<span style='background:#cccccc'>cls=Factor%20Value:%20Spaceflight</span></a><br>
     </body>
 </html>
 """
