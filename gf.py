@@ -4,6 +4,7 @@ from flask import Flask, request
 from genefab import GLDS, GeneLabJSONException, GeneLabException
 from genefab import GeneLabDataManagerException
 from pandas import DataFrame
+from genefab._readme import html
 from genefab._display import display_object
 from genefab._util import parse_rargs
 from genefab._bridge import get_assay, subset_metadata, filter_metadata_cells
@@ -31,7 +32,7 @@ except Exception as e: # I'm sorry
 @app.route("/", methods=["GET"])
 def hello_space():
     """Hello, Space!"""
-    return "Hello, {}!".format(request.args.get("name", "Space"))
+    return html.format(url_root=request.url_root.rstrip("/"))
 
 
 def exception_catcher(e):
