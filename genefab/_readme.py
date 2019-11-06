@@ -45,9 +45,9 @@ html = """
                     <a style='background:#eedd55;' href='#dataset_accession'>dataset_accession</a> /
                     <a style='background:#55dd55;' href='#assay_name'>assay_name</a> /
                     <a style='background:#dd5555;' href='#data_category'>data_category</a> /
-                    <a style='background:#aaaaff;'>data_type</a> /
-                    <a style='background:#ff88ff;'>transform</a> /?
-                    <a style='background:#cccccc;'>[get_args]</a>
+                    <a style='background:#aaaaff;' href='#data_type'>data_type</a> /
+                    <a style='background:#ff88ff;' href='#transform'>transform</a> /?
+                    <a style='background:#cccccc;' href='#get_args'>[get_args]</a>
                 </span>
                 <p>
                     The request can be routed to any depth. All following URLs
@@ -102,6 +102,23 @@ html = """
                     href='#transform'>transform</a>.<br>
                 <b>Examples</b>:<br>
                 <a href='{url_root}/GLDS-42/assay/factors/?cls=Factor%20Value:%20Spaceflight'>{url_root}/<span style='background:#eedd55'>GLDS-42</span>/<span style='background:#55dd55'>assay</span>/<span style='background:#dd5555'>factors</span>/?<span style='background:#cccccc'>cls=Factor%20Value:%20Spaceflight</span></a><br>
+            <h3>{url_root}/<a style='background:#eedd55'>dataset_accession</a>/<a style='background:#55dd55'>assay_name</a>/data/<a style='background:#aaaaff' name='data_type'>data_type</a></h3>
+                <b>Field</b>: <tt>data_type</tt><br>
+                <b>Type</b>: string<br>
+                <b>Regex</b>: <tt>processed|deg|viz-table|pca</tt><br>
+                <b>Description</b>:<br>
+                    Work in progress.<br>
+            <h3>{url_root}/<a style='background:#eedd55'>dataset_accession</a>/<a style='background:#55dd55'>assay_name</a>/data/<a style='background:#aaaaff'>data_type</a>/<a style='background:#ff88ff' name='transform'>transform</a></h3>
+                <b>Field</b>: <tt>transform</tt><br>
+                <b>Type</b>: string<br>
+                <b>Regex</b>: <tt>gct|melted|descriptive</tt><br>
+                <b>Description</b>:<br>
+                    Work in progress.<br>
+            <h3>{url_root}/<a style='background:#eedd55'>dataset_accession</a>/<a style='background:#55dd55'>assay_name</a>/data/<a style='background:#aaaaff'>data_type</a>/<a style='background:#ff88ff'>transform</a>/?<a style='background:#cccccc' name='get_args'>[get_args]</a></h3>
+                <b>Field</b>: <tt>get_args</tt><br>
+                <b>Type</b>: key-value pairs<br>
+                <b>Description</b>:<br>
+                    Work in progress.<br>
     </body>
 </html>
 """
