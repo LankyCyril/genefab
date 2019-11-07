@@ -91,11 +91,14 @@ def melt_table_data(repr_df, melting, cols_to_fix={"Unnamed: 0": "Sample Name"})
         return melted_data
 
 
-def format_table_data(repr_df, assay, data_rargs):
+def format_table_data(repr_df, assay, data_rargs, cols_to_fix={"Unnamed: 0"}):
     """Format file data accoring to rargdict and melting"""
     if data_rargs["name_delim"] != DELIM_AS_IS:
         conv_delim = lambda f: sub(r'[._-]', data_rargs["name_delim"], f)
         repr_df.columns = repr_df.columns.map(conv_delim)
+        for col_to_fix in cols_to_fix:
+            if col_to_fix in repr_df.columns:
+                repr_df[col_to_fix] = repr_df[col_to_fix].apply(conv_delim)
     if data_rargs["any_below"] is not None:
         repr_df = get_padj_filtered_repr_df(repr_df, data_rargs["any_below"])
     if data_rargs["descriptive"]:
