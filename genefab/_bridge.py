@@ -1,5 +1,6 @@
 from genefab import GLDS, GeneLabJSONException
 from re import sub, split, search
+from pandas import DataFrame
 from operator import __lt__, __le__, __eq__, __ne__, __ge__, __gt__
 
 
@@ -54,6 +55,29 @@ def filter_metadata_cells(subset, filename_filter):
             if search(filename_filter, filename):
                 filtered_values.add(filename)
     return filtered_values
+
+
+def resolve_file_name(assay, rargs):
+    """Find single file in metadata matching given request arguments for assay"""
+    subset, is_subset = subset_metadata(assay.metadata, rargs)
+    if not is_subset: # no specific cells selected
+        if "file_filter" not in rargs.data_rargs: # no filenames selected either
+            raise ValueError("no entries selected")
+        else: # filenames selected, should match just one
+            filtered_values = filter_metadata_cells(
+                DataFrame(assay.glds_file_urls.keys()),
+                rargs.data_rargs["file_filter"]
+            )
+    else:
+        filtered_values = filter_metadata_cells(
+            subset, rargs.data_rargs["file_filter"]
+        )
+    if len(filtered_values) == 0:
+        raise FileNotFoundError("no data")
+    elif len(filtered_values) > 1:
+        raise ValueError("multiple data files match search criteria")
+    else:
+        return filtered_values.pop()
 
 
 def get_filtered_repr_df(repr_df, field_filters_raw):
