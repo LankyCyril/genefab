@@ -6,13 +6,18 @@ from urllib.error import URLError
 from contextlib import closing
 from sqlite3 import connect, OperationalError
 from hashlib import sha512
-from pandas import read_csv, read_sql_query, DataFrame, Index, merge
+from pandas import read_csv, read_sql_query, DataFrame, Index, merge, concat
 from pandas.io.sql import DatabaseError as PandasDatabaseError
 from tempfile import TemporaryDirectory
 from genefab._util import STORAGE_PREFIX, DELIM_AS_IS
 from genefab._util import guess_format, data_rargs_digest
 from genefab._display import fix_cols
 from re import sub, search, IGNORECASE
+from math import ceil
+
+
+MAX_TABLE_PART_WITDH = 512
+TABLE_PARTS_SCHEMA = "('name' TEXT, 'part_name' TEXT)"
 
 
 def download_table(accession, assay_name, filemask, url, verbose=False, http_fallback=True):
@@ -125,6 +130,58 @@ def retrieve_table_data(assay, filemask, data_rargs):
     return format_table_data(repr_df, assay, data_rargs)
 
 
+def get_multipart_sql_table_part_names(table_name, db):
+    query_mask = "SELECT part_name FROM 'table_parts' WHERE name = '{}'"
+    try:
+        part_names_series = read_sql_query(query_mask.format(table_name), db)
+        if len(part_names_series):
+            return part_names_series["part_name"]
+        else:
+            return [table_name]
+    except (PandasDatabaseError, OperationalError):
+        return [table_name]
+
+
+def read_multipart_sql_table(table_name, db):
+    part_names = get_multipart_sql_table_part_names(table_name, db)
+    table_parts, successful_parts = [], set()
+    for part_name in part_names:
+        query = "SELECT * FROM '{}'".format(part_name)
+        try:
+            table_parts.append(read_sql_query(query, db, index_col="index"))
+            successful_parts.add(part_name)
+        except:
+            for part_name in successful_parts:
+                db.cursor().execute(
+                    "DROP TABLE IF EXISTS '{}'".format(part_name)
+                )
+                db.commit()
+            raise
+    return concat(table_parts, axis=1)
+
+
+def destroy_multipart_sql_table(table_name, db, drop_date=True):
+    part_names = get_multipart_sql_table_part_names(table_name, db)
+    try:
+        db.cursor().execute(
+            "DELETE FROM 'table_parts' WHERE name = '{}'".format(table_name)
+        )
+        db.commit()
+    except OperationalError:
+        pass
+    for part_name in part_names:
+        db.cursor().execute("DROP TABLE IF EXISTS '{}'".format(part_name))
+        db.commit()
+    if drop_date:
+        try:
+            db.cursor().execute(
+                "DELETE FROM 'table_dates' WHERE name = '{}'".format(table_name)
+            )
+            db.commit()
+        except OperationalError:
+            pass
+
+
 def try_sqlite(accession, assay_name, data_rargs, expect_date):
     """Try to load dataframe from DB_NAME"""
     table_name = data_rargs_digest(data_rargs)
@@ -144,20 +201,35 @@ def try_sqlite(accession, assay_name, data_rargs, expect_date):
             and (stored_dates[0][0] == expect_date)
         )
         if is_stored_date_expected:
-            query = "SELECT * FROM '{}'".format(table_name)
             try:
-                return read_sql_query(query, db, index_col="index")
-            except PandasDatabaseError:
+                return read_multipart_sql_table(table_name, db)
+            except (PandasDatabaseError, OperationalError):
                 pass
-        query = "DELETE FROM 'table_dates' WHERE name = '{}'".format(table_name)
-        try:
-            db.cursor().execute(query)
-            db.commit()
-        except OperationalError:
-            pass
-        db.cursor().execute("DROP TABLE IF EXISTS '{}'".format(table_name))
-        db.commit()
+        # otherwise, the table is too old and needs to be destroyed:
+        destroy_multipart_sql_table(table_name, db)
         return None
+
+
+def write_multipart_sql_table(table_data, table_name, db):
+    if table_data.shape[1] <= MAX_TABLE_PART_WITDH:
+        table_data.to_sql(table_name, db)
+        db.commit()
+    else:
+        query = "CREATE TABLE IF NOT EXISTS 'table_parts' " + TABLE_PARTS_SCHEMA
+        db.cursor().execute(query)
+        db.commit()
+        total_parts = int(ceil(table_data.shape[1] / MAX_TABLE_PART_WITDH))
+        for partno in range(total_parts):
+            part = table_data.iloc[
+                :,partno*MAX_TABLE_PART_WITDH:(partno+1)*MAX_TABLE_PART_WITDH
+            ]
+            part_name = table_name + "-" + str(partno)
+            query = "INSERT INTO '{}' (name, part_name) VALUES ('{}', '{}')"
+            db.cursor().execute(
+                query.format("table_parts", table_name, part_name)
+            )
+            part.to_sql(part_name, db)
+            db.commit()
 
 
 def dump_to_sqlite(accession, assay_name, data_rargs, table_data, set_date):
@@ -167,10 +239,8 @@ def dump_to_sqlite(accession, assay_name, data_rargs, table_data, set_date):
         STORAGE_PREFIX, accession + "-" + assay_name + ".sqlite3"
     )
     with closing(connect(db_name)) as db:
-        db.cursor().execute("DROP TABLE IF EXISTS '{}'".format(table_name))
-        db.commit()
-        table_data.to_sql(table_name, db)
-        db.commit()
+        destroy_multipart_sql_table(table_name, db, drop_date=False)
+        write_multipart_sql_table(table_data, table_name, db)
         test_query_mask = "SELECT date FROM 'table_dates' WHERE name = '{}'"
         test_query = test_query_mask.format(table_name)
         try:

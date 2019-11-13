@@ -1,17 +1,22 @@
 #!/usr/bin/env python
-from sys import stderr
+from sys import stderr, exc_info
+from traceback import format_tb
 from flask import Flask, request
 from genefab import GLDS, GeneLabJSONException, GeneLabException
 from genefab import GeneLabDataManagerException
-from pandas import DataFrame
 from genefab._readme import html
 from genefab._display import display_object
-from genefab._util import parse_rargs
-from genefab._bridge import get_assay, subset_metadata, filter_metadata_cells
+from genefab._util import parse_rargs, log
+from genefab._bridge import get_assay, subset_metadata, resolve_file_name
 from genefab._sqlite import retrieve_table_data, try_sqlite, dump_to_sqlite
 from genefab._bridge import filter_table_data
 from os import environ
 from copy import deepcopy
+
+
+DEG_CSV_REGEX = r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_differential_expression.csv$'
+VIZ_CSV_REGEX = r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_visualization_output_table.csv$'
+PCA_CSV_REGEX = r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_visualization_PCA_table.csv$'
 
 
 FLASK_DEBUG_MARKERS = {"development", "staging", "stage", "debug", "debugging"}
@@ -35,7 +40,20 @@ def hello_space():
     return html.format(url_root=request.url_root.rstrip("/"))
 
 
+def traceback_printer(e):
+    log(request, e)
+    exc_type, exc_value, exc_tb = exc_info()
+    error_mask = "<h2>{}: {}</h2><b>{}</b>:\n<pre>{}</pre><br><b>{}: {}</b>"
+    error_message = error_mask.format(
+        exc_type.__name__, str(exc_value),
+        "Traceback (most recent call last)",
+        "".join(format_tb(exc_tb)), exc_type.__name__, str(exc_value)
+    )
+    return error_message, 400
+
+
 def exception_catcher(e):
+    log(request, e)
     if isinstance(e, FileNotFoundError):
         code, explanation = 404, "Not Found"
     elif isinstance(e, NotImplementedError):
@@ -47,7 +65,10 @@ def exception_catcher(e):
     error_mask = "<b>HTTP error</b>: {} ({})<br><b>{}</b>: {}"
     return error_mask.format(code, explanation, type(e).__name__, str(e)), code
 
-if environ.get("FLASK_ENV", None) not in FLASK_DEBUG_MARKERS:
+
+if environ.get("FLASK_ENV", None) in FLASK_DEBUG_MARKERS:
+    traceback_printer = app.errorhandler(Exception)(traceback_printer)
+else:
     exception_catcher = app.errorhandler(Exception)(exception_catcher)
 
 
@@ -150,25 +171,7 @@ def get_data(accession, assay_name, rargs=None):
     assay, message, status = get_assay(accession, assay_name, rargs)
     if assay is None:
         return message, status
-    subset, is_subset = subset_metadata(assay.metadata, rargs)
-    if not is_subset: # no specific cells selected
-        if "file_filter" not in rargs.data_rargs: # no filenames selected either
-            raise ValueError("no entries selected")
-        else: # filenames selected, should match just one
-            filtered_values = filter_metadata_cells(
-                DataFrame(assay.glds_file_urls.keys()),
-                rargs.data_rargs["file_filter"]
-            )
-    else:
-        filtered_values = filter_metadata_cells(
-            subset, rargs.data_rargs["file_filter"]
-        )
-    if len(filtered_values) == 0:
-        raise FileNotFoundError("no data")
-    elif len(filtered_values) > 1:
-        raise ValueError("multiple data files match search criteria")
-    else:
-        filename = filtered_values.pop()
+    filename = resolve_file_name(assay, rargs)
     table_data = try_sqlite(
         accession, assay.name, rargs.data_rargs,
         expect_date=assay.glds_file_dates.get(filename, -1)
@@ -179,9 +182,7 @@ def get_data(accession, assay_name, rargs=None):
             accession, assay.name, rargs.data_rargs, table_data,
             set_date=assay.glds_file_dates.get(filename, -1)
         )
-    if rargs.display_rargs["fmt"] == "raw":
-        raise NotImplementedError("fmt=raw with SQLite3")
-    elif rargs.display_rargs["fmt"] in {"tsv", "json"}:
+    if rargs.display_rargs["fmt"] in {"tsv", "json"}:
         return display_object(
             filter_table_data(table_data, rargs.data_filter_rargs),
             rargs.display_rargs, index="auto"
@@ -197,17 +198,6 @@ def get_gct(accession, assay_name, rargs):
         return message, status
     pdata = try_sqlite(accession, assay.name, rargs.data_rargs)
     if pdata is None:
-        are_rargs_sane = (
-            (rargs.display_rargs["fmt"] == "tsv") and
-            (rargs.display_rargs["header"] == False) and
-            (rargs.data_rargs["melted"] == False) and
-            (rargs.data_rargs["descriptive"] == False)
-        )
-        if not are_rargs_sane:
-            raise AttributeError(
-                "None of the 'fmt', 'header', 'melted', 'descriptive' "
-                "arguments make sense with the GCT format"
-            )
         pdata = get_data(accession, assay.name, rargs=rargs)
     gct_header = "#1.2\n{}\t{}\n".format(*pdata.shape)
     pdata.columns = ["Description"] + list(pdata.columns)[1:]
@@ -216,44 +206,62 @@ def get_gct(accession, assay_name, rargs):
     return display_object(gct_data, {"fmt": "raw"})
 
 
-def get_data_alias_helper(accession, assay_name, data_type, rargs, transform=None):
-    """Dispatch data for URL aliases"""
+def assess_data_alias(data_type, rargs, transform):
+    """Checks if the URL alias is resolvable"""
     if data_type in {"processed", "deg", "viz-table", "pca"}:
         are_fields_dirty = (rargs.data_rargs["fields"] is not None)
         is_file_filter_dirty = (rargs.data_rargs["file_filter"] != ".*")
         if are_fields_dirty or is_file_filter_dirty:
             error_mask = "'{}' already sets 'fields' and 'file_filter', {}"
-            raise GeneLabException(error_mask.format(
+            return GeneLabException(error_mask.format(
                 data_type, "cannot overwrite them with GET arguments"
             ))
     else:
-        raise GeneLabException("Unknown data alias: '{}'".format(data_type))
+        return GeneLabException("Unknown data alias: '{}'".format(data_type))
     if transform in {"melted", "descriptive"}:
         for rarg in {"melted", "descriptive"}:
             if rargs.data_rargs[rarg]:
                 error_mask = "'{}' already sets '{}', {}"
-                raise GeneLabException(error_mask.format(
+                return GeneLabException(error_mask.format(
                     transform, rarg, "cannot overwrite it with GET arguments"
                 ))
     elif transform == "gct":
         if data_type != "processed":
-            raise ValueError("GCT only available for processed data")
+            return ValueError("GCT only available for processed data")
+        are_rargs_sane = (
+            (rargs.display_rargs["fmt"] == "tsv") and
+            (rargs.display_rargs["header"] == False) and
+            (rargs.data_rargs["melted"] == False) and
+            (rargs.data_rargs["descriptive"] == False)
+        )
+        if not are_rargs_sane:
+            return AttributeError(
+                "None of the 'fmt', 'header', 'melted', 'descriptive' "
+                "arguments make sense with the GCT format"
+            )
     elif transform is not None:
         error_mask = "Unknown transformation alias: '{}'"
-        raise GeneLabException(error_mask.format(transform))
+        return GeneLabException(error_mask.format(transform))
+
+
+def get_data_alias_helper(accession, assay_name, data_type, rargs, transform=None):
+    """Dispatch data for URL aliases"""
+    AssessmentError = assess_data_alias(data_type, rargs, transform)
+    if AssessmentError is not None:
+        raise AssessmentError
     modified_rargs = deepcopy(rargs)
     if data_type == "processed":
         modified_rargs.data_rargs["fields"] = ".*normalized.*annotated.*"
         modified_rargs.data_rargs["file_filter"] = "txt"
     elif data_type == "deg":
         modified_rargs.data_rargs["fields"] = ".*differential.*expression.*"
-        modified_rargs.data_rargs["file_filter"] = "expression.csv"
+        modified_rargs.data_rargs["file_filter"] = DEG_CSV_REGEX
     elif data_type == "viz-table":
-        modified_rargs.data_rargs["file_filter"] = ".*vis.*_output_table.csv"
+        modified_rargs.data_rargs["file_filter"] = VIZ_CSV_REGEX
     elif data_type == "pca":
         if transform == "melted":
             transform = None
-        modified_rargs.data_rargs["file_filter"] = ".*vis.*_PCA_table.csv"
+        modified_rargs.data_rargs["file_filter"] = PCA_CSV_REGEX
     if transform == "gct":
         return get_gct(accession, assay_name, modified_rargs)
     elif transform is not None:

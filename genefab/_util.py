@@ -6,6 +6,9 @@ from json import loads
 from re import search, sub
 from hashlib import sha512
 from datetime import datetime
+from os import path
+from contextlib import closing
+from sqlite3 import connect
 
 
 GENELAB_ROOT = "https://genelab-data.ndc.nasa.gov"
@@ -13,6 +16,7 @@ API_ROOT = "https://genelab-data.ndc.nasa.gov/genelab"
 DELIM_AS_IS = "as.is"
 DELIM_DEFAULT = "-"
 STORAGE_PREFIX = ".genelab"
+LOG_SCHEMA = "('time' INTEGER, 'url' TEXT, 'ip' TEXT, 'exception' TEXT, 'comment' TEXT)"
 
 
 DEFAULT_RARGS = Namespace(
@@ -112,6 +116,23 @@ def date2stamp(fd, key="date_modified", fallback_key="date_created", fallback_va
             return fallback_value
         else:
             return int(dt.timestamp())
+
+
+def log(request, exception):
+    """Save exception context to sqlite3 log database"""
+    db_name = path.join(STORAGE_PREFIX, "log.sqlite3")
+    with closing(connect(db_name)) as db:
+        db.cursor().execute("CREATE TABLE IF NOT EXISTS 'log' " + LOG_SCHEMA)
+        db.cursor().execute(
+            "INSERT INTO 'log' ('time', 'url', 'ip', 'exception', 'comment') " +
+            "VALUES({}, '{}', '{}', '{}', '{}')".format(
+                int(datetime.timestamp(datetime.now())),
+                request.url, request.remote_addr,
+                type(exception).__name__,
+                sub(r'[^0-9A-Za-z_ ]', "_", str(exception))
+            )
+        )
+        db.commit()
 
 
 FFIELD_VALUES = {
