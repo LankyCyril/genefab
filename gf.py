@@ -6,7 +6,7 @@ from genefab import GLDS, GeneLabJSONException, GeneLabException
 from genefab import GeneLabDataManagerException
 from genefab._readme import html
 from genefab._display import display_object
-from genefab._util import parse_rargs
+from genefab._util import parse_rargs, log
 from genefab._bridge import get_assay, subset_metadata, resolve_file_name
 from genefab._sqlite import retrieve_table_data, try_sqlite, dump_to_sqlite
 from genefab._bridge import filter_table_data
@@ -41,6 +41,7 @@ def hello_space():
 
 
 def traceback_printer(e):
+    log(request, e)
     exc_type, exc_value, exc_tb = exc_info()
     error_mask = "<h2>{}: {}</h2><b>{}</b>:\n<pre>{}</pre><br><b>{}: {}</b>"
     error_message = error_mask.format(
@@ -52,6 +53,7 @@ def traceback_printer(e):
 
 
 def exception_catcher(e):
+    log(request, e)
     if isinstance(e, FileNotFoundError):
         code, explanation = 404, "Not Found"
     elif isinstance(e, NotImplementedError):
