@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-from sys import stderr
+from sys import stderr, exc_info
+from traceback import format_tb
 from flask import Flask, request
 from genefab import GLDS, GeneLabJSONException, GeneLabException
 from genefab import GeneLabDataManagerException
@@ -39,6 +40,17 @@ def hello_space():
     return html.format(url_root=request.url_root.rstrip("/"))
 
 
+def traceback_printer(e):
+    exc_type, exc_value, exc_tb = exc_info()
+    error_mask = "<h2>{}: {}</h2><b>{}</b>:\n<pre>{}</pre><br><b>{}: {}</b>"
+    error_message = error_mask.format(
+        exc_type.__name__, str(exc_value),
+        "Traceback (most recent call last)",
+        "".join(format_tb(exc_tb)), exc_type.__name__, str(exc_value)
+    )
+    return error_message, 400
+
+
 def exception_catcher(e):
     if isinstance(e, FileNotFoundError):
         code, explanation = 404, "Not Found"
@@ -51,7 +63,10 @@ def exception_catcher(e):
     error_mask = "<b>HTTP error</b>: {} ({})<br><b>{}</b>: {}"
     return error_mask.format(code, explanation, type(e).__name__, str(e)), code
 
-if environ.get("FLASK_ENV", None) not in FLASK_DEBUG_MARKERS:
+
+if environ.get("FLASK_ENV", None) in FLASK_DEBUG_MARKERS:
+    traceback_printer = app.errorhandler(Exception)(traceback_printer)
+else:
     exception_catcher = app.errorhandler(Exception)(exception_catcher)
 
 
