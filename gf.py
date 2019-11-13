@@ -13,6 +13,11 @@ from os import environ
 from copy import deepcopy
 
 
+DEG_CSV_REGEX = r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_differential_expression.csv$'
+VIZ_CSV_REGEX = r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_visualization_output_table.csv$'
+PCA_CSV_REGEX = r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_visualization_PCA_table.csv$'
+
+
 FLASK_DEBUG_MARKERS = {"development", "staging", "stage", "debug", "debugging"}
 app = Flask("genefab")
 
@@ -233,13 +238,13 @@ def get_data_alias_helper(accession, assay_name, data_type, rargs, transform=Non
         modified_rargs.data_rargs["file_filter"] = "txt"
     elif data_type == "deg":
         modified_rargs.data_rargs["fields"] = ".*differential.*expression.*"
-        modified_rargs.data_rargs["file_filter"] = "expression.csv"
+        modified_rargs.data_rargs["file_filter"] = DEG_CSV_REGEX
     elif data_type == "viz-table":
-        modified_rargs.data_rargs["file_filter"] = ".*vis.*_output_table.csv"
+        modified_rargs.data_rargs["file_filter"] = VIZ_CSV_REGEX
     elif data_type == "pca":
         if transform == "melted":
             transform = None
-        modified_rargs.data_rargs["file_filter"] = ".*vis.*_PCA_table.csv"
+        modified_rargs.data_rargs["file_filter"] = PCA_CSV_REGEX
     if transform == "gct":
         return get_gct(accession, assay_name, modified_rargs)
     elif transform is not None:
