@@ -7,10 +7,11 @@ channels:
 dependencies:
   - _libgcc_mutex=0.1=main
   - blas=1.0=mkl
-  - ca-certificates=2019.6.16=hecc5488_0
-  - certifi=2019.6.16=py37_1
+  - ca-certificates=2019.9.11=hecc5488_0
+  - certifi=2019.9.11=py37_0
   - click=7.0=py_0
   - flask=1.1.1=py_1
+  - flask-caching=1.7.1=py_0
   - intel-openmp=2019.1=144
   - itsdangerous=1.1.0=py_0
   - jinja2=2.10.1=py_0
@@ -26,7 +27,7 @@ dependencies:
   - ncurses=6.1=he6710b0_1
   - numpy=1.15.4=py37h7e9f1db_0
   - numpy-base=1.15.4=py37hde5b4d6_0
-  - openssl=1.1.1c=h516909a_0
+  - openssl=1.1.1d=h516909a_0
   - pandas=0.24.1=py37he6710b0_0
   - pip=19.0.1=py37_0
   - python=3.7.2=h0371630_0
@@ -55,5 +56,3 @@ dependencies:
     - requests==2.21.0
     - urllib3==1.24.1
     - wcwidth==0.1.7
-prefix: /home/kirill/usr/opt/miniconda/envs/genefab
-

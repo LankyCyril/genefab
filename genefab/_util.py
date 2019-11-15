@@ -1,8 +1,5 @@
 from argparse import Namespace
 from copy import deepcopy
-from sys import stderr
-from urllib.request import urlopen
-from json import loads
 from re import search, sub
 from hashlib import sha512
 from datetime import datetime
@@ -77,14 +74,6 @@ def data_rargs_digest(data_rargs):
     string_digest = sub(r'[^0-9A-Za-z_]', "_", raw_string_digest)
     hexdigest = sha512(raw_string_digest.encode("utf-8")).hexdigest()
     return string_digest + "_" + hexdigest
-
-
-def get_json(url, verbose=False):
-    """HTTP get, decode, parse"""
-    if verbose:
-        print("Parsing url:", url, file=stderr)
-    with urlopen(url) as response:
-        return loads(response.read().decode())
 
 
 def guess_format(filemask):

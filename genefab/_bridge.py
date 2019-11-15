@@ -10,10 +10,13 @@ OPERATOR_MAPPER = {
 }
 
 
-def get_assay(accession, assay_name, rargs):
+def get_assay(accession, assay_name, rargs, get_json):
     """Get assay object via GLDS accession and assay name"""
     try:
-        glds = GLDS(accession, name_delim=rargs.data_rargs["name_delim"])
+        glds = GLDS(
+            accession, get_json=get_json,
+            name_delim=rargs.data_rargs["name_delim"]
+        )
     except GeneLabJSONException as e:
         return None, "404; not found: {}".format(e), 404
     if assay_name == "assay":
