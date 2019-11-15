@@ -1,12 +1,11 @@
 #!/usr/bin/env python
-from sys import stderr, exc_info
-from traceback import format_tb
+from sys import stderr
 from flask import Flask, request
 from flask_caching import Cache
-from genefab import GLDS, GeneLabJSONException, GeneLabException, GeneLabDataManagerException
+from genefab import GLDS, GeneLabJSONException, GeneLabException
 from genefab._readme import html
-from genefab._display import display_object
-from genefab._util import parse_rargs, log
+from genefab._display import display_object, traceback_printer, exception_catcher
+from genefab._util import parse_rargs
 from genefab._bridge import get_assay, subset_metadata, resolve_file_name, filter_table_data
 from genefab._sqlite import retrieve_table_data, try_sqlite, dump_to_sqlite
 from os import environ
@@ -15,15 +14,17 @@ from urllib.request import urlopen
 from json import loads
 
 
+FLASK_DEBUG_MARKERS = {"development", "staging", "stage", "debug", "debugging"}
+CACHE_CONFIG = {"CACHE_TYPE": "filesystem", "CACHE_DIR": ".genelab-ttl-cache"}
 DEG_CSV_REGEX = r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_differential_expression.csv$'
 VIZ_CSV_REGEX = r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_visualization_output_table.csv$'
 PCA_CSV_REGEX = r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_visualization_PCA_table.csv$'
 
 
-FLASK_DEBUG_MARKERS = {"development", "staging", "stage", "debug", "debugging"}
-cache = Cache(config={"CACHE_TYPE": "filesystem", "CACHE_DIR": ".genelab-quick-cache"})
 app = Flask("genefab")
+cache = Cache(config=CACHE_CONFIG)
 cache.init_app(app)
+
 
 try:
     from flask_compress import Compress
@@ -37,38 +38,6 @@ except Exception as e: # I'm sorry
     print("The error was:", e, file=stderr)
 
 
-@app.route("/", methods=["GET"])
-def hello_space():
-    """Hello, Space!"""
-    return html.format(url_root=request.url_root.rstrip("/"))
-
-
-def traceback_printer(e):
-    log(request, e)
-    exc_type, exc_value, exc_tb = exc_info()
-    error_mask = "<h2>{}: {}</h2><b>{}</b>:\n<pre>{}</pre><br><b>{}: {}</b>"
-    error_message = error_mask.format(
-        exc_type.__name__, str(exc_value),
-        "Traceback (most recent call last)",
-        "".join(format_tb(exc_tb)), exc_type.__name__, str(exc_value)
-    )
-    return error_message, 400
-
-
-def exception_catcher(e):
-    log(request, e)
-    if isinstance(e, FileNotFoundError):
-        code, explanation = 404, "Not Found"
-    elif isinstance(e, NotImplementedError):
-        code, explanation = 501, "Not Implemented"
-    elif isinstance(e, GeneLabDataManagerException):
-        code, explanation = 500, "GeneLab Data Manager Internal Server Error"
-    else:
-        code, explanation = 400, "Bad Request"
-    error_mask = "<b>HTTP error</b>: {} ({})<br><b>{}</b>: {}"
-    return error_mask.format(code, explanation, type(e).__name__, str(e)), code
-
-
 if environ.get("FLASK_ENV", None) in FLASK_DEBUG_MARKERS:
     traceback_printer = app.errorhandler(Exception)(traceback_printer)
 else:
@@ -80,6 +49,12 @@ def get_json(url):
     """HTTP get, decode, parse"""
     with urlopen(url) as response:
         return loads(response.read().decode())
+
+
+@app.route("/", methods=["GET"])
+def hello_space():
+    """Hello, Space!"""
+    return html.format(url_root=request.url_root.rstrip("/"))
 
 
 @app.route("/favicon.<imgtype>")
