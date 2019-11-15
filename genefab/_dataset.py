@@ -1,7 +1,6 @@
 from sys import stderr
 from re import search, IGNORECASE
-from urllib.parse import quote_plus
-from genefab._util import get_json, date2stamp
+from genefab._util import date2stamp
 from genefab._util import FFIELD_ALIASES, FFIELD_VALUES, API_ROOT, GENELAB_ROOT
 from genefab._util import DELIM_DEFAULT, STORAGE_PREFIX
 from genefab._exceptions import GeneLabJSONException
@@ -15,13 +14,14 @@ class GeneLabDataSet():
     accession, assays, storage = None, None, None
     verbose = False
 
-    def __init__(self, accession, verbose=False, storage_prefix=STORAGE_PREFIX, index_by="Sample Name", name_delim=DELIM_DEFAULT):
+    def __init__(self, accession, get_json, verbose=False, storage_prefix=STORAGE_PREFIX, index_by="Sample Name", name_delim=DELIM_DEFAULT):
         """Request JSON representation of ISA metadata and store fields"""
         self.accession = accession
         self.verbose = verbose
         self.storage = join(storage_prefix, accession)
-        data_json = get_json(
-            "{}/data/study/data/{}/".format(API_ROOT, accession), self.verbose
+        self.get_json = get_json
+        data_json = self.get_json(
+            "{}/data/study/data/{}/".format(API_ROOT, accession)
         )
         if len(data_json) == 0:
             raise GeneLabJSONException("Invalid JSON (GLDS does not exist?)")
@@ -72,8 +72,8 @@ class GeneLabDataSet():
         elif kind == "urls":
             getter_url = "{}/data/glds/files/{}"
             acc_nr = search(r'\d+$', self.accession).group()
-            files_json = get_json(
-                getter_url.format(API_ROOT, acc_nr), self.verbose
+            files_json = self.get_json(
+                getter_url.format(API_ROOT, acc_nr)
             )
             try:
                 filedata = files_json["studies"][self.accession]["study_files"]
@@ -85,8 +85,8 @@ class GeneLabDataSet():
             }
         elif kind == "dates":
             getter_url = "{}/data/study/filelistings/{}"
-            filedata = get_json(
-                getter_url.format(API_ROOT, self.internal_id), self.verbose
+            filedata = self.get_json(
+                getter_url.format(API_ROOT, self.internal_id)
             )
             return {fd["file_name"]: date2stamp(fd) for fd in filedata}
         else:

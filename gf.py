@@ -2,16 +2,17 @@
 from sys import stderr, exc_info
 from traceback import format_tb
 from flask import Flask, request
-from genefab import GLDS, GeneLabJSONException, GeneLabException
-from genefab import GeneLabDataManagerException
+from flask_caching import Cache
+from genefab import GLDS, GeneLabJSONException, GeneLabException, GeneLabDataManagerException
 from genefab._readme import html
 from genefab._display import display_object
 from genefab._util import parse_rargs, log
-from genefab._bridge import get_assay, subset_metadata, resolve_file_name
+from genefab._bridge import get_assay, subset_metadata, resolve_file_name, filter_table_data
 from genefab._sqlite import retrieve_table_data, try_sqlite, dump_to_sqlite
-from genefab._bridge import filter_table_data
 from os import environ
 from copy import deepcopy
+from urllib.request import urlopen
+from json import loads
 
 
 DEG_CSV_REGEX = r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_differential_expression.csv$'
@@ -20,7 +21,9 @@ PCA_CSV_REGEX = r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_visualization_PCA_
 
 
 FLASK_DEBUG_MARKERS = {"development", "staging", "stage", "debug", "debugging"}
+cache = Cache(config={"CACHE_TYPE": "filesystem"})
 app = Flask("genefab")
+cache.init_app(app)
 
 try:
     from flask_compress import Compress
@@ -72,6 +75,13 @@ else:
     exception_catcher = app.errorhandler(Exception)(exception_catcher)
 
 
+@cache.memoize(timeout=60)
+def get_json(url):
+    """HTTP get, decode, parse"""
+    with urlopen(url) as response:
+        return loads(response.read().decode())
+
+
 @app.route("/favicon.<imgtype>")
 def favicon(imgtype):
     """Catch request for favicons"""
@@ -83,7 +93,7 @@ def glds_summary(accession):
     """Report factors, assays, and/or raw JSON"""
     rargs = parse_rargs(request.args)
     try:
-        glds = GLDS(accession)
+        glds = GLDS(accession, get_json=get_json)
     except GeneLabJSONException as e:
         raise FileNotFoundError(e)
     if rargs.display_rargs["fmt"] == "raw":
@@ -98,7 +108,7 @@ def glds_summary(accession):
 def assay_metadata(accession, assay_name):
     """DataFrame view of metadata, optionally queried"""
     rargs = parse_rargs(request.args)
-    assay, message, status = get_assay(accession, assay_name, rargs)
+    assay, message, status = get_assay(accession, assay_name, rargs, get_json)
     if assay is None:
         return message, status
     subset, _ = subset_metadata(assay.metadata, rargs)
@@ -109,7 +119,7 @@ def assay_metadata(accession, assay_name):
 def assay_factors(accession, assay_name):
     """DataFrame of samples and factors in human-readable form"""
     rargs = parse_rargs(request.args)
-    assay, message, status = get_assay(accession, assay_name, rargs)
+    assay, message, status = get_assay(accession, assay_name, rargs, get_json)
     if assay is None:
         return message, status
     else:
@@ -135,7 +145,7 @@ def assay_factors(accession, assay_name):
 def assay_annotation(accession, assay_name):
     """DataFrame of samples and factors in human-readable form"""
     rargs = parse_rargs(request.args)
-    assay, message, status = get_assay(accession, assay_name, rargs)
+    assay, message, status = get_assay(accession, assay_name, rargs, get_json)
     if assay is None:
         return message, status
     else:
@@ -168,7 +178,7 @@ def get_data(accession, assay_name, rargs=None):
     """Serve any kind of data"""
     if rargs is None:
         rargs = parse_rargs(request.args)
-    assay, message, status = get_assay(accession, assay_name, rargs)
+    assay, message, status = get_assay(accession, assay_name, rargs, get_json)
     if assay is None:
         return message, status
     filename = resolve_file_name(assay, rargs)
@@ -193,7 +203,7 @@ def get_data(accession, assay_name, rargs=None):
 
 def get_gct(accession, assay_name, rargs):
     """Get GCT formatted processed data; needs to be refactored!"""
-    assay, message, status = get_assay(accession, assay_name, rargs)
+    assay, message, status = get_assay(accession, assay_name, rargs, get_json)
     if assay is None:
         return message, status
     pdata = try_sqlite(accession, assay.name, rargs.data_rargs)
