@@ -109,37 +109,3 @@ def get_ffield_matches(verbose=False, **ffield_kwargs):
                 yield ffield, ffvalue
         if verbose:
             print("\b", file=stderr)
-
-
-def get_datasets(maxcount="25", storage=STORAGE_PREFIX, verbose=False, onerror="warn", **ffield_kwargs):
-    """Match passed regexes and combine into search URL, get JSON and parse for accessions"""
-    url_lead_components = [
-        API_ROOT+"/data/search/?term=GLDS", "type=cgene", "size="+str(maxcount)
-    ]
-    url_ffield_components = [
-        "ffield={}&fvalue={}".format(ffield, quote_plus(ffvalue))
-        for ffield, ffvalue
-        in get_ffield_matches(verbose=verbose, **ffield_kwargs)
-    ]
-    url = "&".join(url_lead_components + url_ffield_components)
-    try:
-        json = get_json(url, verbose=verbose)["hits"]["hits"]
-    except:
-        raise GeneLabJSONException("Unrecognized JSON structure")
-    datasets = []
-    for hit in json:
-        try:
-            datasets.append(
-                GeneLabDataSet(
-                    hit["_id"], storage_prefix=storage, verbose=verbose
-                )
-            )
-        except Exception as e:
-            if onerror == "ignore":
-                pass
-            elif onerror == "warn":
-                msgmask = "Warning: Could not process {} due to error:"
-                print(msgmask.format(hit["_id"]), e, file=stderr)
-            else:
-                raise
-    return datasets
