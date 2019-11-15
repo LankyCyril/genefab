@@ -21,7 +21,7 @@ PCA_CSV_REGEX = r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_visualization_PCA_
 
 
 FLASK_DEBUG_MARKERS = {"development", "staging", "stage", "debug", "debugging"}
-cache = Cache(config={"CACHE_TYPE": "filesystem"})
+cache = Cache(config={"CACHE_TYPE": "filesystem", "CACHE_DIR": ".genelab-quick-cache"})
 app = Flask("genefab")
 cache.init_app(app)
 
