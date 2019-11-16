@@ -1,0 +1,118 @@
+html = """
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset='utf-8'>
+        <title>NASA GeneLab Data API reference</title>
+        <style type='text/css'>
+            span.code {{
+                font-family: monospace, mono;
+                border: 1px solid #888888;
+                padding: 5pt;
+            }}
+            span.code a, span.code tt {{
+                font-family: monospace, mono;
+                color: #000;
+                text-decoration: none;
+            }}
+            a {{
+                font-family: monospace, mono;
+                font-size: .85em;
+                color: #000;
+                text-decoration: none;
+            }}
+            code {{
+                font-family: monospace, mono;
+                font-size: .85em;
+            }}
+            code a {{
+                color: #000;
+                text-decoration: none;
+                font-size: 1em;
+            }}
+            h3 {{
+                font-family: monospace, mono;
+                font-size: 1.3em;
+            }}
+        </style>
+    </head>
+
+    <body>
+        <h1>NASA GeneLab Data API reference</h1>
+            <h2><a name='request_anatomy'>The anatomy of a request</a></h2>
+                <span class='code'>
+                    <tt>{url_root}</tt><tt>/</tt><a style='background:#eedd55;' href='#dataset_accession'>dataset_accession</a>/<a style='background:#55dd55;' href='#assay_name'>assay_name</a>/<a style='background:#dd5555;' href='#data_category'>data_category</a>/<a style='background:#aaaaff;' href='#data_type'>data_type</a>/<a style='background:#ff88ff;' href='#transform'>transform</a>/?<a style='background:#cccccc;' href='#get_args'>[get_args]</a>
+                </span>
+                <p>
+                    The request can be routed to any depth. All following URLs
+                    are valid examples:
+                </p>
+                <code>
+                    <a href='{url_root}/GLDS-111/'>{url_root}/<span style='background:#eedd55'>GLDS-111</span>/</a><br>
+                    <a href='{url_root}/GLDS-4/assay/?fmt=html'>{url_root}/<span style='background:#eedd55'>GLDS-4</span>/<span style='background:#55dd55'>assay</span>/?<span style='background:#cccccc'>fmt=html</span></a><br>
+                    <a href='{url_root}/GLDS-42/assay/annotation/?fmt=json'>{url_root}/<span style='background:#eedd55'>GLDS-42</span>/<span style='background:#55dd55'>assay</span>/<span style='background:#dd5555'>annotation</span>/?<span style='background:#cccccc'>fmt=json</span></a><br>
+                    <a href='{url_root}/GLDS-30/a_GLDS-30_microarray_metadata-txt/data/pca/'>{url_root}/<span style='background:#eedd55'>GLDS-30</span>/<span style='background:#55dd55'>a_GLDS-30_microarray_metadata-txt</span>/<span style='background:#dd5555'>data</span>/<span style='background:#aaaaff'>pca</span>/</a><br>
+                    <a href='{url_root}/GLDS-63/assay/data/processed/descriptive/?sort_by=Parameter%20Value:%20Absorbed%20Radiation%20Dose&hidecol=Protocol%20REF&top=20'>{url_root}/<span style='background:#eedd55'>GLDS-63</span>/<span style='background:#55dd55'>assay</span>/<span style='background:#dd5555'>data</span>/<span style='background:#aaaaff'>processed</span>/<span style='background:#ff88ff'>descriptive</span>/?<span style='background:#cccccc'>sort_by=Parameter%20Value:%20Absorbed%20Radiation%20Dose</span>&<span style='background:#cccccc'>hidecol=Protocol%20REF</span>&<span style='background:#cccccc'>top=20</span></a>
+                </code>
+            <br><br><hr>
+            <h3>{url_root}/<a style='background:#eedd55' name='dataset_accession'>dataset_accession</a></h3>
+                <b>Field</b>: <tt>dataset_accession</tt><br>
+                <b>Type</b>: string<br>
+                <b>Regex</b>: <tt>GLDS-[0-9]+</tt><br>
+                <b>Description</b>:<br>
+                    Returns information about the dataset and the assays it
+                    contains.<br>
+                    Columns: resource type, name, factors associated with it,
+                    file types available, protocols used.<br>
+                <b>Examples</b>:<br>
+                <a href='{url_root}/GLDS-111/?fmt=html'>{url_root}/<span style='background:#eedd55'>GLDS-111</span>/?<span style='background:#cccccc'>fmt=html</span></a>
+            <h3>{url_root}/<a style='background:#eedd55'>dataset_accession</a>/<a style='background:#55dd55' name='assay_name'>assay_name</a></h3>
+                <b>Field</b>: <tt>assay_name</tt><br>
+                <b>Type</b>: string<br>
+                <b>Wildcard</b>: assay <i>(only works if the dataset contains a single assay)</i><br>
+                <b>Description</b>:<br>
+                    Returns assay metadata.<br>
+                    The header of the metadata represents human-readable field
+                    names (<tt>field</tt>) and internally used field names
+                    (<tt>internal_field</tt>).<br>
+                    The row names of the metadata table correspond to sample
+                    names in the assay.<br>
+                <b>Examples</b>:<br>
+                <a href='{url_root}/GLDS-4/assay/?fmt=html'>{url_root}/<span style='background:#eedd55'>GLDS-4</span>/<span style='background:#55dd55'>assay</span>/?<span style='background:#cccccc'>fmt=html</span></a><br>
+            <h3>{url_root}/<a style='background:#eedd55'>dataset_accession</a>/<a style='background:#55dd55'>assay_name</a>/<a style='background:#dd5555' name='data_category'>data_category</a></h3>
+                <b>Field</b>: <tt>data_category</tt><br>
+                <b>Type</b>: string<br>
+                <b>Regex</b>: <tt>annotation|factors|data</tt><br>
+                <b>Description</b>:<br>
+                    Returns assay data.<br>
+                    <u>annotation</u> and <u>factors</u> can be requested
+                    directly or together with <a style='background:#cccccc'
+                    href='#cls_rargs'>annotation/factor-specific GET
+                    arguments</a>;<br>
+                    <u>data</u> requires either <a style='background:#cccccc'
+                    href='#data_rargs'>GET data arguments</a> or specifying <a
+                    style='background:#aaaaff' href='#data_type'>data_type</a>
+                    and/or <a style='background:#ff88ff'
+                    href='#transform'>transform</a>.<br>
+                <b>Examples</b>:<br>
+                <a href='{url_root}/GLDS-42/assay/factors/?cls=Factor%20Value:%20Spaceflight'>{url_root}/<span style='background:#eedd55'>GLDS-42</span>/<span style='background:#55dd55'>assay</span>/<span style='background:#dd5555'>factors</span>/?<span style='background:#cccccc'>cls=Factor%20Value:%20Spaceflight</span></a><br>
+            <h3>{url_root}/<a style='background:#eedd55'>dataset_accession</a>/<a style='background:#55dd55'>assay_name</a>/data/<a style='background:#aaaaff' name='data_type'>data_type</a></h3>
+                <b>Field</b>: <tt>data_type</tt><br>
+                <b>Type</b>: string<br>
+                <b>Regex</b>: <tt>processed|deg|viz-table|pca</tt><br>
+                <b>Description</b>:<br>
+                    Work in progress.<br>
+            <h3>{url_root}/<a style='background:#eedd55'>dataset_accession</a>/<a style='background:#55dd55'>assay_name</a>/data/<a style='background:#aaaaff'>data_type</a>/<a style='background:#ff88ff' name='transform'>transform</a></h3>
+                <b>Field</b>: <tt>transform</tt><br>
+                <b>Type</b>: string<br>
+                <b>Regex</b>: <tt>gct|melted|descriptive</tt><br>
+                <b>Description</b>:<br>
+                    Work in progress.<br>
+            <h3>{url_root}/<a style='background:#eedd55'>dataset_accession</a>/<a style='background:#55dd55'>assay_name</a>/data/<a style='background:#aaaaff'>data_type</a>/<a style='background:#ff88ff'>transform</a>/?<a style='background:#cccccc' name='get_args'>[get_args]</a></h3>
+                <b>Field</b>: <tt>get_args</tt><br>
+                <b>Type</b>: key-value pairs<br>
+                <b>Description</b>:<br>
+                    Work in progress.<br>
+    </body>
+</html>
+"""

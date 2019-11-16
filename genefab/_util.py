@@ -1,16 +1,14 @@
+from argparse import Namespace
+from copy import deepcopy
 from sys import stderr
 from urllib.request import urlopen
 from json import loads
-from os.path import join, isdir, isfile
-from os import makedirs, remove
-from requests import get
-from requests.exceptions import InvalidSchema
-from urllib.error import URLError
-from re import sub, search
-from sqlite3 import connect
+from re import search, sub
 from hashlib import sha512
-from pandas import read_csv
-from tempfile import TemporaryDirectory
+from datetime import datetime
+from os import path
+from contextlib import closing
+from sqlite3 import connect
 
 
 GENELAB_ROOT = "https://genelab-data.ndc.nasa.gov"
@@ -18,6 +16,67 @@ API_ROOT = "https://genelab-data.ndc.nasa.gov/genelab"
 DELIM_AS_IS = "as.is"
 DELIM_DEFAULT = "-"
 STORAGE_PREFIX = ".genelab"
+LOG_SCHEMA = "('time' INTEGER, 'url' TEXT, 'ip' TEXT, 'exception' TEXT, 'comment' TEXT)"
+
+
+DEFAULT_RARGS = Namespace(
+    data_rargs = {
+        "fields": None,
+        "index": None,
+        "file_filter": ".*",
+        "name_delim": DELIM_DEFAULT,
+        "melted": False, # TODO: 'descriptive' conflictable
+        "descriptive": False,
+        "any_below": None,
+    },
+    data_filter_rargs = {
+        "filter": None,
+        "sort_by": None,
+        "ascending": True,
+    },
+    display_rargs = {
+        "fmt": "tsv", # TODO: 'raw' conflictable
+        "header": False, # TODO: 'top' conflictable
+        "top": None,
+        "showcol": None,
+        "hidecol": None,
+    },
+    non_data_rargs = {
+        "diff": True,
+        "named_only": True,
+        "cls": None,
+        "continuous": "infer",
+    }
+)
+
+
+def parse_rargs(request_args):
+    """Get all common arguments from request.args"""
+    rargs = deepcopy(DEFAULT_RARGS)
+    for rarg_type, rargs_of_type in DEFAULT_RARGS.__dict__.items():
+        for rarg, rarg_default_value in rargs_of_type.items():
+            if rarg in request_args:
+                if not isinstance(rarg_default_value, bool):
+                    if len(request_args.getlist(rarg)) == 1:
+                        getattr(rargs, rarg_type)[rarg] = request_args[rarg]
+                    else:
+                        getattr(rargs, rarg_type)[rarg] = request_args.getlist(rarg)
+                elif request_args[rarg] == "0":
+                    getattr(rargs, rarg_type)[rarg] = False
+                else:
+                    getattr(rargs, rarg_type)[rarg] = True
+    return rargs
+
+
+def data_rargs_digest(data_rargs):
+    """Convert data_rargs to a string digest"""
+    raw_digest = []
+    for key, value in sorted(data_rargs.items()):
+        raw_digest.extend([key, str(value)])
+    raw_string_digest = "_".join(raw_digest)
+    string_digest = sub(r'[^0-9A-Za-z_]', "_", raw_string_digest)
+    hexdigest = sha512(raw_string_digest.encode("utf-8")).hexdigest()
+    return string_digest + "_" + hexdigest
 
 
 def get_json(url, verbose=False):
@@ -26,41 +85,6 @@ def get_json(url, verbose=False):
         print("Parsing url:", url, file=stderr)
     with urlopen(url) as response:
         return loads(response.read().decode())
-
-
-def fetch_file(file_name, url, target_directory, update=False, verbose=False, http_fallback=True):
-    """Soon to be deprecated: perform checks, download file"""
-    if not isdir(target_directory):
-        if isfile(target_directory):
-            raise OSError("Local storage exists and is not a directory")
-        makedirs(target_directory)
-    target_file = join(target_directory, file_name)
-    if not update:
-        if isdir(target_file):
-            raise OSError("Directory with target name exists: " + target_file)
-        if isfile(target_file):
-            if verbose:
-                print("Reusing", file_name, file=stderr)
-            return target_file
-    try:
-        stream = get(url, stream=True)
-    except InvalidSchema:
-        if http_fallback:
-            stream = get(sub(r'^ftp:\/\/', "http://", url), stream=True)
-        else:
-            raise
-    if stream.status_code != 200:
-        raise URLError("{}: status code {}".format(url, stream.status_code))
-    total_bytes = int(stream.headers.get("content-length", 0))
-    with open(target_file, "wb") as output_handle:
-        written_bytes = 0
-        for block in stream.iter_content(1024):
-            output_handle.write(block)
-            written_bytes += len(block)
-    if total_bytes != written_bytes:
-        remove(target_file)
-        raise URLError("Failed to download the correct number of bytes")
-    return target_file
 
 
 def guess_format(filemask):
@@ -78,83 +102,37 @@ def guess_format(filemask):
     return sep, compression
 
 
-def update_table(accession, assay_name, filemask, url, table_prefix, verbose=False, http_fallback=True):
-    """Check if table already in database, if not, download and store; return table name"""
-    db = connect(join(
-        STORAGE_PREFIX, accession + "-" + assay_name + ".sqlite3"
-    ))
-    filemask_hash = sha512(filemask.encode("utf-8")).hexdigest()
-    table_name = "{}/{}".format(table_prefix, filemask_hash)
-    query_mask = (
-        "SELECT count(name) FROM sqlite_master WHERE type='table' AND name='{}'"
-    )
-    cursor = db.execute(query_mask.format(table_name))
-    if cursor.fetchone()[0] > 0: # table exists
-        return table_name
-    # otherwise, table doesn't exist and we need to download data:
-    try:
-        stream = get(url, stream=True)
-    except InvalidSchema:
-        if http_fallback:
-            stream = get(sub(r'^ftp:\/\/', "http://", url), stream=True)
-        else:
-            raise
-    if stream.status_code != 200:
-        raise URLError("{}: status code {}".format(url, stream.status_code))
-    total_bytes = int(stream.headers.get("content-length", 0))
-    with TemporaryDirectory() as tempdir:
-        sep, compression = guess_format(filemask)
-        target_file = join(tempdir, filemask_hash)
-        if compression:
-            target_file = target_file + "." + compression
-        with open(target_file, "wb") as output_handle:
-            written_bytes = 0
-            for block in stream.iter_content(1024):
-                output_handle.write(block)
-                written_bytes += len(block)
-        if total_bytes != written_bytes:
-            remove(target_file)
-            raise URLError("Failed to download the correct number of bytes")
-        read_csv(target_file, sep=sep).to_sql(table_name, db)
-        db.commit()
-        db.close()
-    return table_name
-
-
-def to_cls(dataframe, target, continuous="infer", space_sub=lambda s: sub(r'\s', "", s)):
-    """Convert a presumed annotation/factor dataframe to CLS format"""
-    sample_count = dataframe.shape[0]
-    if continuous == "infer":
-        try:
-            _ = dataframe[target].astype(float)
-            continuous = True
-        except ValueError:
-            continuous = False
-    elif not isinstance(continuous, bool):
-        if continuous == "0":
-            continuous = False
-        elif continuous == "1":
-            continuous = True
-        else:
-            error_message = "`continuous` can be either boolean-like or 'infer'"
-            raise TypeError(error_message)
-    if continuous:
-        cls_data = [
-            ["#numeric"], ["#" + target],
-            dataframe[target].astype(float)
-        ]
+def date2stamp(fd, key="date_modified", fallback_key="date_created", fallback_value=-1):
+    """Convert date like 'Fri Oct 11 22:02:48 EDT 2019' to timestamp"""
+    strdate = fd.get(key)
+    if strdate is None:
+        strdate = fd.get(fallback_key)
+    if strdate is None:
+        return fallback_value
     else:
-        if space_sub is None:
-            space_sub = lambda s: s
-        classes = dataframe[target].unique()
-        cls_data = [
-            [sample_count, len(classes), 1],
-            ["# "+space_sub(classes[0])] + [space_sub(c) for c in classes[1:]],
-            [space_sub(v) for v in dataframe[target]]
-        ]
-    return "\n".join([
-        "\t".join([str(f) for f in fields]) for fields in cls_data
-    ])
+        try:
+            dt = datetime.strptime(strdate, "%a %b %d %H:%M:%S %Z %Y")
+        except ValueError:
+            return fallback_value
+        else:
+            return int(dt.timestamp())
+
+
+def log(request, exception):
+    """Save exception context to sqlite3 log database"""
+    db_name = path.join(STORAGE_PREFIX, "log.sqlite3")
+    with closing(connect(db_name)) as db:
+        db.cursor().execute("CREATE TABLE IF NOT EXISTS 'log' " + LOG_SCHEMA)
+        db.cursor().execute(
+            "INSERT INTO 'log' ('time', 'url', 'ip', 'exception', 'comment') " +
+            "VALUES({}, '{}', '{}', '{}', '{}')".format(
+                int(datetime.timestamp(datetime.now())),
+                request.url, request.remote_addr,
+                type(exception).__name__,
+                sub(r'[^0-9A-Za-z_ ]', "_", str(exception))
+            )
+        )
+        db.commit()
 
 
 FFIELD_VALUES = {

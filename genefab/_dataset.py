@@ -1,18 +1,18 @@
 from sys import stderr
 from re import search, IGNORECASE
 from urllib.parse import quote_plus
-from ._util import get_json
-from ._util import FFIELD_ALIASES, FFIELD_VALUES, API_ROOT, GENELAB_ROOT
-from ._util import DELIM_DEFAULT, STORAGE_PREFIX
-from ._exceptions import GeneLabJSONException
-from ._assay import AssayDispatcher
+from genefab._util import get_json, date2stamp
+from genefab._util import FFIELD_ALIASES, FFIELD_VALUES, API_ROOT, GENELAB_ROOT
+from genefab._util import DELIM_DEFAULT, STORAGE_PREFIX
+from genefab._exceptions import GeneLabJSONException
+from genefab._assay import AssayDispatcher
 from pandas import DataFrame, concat
 from os.path import join
 
 
 class GeneLabDataSet():
     """Stores GLDS metadata associated with an accession number"""
-    accession, assays, file_urls, storage = None, None, None, None
+    accession, assays, storage = None, None, None
     verbose = False
 
     def __init__(self, accession, verbose=False, storage_prefix=STORAGE_PREFIX, index_by="Sample Name", name_delim=DELIM_DEFAULT):
@@ -38,13 +38,12 @@ class GeneLabDataSet():
             for field in "description", "samples", "ontologies", "organisms":
                 setattr(self, field, self._info[field])
         except KeyError:
-            raise GeneLabJSONException(
-                "Malformed JSON ({})".format(self.accession)
-            )
+            error_message = "Malformed JSON ({})".format(self.accession)
+            raise GeneLabJSONException(error_message)
         self.assays = AssayDispatcher(
             parent=self, json=self._info["assays"], storage_prefix=self.storage,
-            name_delim=name_delim, index_by=index_by,
-            glds_file_urls=self._get_file_urls()
+            name_delim=name_delim, glds_file_urls=self.get_files_info("urls"),
+            index_by=index_by, glds_file_dates=self.get_files_info("dates")
         )
 
     @property
@@ -53,27 +52,24 @@ class GeneLabDataSet():
         return [fi["factor"] for fi in self.description["factors"]]
 
     @property
-    def _summary_dataframe(self):
+    def summary_dataframe(self):
         """List factors, assay names and types"""
-        assays_df = self.assays._summary_dataframe.copy()
+        assays_df = self.assays.summary_dataframe.copy()
         assays_df["type"] = "assay"
         factors_df = DataFrame(
             columns=["type", "name", "factors"],
-            data=[["dataset", self.accession, factor] for factor in self.factors]
+            data=[
+                ["dataset", self.accession, factor]
+                for factor in self.factors
+            ]
         )
         return concat([factors_df, assays_df], axis=0, sort=False)
 
-    def __repr__(self):
-        """Use summary dataframe"""
-        return repr(self._summary_dataframe)
-
-    def _get_file_urls(self, force_reload=False):
+    def get_files_info(self, kind="urls"):
         """Get filenames and associated URLs"""
         if self.accession is None:
             raise ValueError("Uninitialized GLDS instance")
-        elif (not force_reload) and (self.file_urls is not None):
-            return self.file_urls
-        else:
+        elif kind == "urls":
             getter_url = "{}/data/glds/files/{}"
             acc_nr = search(r'\d+$', self.accession).group()
             files_json = get_json(
@@ -83,11 +79,18 @@ class GeneLabDataSet():
                 filedata = files_json["studies"][self.accession]["study_files"]
             except KeyError:
                 raise GeneLabJSONException("Malformed JSON")
-            self.file_urls = {
+            return {
                 fd["file_name"]: GENELAB_ROOT+fd["remote_url"]
                 for fd in filedata
             }
-            return self.file_urls
+        elif kind == "dates":
+            getter_url = "{}/data/study/filelistings/{}"
+            filedata = get_json(
+                getter_url.format(API_ROOT, self.internal_id), self.verbose
+            )
+            return {fd["file_name"]: date2stamp(fd) for fd in filedata}
+        else:
+            raise ValueError("Unrecognized parameter: '{}'".format(kind))
 
 
 def get_ffield_matches(verbose=False, **ffield_kwargs):
