@@ -12,6 +12,7 @@ from os import environ
 from copy import deepcopy
 from urllib.request import urlopen
 from json import loads
+from pandas import DataFrame
 
 
 FLASK_DEBUG_MARKERS = {"development", "staging", "stage", "debug", "debugging"}
@@ -149,7 +150,7 @@ def assay_annotation(accession, assay_name):
 
 
 @app.route("/<accession>/<assay_name>/data/", methods=["GET"])
-def get_data(accession, assay_name, rargs=None):
+def get_data(accession, assay_name, rargs=None, return_raw=False):
     """Serve any kind of data"""
     if rargs is None:
         rargs = parse_rargs(request.args)
@@ -167,10 +168,12 @@ def get_data(accession, assay_name, rargs=None):
             accession, assay.name, rargs.data_rargs, table_data,
             set_date=assay.glds_file_dates.get(filename, -1)
         )
-    if rargs.display_rargs["fmt"] in {"tsv", "json"}:
+    filtered_table_data = filter_table_data(table_data, rargs.data_filter_rargs)
+    if return_raw:
+        return filtered_table_data
+    elif rargs.display_rargs["fmt"] in {"tsv", "json"}:
         return display_object(
-            filter_table_data(table_data, rargs.data_filter_rargs),
-            rargs.display_rargs, index="auto"
+            filtered_table_data, rargs.display_rargs, index="auto"
         )
     else:
         raise NotImplementedError("fmt={}".format(rargs.display_rargs["fmt"]))
@@ -181,14 +184,15 @@ def get_gct(accession, assay_name, rargs):
     assay, message, status = get_assay(accession, assay_name, rargs, get_json)
     if assay is None:
         return message, status
-    pdata = try_sqlite(accession, assay.name, rargs.data_rargs)
-    if pdata is None:
-        pdata = get_data(accession, assay.name, rargs=rargs)
-    gct_header = "#1.2\n{}\t{}\n".format(*pdata.shape)
-    pdata.columns = ["Description"] + list(pdata.columns)[1:]
-    pdata.insert(loc=0, column="Name", value=pdata["Description"])
-    gct_data = gct_header + pdata.to_csv(sep="\t", index=False)
-    return display_object(gct_data, {"fmt": "raw"})
+    pdata = get_data(accession, assay.name, rargs=rargs, return_raw=True)
+    if isinstance(pdata, DataFrame):
+        gct_header = "#1.2\n{}\t{}\n".format(pdata.shape[0], pdata.shape[1]-1)
+        pdata.columns = ["Description"] + list(pdata.columns)[1:]
+        pdata.insert(loc=0, column="Name", value=pdata["Description"])
+        gct_data = gct_header + pdata.to_csv(sep="\t", index=False)
+        return display_object(gct_data, {"fmt": "raw"})
+    else:
+        raise TypeError("Unexpected type: expected `DataFrame`")
 
 
 def assess_data_alias(data_type, rargs, transform):
