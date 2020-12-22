@@ -17,6 +17,7 @@ from pandas import DataFrame
 
 FLASK_DEBUG_MARKERS = {"development", "staging", "stage", "debug", "debugging"}
 CACHE_CONFIG = {"CACHE_TYPE": "filesystem", "CACHE_DIR": ".genelab-ttl-cache"}
+PROCESSED_XSV_REGEX = r'^GLDS-[0-9]+_(array_normalized-annotated\.txt|rna_seq(_all-samples)?_Normalized_Counts\.csv)$'
 DEG_CSV_REGEX = r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_differential_expression.csv$'
 VIZ_CSV_REGEX = r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_visualization_output_table.csv$'
 PCA_CSV_REGEX = r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_visualization_PCA_table.csv$'
@@ -240,8 +241,7 @@ def get_data_alias_helper(accession, assay_name, data_type, rargs, transform=Non
         raise AssessmentError
     modified_rargs = deepcopy(rargs)
     if data_type == "processed":
-        modified_rargs.data_rargs["fields"] = ".*normalized.*annotated.*"
-        modified_rargs.data_rargs["file_filter"] = "txt"
+        modified_rargs.data_rargs["file_filter"] = PROCESSED_XSV_REGEX
     elif data_type == "deg":
         modified_rargs.data_rargs["fields"] = ".*differential.*expression.*"
         modified_rargs.data_rargs["file_filter"] = DEG_CSV_REGEX
