@@ -192,13 +192,26 @@ class Assay():
         if len(matching_titles) == 0:
             raise IndexError("Nonexistent '{}'".format(title))
         elif len(matching_titles) > 1:
-            raise IndexError("Ambiguous '{}'".format(title))
+            matching_titles_redux = self._match_field_titles(
+                title, method=fullmatch,
+            )
+            if len(matching_titles_redux) == 1:
+                matching_title = matching_titles_redux.pop()
+            else:
+                candidates = sorted(
+                    (abs(len(mt) - len(title)), mt)
+                    for mt in matching_titles
+                )
+                if candidates[0][0] < candidates[1][0]:
+                    matching_title = candidates[0][1]
+                else:
+                    raise IndexError("Ambiguous '{}'".format(title))
         else:
             matching_title = matching_titles.pop()
-            if matching_title == self._indexed_by:
-                matching_fields = {self._field_indexed_by}
-            else:
-                matching_fields = self._fields[matching_title]
+        if matching_title == self._indexed_by:
+            matching_fields = {self._field_indexed_by}
+        else:
+            matching_fields = self._fields[matching_title]
         if len(matching_fields) == 0:
             raise IndexError("Nonexistent '{}'".format(title))
         elif len(matching_fields) > 1:
