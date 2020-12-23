@@ -246,10 +246,12 @@ def get_data_alias_helper(accession, assay_name, data_type, rargs, transform=Non
         modified_rargs.data_rargs["fields"] = ".*differential.*expression.*"
         modified_rargs.data_rargs["file_filter"] = DEG_CSV_REGEX
     elif data_type == "viz-table":
+        modified_rargs.data_rargs["fields"] = False # skip metadata check
         modified_rargs.data_rargs["file_filter"] = VIZ_CSV_REGEX
     elif data_type == "pca":
         if transform == "melted":
             transform = None
+        modified_rargs.data_rargs["fields"] = False # skip metadata check
         modified_rargs.data_rargs["file_filter"] = PCA_CSV_REGEX
     if transform == "gct":
         return get_gct(accession, assay_name, modified_rargs)
