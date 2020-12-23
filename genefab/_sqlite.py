@@ -35,11 +35,8 @@ def download_table(accession, assay_name, filemask, url, verbose=False, http_fal
         ))
     total_bytes = int(stream.headers.get("content-length", 0))
     with TemporaryDirectory() as tempdir:
-        sep, compression = guess_format(filemask)
         filemask_hash = sha512(filemask.encode("utf-8")).hexdigest()
         target_file = path.join(tempdir, filemask_hash)
-        if compression:
-            target_file = target_file + "." + compression
         with open(target_file, "wb") as output_handle:
             written_bytes = 0
             for block in stream.iter_content(1024):
@@ -48,7 +45,8 @@ def download_table(accession, assay_name, filemask, url, verbose=False, http_fal
         if total_bytes != written_bytes:
             remove(target_file)
             raise URLError("Failed to download the correct number of bytes")
-        return read_csv(target_file, sep=sep)
+        sep, compression = guess_format(target_file)
+        return read_csv(target_file, sep=sep, compression=compression)
 
 
 def get_padj_filtered_repr_df(repr_df, any_below):
