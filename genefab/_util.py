@@ -91,7 +91,7 @@ def guess_format(target_file):
             compression = None
             _open = open
     with _open(target_file, newline="", mode="rt") as handle:
-        dialect = Sniffer().sniff(handle.read(2048))
+        dialect = Sniffer().sniff(handle.read(2**20))
         sep = dialect.delimiter
     return sep, compression
 
