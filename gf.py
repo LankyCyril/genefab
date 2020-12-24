@@ -186,6 +186,12 @@ def get_gct(accession, assay_name, rargs):
     if assay is None:
         return message, status
     pdata = get_data(accession, assay.name, rargs=rargs, return_raw=True)
+    # ensure that order of columns matches order of samples in annotation:
+    pdc, aai = pdata.columns, assay.annotation().index
+    pdcs, aais = set(pdc), set(aai)
+    pdata = pdata[
+        [c for c in pdc if c not in aais] + [c for c in aai if c in pdcs]
+    ]
     if isinstance(pdata, DataFrame):
         gct_header = "#1.2\n{}\t{}\n".format(pdata.shape[0], pdata.shape[1]-1)
         pdata.columns = ["Description"] + list(pdata.columns)[1:]
