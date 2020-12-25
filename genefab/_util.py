@@ -66,15 +66,15 @@ def parse_rargs(request_args):
     return rargs
 
 
-def data_rargs_digest(data_rargs):
+def data_rargs_digest(accession, assay_name, data_rargs):
     """Convert data_rargs to a string digest"""
-    raw_digest = []
+    raw_digest = [accession, assay_name]
     for key, value in sorted(data_rargs.items()):
-        raw_digest.extend([key, str(value)])
-    raw_string_digest = "_".join(raw_digest)
-    string_digest = sub(r'[^0-9A-Za-z_]', "_", raw_string_digest)
-    hexdigest = sha512(raw_string_digest.encode("utf-8")).hexdigest()
-    return string_digest + "_" + hexdigest
+        raw_digest.append(key+"="+str(value))
+    raw_string_digest = ",".join(raw_digest)
+    string_digest = sub(r'[^0-9A-Za-z_.=-]', ".", raw_string_digest)
+    hexdigest = sha512(raw_string_digest.encode("utf-8")).hexdigest()[:32]
+    return string_digest + "/" + hexdigest
 
 
 def guess_format(target_file):
