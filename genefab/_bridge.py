@@ -10,10 +10,13 @@ OPERATOR_MAPPER = {
 }
 
 
-def get_assay(accession, assay_name, rargs):
+def get_assay(accession, assay_name, rargs, get_json):
     """Get assay object via GLDS accession and assay name"""
     try:
-        glds = GLDS(accession, name_delim=rargs.data_rargs["name_delim"])
+        glds = GLDS(
+            accession, get_json=get_json,
+            name_delim=rargs.data_rargs["name_delim"]
+        )
     except GeneLabJSONException as e:
         return None, "404; not found: {}".format(e), 404
     if assay_name == "assay":
@@ -59,19 +62,20 @@ def filter_metadata_cells(subset, filename_filter):
 
 def resolve_file_name(assay, rargs):
     """Find single file in metadata matching given request arguments for assay"""
-    subset, is_subset = subset_metadata(assay.metadata, rargs)
-    if not is_subset: # no specific cells selected
-        if "file_filter" not in rargs.data_rargs: # no filenames selected either
-            raise ValueError("no entries selected")
-        else: # filenames selected, should match just one
-            filtered_values = filter_metadata_cells(
-                DataFrame(assay.glds_file_urls.keys()),
-                rargs.data_rargs["file_filter"]
-            )
-    else:
+    if rargs.data_rargs.get("fields", None) is False:
+        # 'hidden' public filename requested, should match just one:
         filtered_values = filter_metadata_cells(
-            subset, rargs.data_rargs["file_filter"]
+            DataFrame(assay.glds_file_urls.keys()),
+            rargs.data_rargs["file_filter"]
         )
+    else:
+        subset, is_subset = subset_metadata(assay.metadata, rargs)
+        if (not is_subset) and ("file_filter" not in rargs.data_rargs):
+            raise ValueError("no entries selected")
+        else:
+            filtered_values = filter_metadata_cells(
+                subset, rargs.data_rargs["file_filter"]
+            )
     if len(filtered_values) == 0:
         raise FileNotFoundError("no data")
     elif len(filtered_values) > 1:

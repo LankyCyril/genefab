@@ -1,9 +1,7 @@
 from argparse import Namespace
+from csv import Sniffer
 from copy import deepcopy
-from sys import stderr
-from urllib.request import urlopen
-from json import loads
-from re import search, sub
+from re import sub
 from hashlib import sha512
 from datetime import datetime
 from os import path
@@ -79,26 +77,22 @@ def data_rargs_digest(data_rargs):
     return string_digest + "_" + hexdigest
 
 
-def get_json(url, verbose=False):
-    """HTTP get, decode, parse"""
-    if verbose:
-        print("Parsing url:", url, file=stderr)
-    with urlopen(url) as response:
-        return loads(response.read().decode())
-
-
-def guess_format(filemask):
+def guess_format(target_file):
     """Guess whether the file is a CSV or a TSV and whether it is compressed"""
-    comp_ext_match = search(r'\.(gz|bz2|xz)$', filemask)
-    if comp_ext_match:
-        compression = comp_ext_match.group(1)
-    else:
-        compression = None
-    fmt_ext_match = search(r'\.csv', filemask)
-    if fmt_ext_match:
-        sep = ","
-    else:
-        sep = "\t"
+    with open(target_file, mode="rb") as handle:
+        magic = handle.read(3)
+        if magic == b"\x1f\x8b\x08":
+            compression = "gzip"
+            from gzip import open as _open
+        elif magic == b"\x42\x5a\x68":
+            compression = "bz2"
+            from bz2 import open as _open
+        else:
+            compression = None
+            _open = open
+    with _open(target_file, newline="", mode="rt") as handle:
+        dialect = Sniffer().sniff(handle.read(2**20))
+        sep = dialect.delimiter
     return sep, compression
 
 

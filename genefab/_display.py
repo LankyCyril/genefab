@@ -1,7 +1,37 @@
-from flask import Response
+from flask import Response, request
 from json import JSONEncoder, dumps
 from pandas import DataFrame, option_context, Series
 from re import sub
+from traceback import format_tb
+from sys import exc_info
+from genefab._util import log
+from genefab._exceptions import GeneLabDataManagerException
+
+
+def traceback_printer(e):
+    log(request, e)
+    exc_type, exc_value, exc_tb = exc_info()
+    error_mask = "<h2>{}: {}</h2><b>{}</b>:\n<pre>{}</pre><br><b>{}: {}</b>"
+    error_message = error_mask.format(
+        exc_type.__name__, str(exc_value),
+        "Traceback (most recent call last)",
+        "".join(format_tb(exc_tb)), exc_type.__name__, str(exc_value)
+    )
+    return error_message, 400
+
+
+def exception_catcher(e):
+    log(request, e)
+    if isinstance(e, FileNotFoundError):
+        code, explanation = 404, "Not Found"
+    elif isinstance(e, NotImplementedError):
+        code, explanation = 501, "Not Implemented"
+    elif isinstance(e, GeneLabDataManagerException):
+        code, explanation = 500, "GeneLab Data Manager Internal Server Error"
+    else:
+        code, explanation = 400, "Bad Request"
+    error_mask = "<b>HTTP error</b>: {} ({})<br><b>{}</b>: {}"
+    return error_mask.format(code, explanation, type(e).__name__, str(e)), code
 
 
 class SetEnc(JSONEncoder):

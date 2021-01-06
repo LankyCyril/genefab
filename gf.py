@@ -1,26 +1,32 @@
 #!/usr/bin/env python
-from sys import stderr, exc_info
-from traceback import format_tb
+from sys import stderr
 from flask import Flask, request
+from flask_caching import Cache
 from genefab import GLDS, GeneLabJSONException, GeneLabException
-from genefab import GeneLabDataManagerException
 from genefab._readme import html
-from genefab._display import display_object
-from genefab._util import parse_rargs, log
-from genefab._bridge import get_assay, subset_metadata, resolve_file_name
+from genefab._display import display_object, traceback_printer, exception_catcher
+from genefab._util import parse_rargs
+from genefab._bridge import get_assay, subset_metadata, resolve_file_name, filter_table_data
 from genefab._sqlite import retrieve_table_data, try_sqlite, dump_to_sqlite
-from genefab._bridge import filter_table_data
 from os import environ
 from copy import deepcopy
+from urllib.request import urlopen
+from json import loads
+from pandas import DataFrame
 
 
+FLASK_DEBUG_MARKERS = {"development", "staging", "stage", "debug", "debugging"}
+CACHE_CONFIG = {"CACHE_TYPE": "filesystem", "CACHE_DIR": ".genelab-ttl-cache"}
+PROCESSED_XSV_REGEX = r'^GLDS-[0-9]+_(array_normalized-annotated\.txt|rna_seq(_all-samples)?_Normalized_Counts\.csv)(\.gz|\.bz2)?$'
 DEG_CSV_REGEX = r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_differential_expression.csv$'
 VIZ_CSV_REGEX = r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_visualization_output_table.csv$'
 PCA_CSV_REGEX = r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_visualization_PCA_table.csv$'
 
 
-FLASK_DEBUG_MARKERS = {"development", "staging", "stage", "debug", "debugging"}
 app = Flask("genefab")
+cache = Cache(config=CACHE_CONFIG)
+cache.init_app(app)
+
 
 try:
     from flask_compress import Compress
@@ -34,42 +40,23 @@ except Exception as e: # I'm sorry
     print("The error was:", e, file=stderr)
 
 
-@app.route("/", methods=["GET"])
-def hello_space():
-    """Hello, Space!"""
-    return html.format(url_root=request.url_root.rstrip("/"))
-
-
-def traceback_printer(e):
-    log(request, e)
-    exc_type, exc_value, exc_tb = exc_info()
-    error_mask = "<h2>{}: {}</h2><b>{}</b>:\n<pre>{}</pre><br><b>{}: {}</b>"
-    error_message = error_mask.format(
-        exc_type.__name__, str(exc_value),
-        "Traceback (most recent call last)",
-        "".join(format_tb(exc_tb)), exc_type.__name__, str(exc_value)
-    )
-    return error_message, 400
-
-
-def exception_catcher(e):
-    log(request, e)
-    if isinstance(e, FileNotFoundError):
-        code, explanation = 404, "Not Found"
-    elif isinstance(e, NotImplementedError):
-        code, explanation = 501, "Not Implemented"
-    elif isinstance(e, GeneLabDataManagerException):
-        code, explanation = 500, "GeneLab Data Manager Internal Server Error"
-    else:
-        code, explanation = 400, "Bad Request"
-    error_mask = "<b>HTTP error</b>: {} ({})<br><b>{}</b>: {}"
-    return error_mask.format(code, explanation, type(e).__name__, str(e)), code
-
-
 if environ.get("FLASK_ENV", None) in FLASK_DEBUG_MARKERS:
     traceback_printer = app.errorhandler(Exception)(traceback_printer)
 else:
     exception_catcher = app.errorhandler(Exception)(exception_catcher)
+
+
+@cache.memoize(timeout=60)
+def get_json(url):
+    """HTTP get, decode, parse"""
+    with urlopen(url) as response:
+        return loads(response.read().decode())
+
+
+@app.route("/", methods=["GET"])
+def hello_space():
+    """Hello, Space!"""
+    return html.format(url_root=request.url_root.rstrip("/"))
 
 
 @app.route("/favicon.<imgtype>")
@@ -83,7 +70,7 @@ def glds_summary(accession):
     """Report factors, assays, and/or raw JSON"""
     rargs = parse_rargs(request.args)
     try:
-        glds = GLDS(accession)
+        glds = GLDS(accession, get_json=get_json)
     except GeneLabJSONException as e:
         raise FileNotFoundError(e)
     if rargs.display_rargs["fmt"] == "raw":
@@ -98,7 +85,7 @@ def glds_summary(accession):
 def assay_metadata(accession, assay_name):
     """DataFrame view of metadata, optionally queried"""
     rargs = parse_rargs(request.args)
-    assay, message, status = get_assay(accession, assay_name, rargs)
+    assay, message, status = get_assay(accession, assay_name, rargs, get_json)
     if assay is None:
         return message, status
     subset, _ = subset_metadata(assay.metadata, rargs)
@@ -109,7 +96,7 @@ def assay_metadata(accession, assay_name):
 def assay_factors(accession, assay_name):
     """DataFrame of samples and factors in human-readable form"""
     rargs = parse_rargs(request.args)
-    assay, message, status = get_assay(accession, assay_name, rargs)
+    assay, message, status = get_assay(accession, assay_name, rargs, get_json)
     if assay is None:
         return message, status
     else:
@@ -135,7 +122,7 @@ def assay_factors(accession, assay_name):
 def assay_annotation(accession, assay_name):
     """DataFrame of samples and factors in human-readable form"""
     rargs = parse_rargs(request.args)
-    assay, message, status = get_assay(accession, assay_name, rargs)
+    assay, message, status = get_assay(accession, assay_name, rargs, get_json)
     if assay is None:
         return message, status
     else:
@@ -164,11 +151,11 @@ def assay_annotation(accession, assay_name):
 
 
 @app.route("/<accession>/<assay_name>/data/", methods=["GET"])
-def get_data(accession, assay_name, rargs=None):
+def get_data(accession, assay_name, rargs=None, return_raw=False):
     """Serve any kind of data"""
     if rargs is None:
         rargs = parse_rargs(request.args)
-    assay, message, status = get_assay(accession, assay_name, rargs)
+    assay, message, status = get_assay(accession, assay_name, rargs, get_json)
     if assay is None:
         return message, status
     filename = resolve_file_name(assay, rargs)
@@ -182,10 +169,12 @@ def get_data(accession, assay_name, rargs=None):
             accession, assay.name, rargs.data_rargs, table_data,
             set_date=assay.glds_file_dates.get(filename, -1)
         )
-    if rargs.display_rargs["fmt"] in {"tsv", "json"}:
+    filtered_table_data = filter_table_data(table_data, rargs.data_filter_rargs)
+    if return_raw:
+        return filtered_table_data
+    elif rargs.display_rargs["fmt"] in {"tsv", "json"}:
         return display_object(
-            filter_table_data(table_data, rargs.data_filter_rargs),
-            rargs.display_rargs, index="auto"
+            filtered_table_data, rargs.display_rargs, index="auto"
         )
     else:
         raise NotImplementedError("fmt={}".format(rargs.display_rargs["fmt"]))
@@ -193,17 +182,29 @@ def get_data(accession, assay_name, rargs=None):
 
 def get_gct(accession, assay_name, rargs):
     """Get GCT formatted processed data; needs to be refactored!"""
-    assay, message, status = get_assay(accession, assay_name, rargs)
+    assay, message, status = get_assay(accession, assay_name, rargs, get_json)
     if assay is None:
         return message, status
-    pdata = try_sqlite(accession, assay.name, rargs.data_rargs)
-    if pdata is None:
-        pdata = get_data(accession, assay.name, rargs=rargs)
-    gct_header = "#1.2\n{}\t{}\n".format(*pdata.shape)
-    pdata.columns = ["Description"] + list(pdata.columns)[1:]
-    pdata.insert(loc=0, column="Name", value=pdata["Description"])
-    gct_data = gct_header + pdata.to_csv(sep="\t", index=False)
-    return display_object(gct_data, {"fmt": "raw"})
+    pdata = get_data(accession, assay.name, rargs=rargs, return_raw=True)
+    if isinstance(pdata, DataFrame):
+        # ensure that order of columns matches order of samples in annotation:
+        pdc, aai = pdata.columns, assay.annotation().index
+        pdcs, aais = set(pdc), set(aai)
+        if aais - pdcs:
+            raise GeneLabException(
+                "Sample names are present in the annotation but not in the GCT",
+                sorted(aais - pdcs)
+            )
+        pdata = pdata[
+            [c for c in pdc if c not in aais] + [c for c in aai if c in pdcs]
+        ]
+        gct_header = "#1.2\n{}\t{}\n".format(pdata.shape[0], pdata.shape[1]-1)
+        pdata.columns = ["Description"] + list(pdata.columns)[1:]
+        pdata.insert(loc=0, column="Name", value=pdata["Description"])
+        gct_data = gct_header + pdata.to_csv(sep="\t", index=False)
+        return display_object(gct_data, {"fmt": "raw"})
+    else:
+        raise TypeError("Unexpected type: expected `DataFrame`")
 
 
 def assess_data_alias(data_type, rargs, transform):
@@ -251,16 +252,17 @@ def get_data_alias_helper(accession, assay_name, data_type, rargs, transform=Non
         raise AssessmentError
     modified_rargs = deepcopy(rargs)
     if data_type == "processed":
-        modified_rargs.data_rargs["fields"] = ".*normalized.*annotated.*"
-        modified_rargs.data_rargs["file_filter"] = "txt"
+        modified_rargs.data_rargs["file_filter"] = PROCESSED_XSV_REGEX
     elif data_type == "deg":
         modified_rargs.data_rargs["fields"] = ".*differential.*expression.*"
         modified_rargs.data_rargs["file_filter"] = DEG_CSV_REGEX
     elif data_type == "viz-table":
+        modified_rargs.data_rargs["fields"] = False # skip metadata check
         modified_rargs.data_rargs["file_filter"] = VIZ_CSV_REGEX
     elif data_type == "pca":
         if transform == "melted":
             transform = None
+        modified_rargs.data_rargs["fields"] = False # skip metadata check
         modified_rargs.data_rargs["file_filter"] = PCA_CSV_REGEX
     if transform == "gct":
         return get_gct(accession, assay_name, modified_rargs)
