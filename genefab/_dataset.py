@@ -7,6 +7,7 @@ from genefab._exceptions import GeneLabJSONException
 from genefab._assay import AssayDispatcher
 from pandas import DataFrame, concat
 from os.path import join
+from urllib.parse import quote
 
 
 class GeneLabDataSet():
@@ -72,15 +73,18 @@ class GeneLabDataSet():
         elif kind == "urls":
             getter_url = "{}/data/glds/files/{}"
             acc_nr = search(r'\d+$', self.accession).group()
-            files_json = self.get_json(
-                getter_url.format(API_ROOT, acc_nr)
-            )
+            files_json = self.get_json(getter_url.format(API_ROOT, acc_nr))
             try:
                 filedata = files_json["studies"][self.accession]["study_files"]
             except KeyError:
                 raise GeneLabJSONException("Malformed JSON")
+            fileversions = self.get_files_info(kind="versions")
             return {
-                fd["file_name"]: GENELAB_ROOT+fd["remote_url"]
+                fd["file_name"]: (
+                    GENELAB_ROOT + "/genelab/static/media/dataset/" +
+                    quote(fd["file_name"]) +
+                    "?version={}".format(fileversions[fd["file_name"]])
+                )
                 for fd in filedata
             }
         elif kind == "dates":
@@ -89,6 +93,12 @@ class GeneLabDataSet():
                 getter_url.format(API_ROOT, self.internal_id)
             )
             return {fd["file_name"]: date2stamp(fd) for fd in filedata}
+        elif kind == "versions":
+            getter_url = "{}/data/study/filelistings/{}"
+            filedata = self.get_json(
+                getter_url.format(API_ROOT, self.internal_id)
+            )
+            return {fd["file_name"]: fd["version"] for fd in filedata}
         else:
             raise ValueError("Unrecognized parameter: '{}'".format(kind))
 
