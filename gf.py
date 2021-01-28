@@ -17,6 +17,7 @@ from pandas import DataFrame
 
 FLASK_DEBUG_MARKERS = {"development", "staging", "stage", "debug", "debugging"}
 CACHE_CONFIG = {"CACHE_TYPE": "filesystem", "CACHE_DIR": ".genelab-ttl-cache"}
+PROCESSED_XSV_REGEX = r'^GLDS-[0-9]+_(array_normalized-annotated\.txt|rna_seq(_all-samples)?_Normalized_Counts\.csv)(\.gz|\.bz2)?$'
 DEG_CSV_REGEX = r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_differential_expression.csv$'
 VIZ_CSV_REGEX = r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_visualization_output_table.csv$'
 PCA_CSV_REGEX = r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_visualization_PCA_table.csv$'
@@ -186,6 +187,17 @@ def get_gct(accession, assay_name, rargs):
         return message, status
     pdata = get_data(accession, assay.name, rargs=rargs, return_raw=True)
     if isinstance(pdata, DataFrame):
+        # ensure that order of columns matches order of samples in annotation:
+        pdc, aai = pdata.columns, assay.annotation().index
+        pdcs, aais = set(pdc), set(aai)
+        if aais - pdcs:
+            raise GeneLabException(
+                "Sample names are present in the annotation but not in the GCT",
+                sorted(aais - pdcs)
+            )
+        pdata = pdata[
+            [c for c in pdc if c not in aais] + [c for c in aai if c in pdcs]
+        ]
         gct_header = "#1.2\n{}\t{}\n".format(pdata.shape[0], pdata.shape[1]-1)
         pdata.columns = ["Description"] + list(pdata.columns)[1:]
         pdata.insert(loc=0, column="Name", value=pdata["Description"])
@@ -240,16 +252,17 @@ def get_data_alias_helper(accession, assay_name, data_type, rargs, transform=Non
         raise AssessmentError
     modified_rargs = deepcopy(rargs)
     if data_type == "processed":
-        modified_rargs.data_rargs["fields"] = ".*normalized.*annotated.*"
-        modified_rargs.data_rargs["file_filter"] = "txt"
+        modified_rargs.data_rargs["file_filter"] = PROCESSED_XSV_REGEX
     elif data_type == "deg":
         modified_rargs.data_rargs["fields"] = ".*differential.*expression.*"
         modified_rargs.data_rargs["file_filter"] = DEG_CSV_REGEX
     elif data_type == "viz-table":
+        modified_rargs.data_rargs["fields"] = False # skip metadata check
         modified_rargs.data_rargs["file_filter"] = VIZ_CSV_REGEX
     elif data_type == "pca":
         if transform == "melted":
             transform = None
+        modified_rargs.data_rargs["fields"] = False # skip metadata check
         modified_rargs.data_rargs["file_filter"] = PCA_CSV_REGEX
     if transform == "gct":
         return get_gct(accession, assay_name, modified_rargs)

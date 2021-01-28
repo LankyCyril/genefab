@@ -1,3 +1,3 @@
 #!/bin/sh
 set -eu
-FLASK_ENV=development FLASK_APP=gf.py flask run
+FLASK_ENV=development FLASK_APP=gf.py flask run --with-threads
