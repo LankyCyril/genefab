@@ -85,7 +85,7 @@ class GeneLabDataSet():
                     quote(fd["file_name"]) +
                     "?version={}".format(fileversions[fd["file_name"]])
                 )
-                for fd in filedata
+                for fd in filedata if fd["file_name"] in fileversions
             }
         elif kind == "dates":
             getter_url = "{}/data/study/filelistings/{}"
